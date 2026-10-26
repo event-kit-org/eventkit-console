@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, Outlet, useParams } from 'react-router';
+import { Menu, X } from 'lucide-react';
+import { useState } from 'react';
+import { NavLink, Outlet, useLocation, useParams } from 'react-router';
 import { ApiError, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { Alert } from '@/components/ui/alert';
@@ -42,6 +44,8 @@ const SECTIONS: { group: string | null; links: [string, string][] }[] = [
 /** Loads the event and the caller's role, then shows the role's tabs. */
 export function EventLayout() {
   const { eventId = '' } = useParams();
+  const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
   const api = useApi();
   const path = { params: { path: { eventId } } };
 
@@ -89,40 +93,73 @@ export function EventLayout() {
         <Badge>{roleLabel[role]}</Badge>
       </div>
       <div className="grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)] md:gap-6">
-        {/* A row that scrolls on phones; a sticky sidebar from md up. */}
+        {/* Phones: a menu button that opens the sections. From md up: a sticky sidebar. */}
         <nav
           aria-label="Event sections"
-          className="-mx-1 flex gap-1 overflow-x-auto border-b pb-px md:sticky md:top-4 md:mx-0 md:flex-col md:gap-4 md:self-start md:overflow-visible md:border-b-0 md:pb-0"
+          className="md:sticky md:top-4 md:self-start"
+          onKeyDown={(e) => e.key === 'Escape' && setMenuOpen(false)}
         >
-          {SECTIONS.map(({ group, links }) => (
-            <div key={group ?? 'top'} className="flex gap-1 md:flex-col md:gap-0.5">
-              {group && (
-                <div className="hidden px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground md:block">
-                  {group}
-                </div>
-              )}
-              {links.map(([to, label]) => (
-                <NavLink
-                  key={label}
-                  to={to}
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      'whitespace-nowrap px-3 py-2 text-sm md:rounded-md md:py-1.5',
-                      isActive
-                        ? 'border-b-2 border-foreground font-medium md:border-b-0 md:bg-background md:shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground md:hover:bg-background/60',
-                    )
-                  }
-                >
-                  {label}
-                </NavLink>
-              ))}
-            </div>
-          ))}
+          <button
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="event-sections"
+            aria-label={`Sections: ${currentLabel(pathname, eventId)}`}
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm font-medium md:hidden"
+          >
+            {menuOpen ? (
+              <X className="size-4" aria-hidden />
+            ) : (
+              <Menu className="size-4" aria-hidden />
+            )}
+            {currentLabel(pathname, eventId)}
+          </button>
+          <div
+            id="event-sections"
+            className={cn(
+              'mt-2 flex-col gap-4 rounded-md border bg-background p-2 md:mt-0 md:flex md:border-0 md:bg-transparent md:p-0',
+              menuOpen ? 'flex' : 'hidden',
+            )}
+          >
+            {SECTIONS.map(({ group, links }) => (
+              <div key={group ?? 'top'} className="flex flex-col gap-0.5">
+                {group && (
+                  <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {group}
+                  </div>
+                )}
+                {links.map(([to, label]) => (
+                  <NavLink
+                    key={label}
+                    to={to}
+                    end
+                    onClick={() => setMenuOpen(false)}
+                    className={({ isActive }) =>
+                      cn(
+                        'rounded-md px-3 py-2 text-sm md:py-1.5',
+                        isActive
+                          ? 'bg-muted font-medium md:bg-background md:shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground md:hover:bg-background/60',
+                      )
+                    }
+                  >
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            ))}
+          </div>
         </nav>
         <div className="min-w-0">{features.isSuccess && <Outlet context={context} />}</div>
       </div>
     </section>
   );
+}
+
+/** The open section's name, for the phone menu button. */
+function currentLabel(pathname: string, eventId: string): string {
+  const rest = pathname.split(`/events/${eventId}`)[1] ?? '';
+  const first = rest.split('/').filter(Boolean)[0] ?? '';
+  const links = SECTIONS.flatMap((s) => s.links);
+  return links.find(([to]) => to === first)?.[1] ?? 'Overview';
 }

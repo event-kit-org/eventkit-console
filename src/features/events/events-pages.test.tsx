@@ -58,6 +58,28 @@ describe('event layout', () => {
     expect(nav).toHaveTextContent('SetupStaffPortal & settings');
   });
 
+  it('opens and closes the phone menu, which names the open section', async () => {
+    server.use(
+      http.get(eventUrl, () => HttpResponse.json({ event, role: 'admin' })),
+      http.get(`${eventUrl}/features`, () => HttpResponse.json([])),
+      http.get(`${eventUrl}/teams`, () => HttpResponse.json([])),
+      http.get(`${eventUrl}/payment-proofs`, () => HttpResponse.json([])),
+    );
+    renderApp(`/events/${event.id}`, { token: 'good-token' });
+    const menu = await screen.findByRole('button', { name: 'Sections: Overview' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(menu);
+    expect(menu).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(menu);
+    await userEvent.click(screen.getByRole('link', { name: 'Teams' }));
+    expect(await screen.findByRole('button', { name: 'Sections: Teams' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
   it('sends staff to the portal', async () => {
     server.use(
       http.get(eventUrl, () => HttpResponse.json({ event, role: 'judge' })),
