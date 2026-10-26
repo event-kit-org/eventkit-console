@@ -1,0 +1,96 @@
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { describe, expect, it } from 'vitest';
+import { renderApp } from '@/test/render';
+import { API, apiError, event, server } from '@/test/server';
+
+const eventUrl = `${API}/v1/events/${event.id}`;
+
+describe('EventsPage', () => {
+  it('lists my events with role and IST dates, and links to each', async () => {
+    const { router } = renderApp('/', { token: 'good-token' });
+    expect(await screen.findByRole('heading', { name: 'PESOS X Silicon' })).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toBeInTheDocument();
+    expect(screen.getByText('31 Oct 2026 – 1 Nov 2026')).toBeInTheDocument();
+    expect(screen.getByText('Asha')).toBeInTheDocument();
+
+    server.use(
+      http.get(eventUrl, () => HttpResponse.json({ event, role: 'judge' })),
+      http.get(`${eventUrl}/features`, () => HttpResponse.json([])),
+    );
+    await userEvent.click(screen.getByRole('link', { name: /PESOS X Silicon/ }));
+    expect(router.state.location.pathname).toBe(`/events/${event.id}`);
+  });
+
+  it('explains what to do when there are no events', async () => {
+    server.use(http.get(`${API}/v1/events`, () => HttpResponse.json([])));
+    renderApp('/', { token: 'good-token' });
+    expect(await screen.findByText('No events yet')).toBeInTheDocument();
+  });
+
+  it('shows a load error', async () => {
+    server.use(
+      http.get(`${API}/v1/events`, () => apiError(500, 'INTERNAL_ERROR', 'Something went wrong.')),
+    );
+    renderApp('/', { token: 'good-token' });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your events.');
+  });
+
+  it('logs out from the header', async () => {
+    const { router, session } = renderApp('/', { token: 'good-token' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Log out' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    expect(session.get()).toBeNull();
+  });
+});
+
+describe('event layout', () => {
+  it("shows the owner's tabs", async () => {
+    server.use(
+      http.get(eventUrl, () => HttpResponse.json({ event, role: 'admin' })),
+      http.get(`${eventUrl}/features`, () => HttpResponse.json([])),
+    );
+    renderApp(`/events/${event.id}`, { token: 'good-token' });
+    expect(await screen.findByRole('heading', { name: 'PESOS X Silicon' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Event sections' })).toHaveTextContent(
+      'OverviewTeamsPayments',
+    );
+  });
+
+  it('sends staff to the portal', async () => {
+    server.use(
+      http.get(eventUrl, () => HttpResponse.json({ event, role: 'judge' })),
+      http.get(`${eventUrl}/features`, () => HttpResponse.json([])),
+    );
+    renderApp(`/events/${event.id}`, { token: 'good-token' });
+    expect(await screen.findByRole('alert')).toHaveTextContent("event's own portal");
+  });
+
+  it('says so when the event is missing or private', async () => {
+    server.use(http.get(eventUrl, () => apiError(404, 'EVENT_NOT_FOUND', 'Event not found.')));
+    renderApp(`/events/${event.id}`, { token: 'good-token' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'does not exist or you are not part of it',
+    );
+  });
+
+  it('shows other errors as they come', async () => {
+    server.use(
+      http.get(eventUrl, () =>
+        apiError(403, 'API_KEY_INVALID', 'The API key is invalid or revoked.'),
+      ),
+    );
+    renderApp(`/events/${event.id}`, { token: 'good-token' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The API key is invalid or revoked.',
+    );
+  });
+});
+
+describe('NotFoundPage', () => {
+  it('renders for unknown paths', async () => {
+    renderApp('/nope');
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+  });
+});
