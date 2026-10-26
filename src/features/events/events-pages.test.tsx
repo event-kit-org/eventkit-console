@@ -53,9 +53,9 @@ describe('event layout', () => {
     );
     renderApp(`/events/${event.id}`, { token: 'good-token' });
     expect(await screen.findByRole('heading', { name: 'PESOS X Silicon' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Event sections' })).toHaveTextContent(
-      'OverviewTeamsPayments',
-    );
+    const nav = screen.getByRole('navigation', { name: 'Event sections' });
+    expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments');
+    expect(nav).toHaveTextContent('SetupStaffPortal & settings');
   });
 
   it('sends staff to the portal', async () => {
