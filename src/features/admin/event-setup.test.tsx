@@ -161,6 +161,23 @@ describe('settings', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create API key' }));
     expect(await screen.findByText('ek_secret')).toBeInTheDocument();
     expect(key[0]?.body).toEqual({ name: 'Portal' });
+    // Everything the portal needs, ready to paste.
+    expect(screen.getByLabelText('Portal settings')).toHaveTextContent(
+      `VITE_EVENTKIT_API_URL=${API} VITE_EVENTKIT_EVENT_ID=${event.id} VITE_EVENTKIT_API_KEY=ek_secret`,
+    );
+  });
+
+  it('shows the event ID and API URL, and copies them', async () => {
+    const user = userEvent.setup();
+    asRole('admin');
+    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    expect(await screen.findByText(event.id)).toBeInTheDocument();
+    expect(screen.getByText(API)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Copy Event ID' }));
+    expect(await navigator.clipboard.readText()).toBe(event.id);
+    expect(await screen.findByRole('button', { name: 'Event ID copied' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Copy API URL' }));
+    expect(await navigator.clipboard.readText()).toBe(API);
   });
 
   it('activates and switches features', async () => {

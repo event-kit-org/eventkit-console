@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { Link, useSearchParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
-import { useApi } from '@/auth/context';
+import { useApi, useAuth } from '@/auth/context';
+import { CopyButton } from '@/components/CopyButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { FormField } from '@/components/FormField';
@@ -107,6 +108,10 @@ function PortalCard() {
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/api-keys', path)),
   });
   const [newKey, setNewKey] = useState<string | null>(null);
+  // The address the console reaches the API on, made absolute for a portal elsewhere.
+  const apiUrl = new URL(useAuth().config.apiUrl, window.location.origin).href.replace(/\/+$/, '');
+  const portalEnv = (key: string) =>
+    `VITE_EVENTKIT_API_URL=${apiUrl}\nVITE_EVENTKIT_EVENT_ID=${event.id}\nVITE_EVENTKIT_API_KEY=${key}`;
   const createKey = useEventMutation(event.id, () =>
     unwrap(api.POST('/v1/events/{eventId}/api-keys', { ...path, body: { name: 'Portal' } })),
   );
@@ -164,6 +169,33 @@ function PortalCard() {
         </form>
         <Separator className="my-6" />
         <FieldSet className="gap-3 text-sm">
+          <FieldLegend variant="label">Connect your portal</FieldLegend>
+          <p className="text-muted-foreground">
+            Your portal needs these two values and an API key (below), for example as{' '}
+            <code className="font-mono text-xs">VITE_EVENTKIT_EVENT_ID</code> and{' '}
+            <code className="font-mono text-xs">VITE_EVENTKIT_API_URL</code> in the template portal.
+          </p>
+          <dl className="grid gap-2">
+            {(
+              [
+                ['Event ID', event.id],
+                ['API URL', apiUrl],
+              ] as const
+            ).map(([label, value]) => (
+              <div key={label} className="flex flex-wrap items-center gap-2">
+                <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
+                <dd className="min-w-0 flex-1">
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs break-all">
+                    {value}
+                  </code>
+                </dd>
+                <CopyButton value={value} label={label} />
+              </div>
+            ))}
+          </dl>
+        </FieldSet>
+        <Separator className="my-6" />
+        <FieldSet className="gap-3 text-sm">
           <FieldLegend variant="label">API keys</FieldLegend>
           <p className="text-muted-foreground">
             The portal sends its key with every request. It identifies the portal and grants nothing
@@ -185,9 +217,21 @@ function PortalCard() {
           {newKey && (
             <Alert>
               <KeyRound aria-hidden />
-              <AlertDescription>
-                New key (shown once):{' '}
-                <code className="font-mono break-all text-foreground">{newKey}</code>
+              <AlertDescription className="grid gap-2">
+                <p>
+                  New key (shown once):{' '}
+                  <code className="font-mono break-all text-foreground">{newKey}</code>
+                </p>
+                <p>Your portal's settings, ready to paste into its environment:</p>
+                <pre
+                  aria-label="Portal settings"
+                  className="overflow-x-auto rounded bg-muted p-2 font-mono text-xs text-foreground"
+                >
+                  {portalEnv(newKey)}
+                </pre>
+                <div>
+                  <CopyButton value={portalEnv(newKey)} label="portal settings" />
+                </div>
               </AlertDescription>
             </Alert>
           )}
