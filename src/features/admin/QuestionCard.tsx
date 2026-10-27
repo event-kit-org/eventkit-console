@@ -1,4 +1,13 @@
-import { ChevronDown, ChevronUp, Copy, EllipsisVertical, Plus, Trash2, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  EllipsisVertical,
+  Lock,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -22,6 +31,7 @@ const TYPE_LABEL: Record<Field['type'], string> = {
   short_text: 'Short answer',
   long_text: 'Paragraph',
   number: 'Number',
+  phone: 'Phone number',
   choice: 'Dropdown',
 };
 
@@ -39,9 +49,26 @@ const ANSWER_HINT: Record<Exclude<Field['type'], 'choice'>, string> = {
   short_text: 'Short answer text',
   long_text: 'Long answer text',
   number: 'Number',
+  phone: 'Phone number',
 };
 
 const isText = (type: Field['type']) => type === 'short_text' || type === 'long_text';
+
+/** A question every form has (team name, member name and email): shown, not editable. */
+export function BuiltInQuestion({ label, hint }: { label: string; hint: string }) {
+  return (
+    <div className="grid gap-2 rounded-xl border border-dashed bg-muted/30 p-4 text-sm">
+      <div className="flex items-center gap-2 font-medium">
+        {label}
+        <span className="text-destructive"> *</span>
+        <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+          <Lock className="size-3" aria-hidden /> Always asked
+        </span>
+      </div>
+      <div className="w-1/2 border-b border-dashed pb-1 text-muted-foreground">{hint}</div>
+    </div>
+  );
+}
 
 /** A question as the person filling in the form will see it. Click to edit. */
 export function QuestionPreview({

@@ -67,6 +67,24 @@ describe('registration form builder', () => {
     );
   });
 
+  it('starts empty but for team name, member name and email, which are always asked', async () => {
+    open([]);
+    const team = await screen.findByRole('region', { name: 'Team details' });
+    expect(within(team).getByText('Team name')).toBeInTheDocument();
+    const member = section('Member details');
+    expect(within(member).getByText('Name')).toBeInTheDocument();
+    expect(within(member).getByText('Email')).toBeInTheDocument();
+    expect(within(member).getAllByText('Always asked')).toHaveLength(2);
+    expect(within(member).queryByRole('button', { name: /^Edit/ })).not.toBeInTheDocument();
+  });
+
+  it('offers a phone number question', async () => {
+    open([field({ id: 'tel', label: 'WhatsApp', type: 'phone' })]);
+    expect(await screen.findByRole('button', { name: 'Edit WhatsApp' })).toHaveTextContent(
+      'Phone number',
+    );
+  });
+
   it('edits a saved question in place, saving each change', async () => {
     const patch = capture('patch', `${E}/fields/dept`, DEPT);
     open();

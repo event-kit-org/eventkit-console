@@ -160,10 +160,15 @@ export function TeamDetailPage() {
                     <StatusBadge status={m.status} />
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {m.email} · {m.phone} ·{' '}
-                    {m.linkLastUsedAt
-                      ? `link last opened ${formatIST(m.linkLastUsedAt)}`
-                      : 'link never opened'}
+                    {[
+                      m.email,
+                      m.phone,
+                      m.linkLastUsedAt
+                        ? `link last opened ${formatIST(m.linkLastUsedAt)}`
+                        : 'link never opened',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </div>
                   <AnswerList fields={memberFields(fields)} answers={m.answers} />
                 </div>

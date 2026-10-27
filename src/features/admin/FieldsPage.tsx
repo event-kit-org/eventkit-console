@@ -14,6 +14,7 @@ import {
   type MinCounts,
   type Question,
   type QuestionPatch,
+  BuiltInQuestion,
   QuestionEditor,
   QuestionPreview,
   SavedActions,
@@ -24,11 +25,16 @@ const SECTIONS = {
     scope: 'team',
     title: 'Team details',
     hint: 'Answered once per team.',
+    builtIn: [{ label: 'Team name', hint: 'Short answer text' }],
   },
   member: {
     scope: 'member',
     title: 'Member details',
-    hint: 'e.g. department, student ID. Asked for each member; the leader fills them in when registering the team.',
+    hint: 'e.g. department, student ID, phone. Asked for each member; the leader fills them in when registering the team.',
+    builtIn: [
+      { label: 'Name', hint: 'Short answer text' },
+      { label: 'Email', hint: 'Email address: their personal link is sent here' },
+    ],
   },
 } as const;
 type Section = keyof typeof SECTIONS;
@@ -42,7 +48,8 @@ type Active = { id: string } | { draft: Section } | null;
 
 /**
  * Admin: the registration form, built like a Google Form. Questions sit in
- * three sections by who answers them; click one to edit it in place. Team
+ * two sections by who answers them, after the ones every form has (team name,
+ * member name and email); click one to edit it in place. Team
  * rules ("at least 2 members from CSE") are set next to a dropdown's options.
  */
 export function FieldsPage() {
@@ -56,7 +63,7 @@ export function FieldsPage() {
     <div className="mx-auto grid w-full max-w-3xl gap-8">
       <PageHeader
         title="Registration form"
-        description="What the team leader fills in when registering. Click a question to edit it."
+        description="What the team leader fills in when registering. Team name, and each member's name and email, are always asked; add everything else. Click a question to edit it."
       />
       <ErrorAlert error={fields.error ?? rules.error ?? move.error} />
       {(Object.keys(SECTIONS) as Section[]).map((section) => {
@@ -69,6 +76,9 @@ export function FieldsPage() {
               </h2>
               <p className="text-sm text-muted-foreground">{SECTIONS[section].hint}</p>
             </div>
+            {SECTIONS[section].builtIn.map((q) => (
+              <BuiltInQuestion key={q.label} label={q.label} hint={q.hint} />
+            ))}
             {inSection.map((f, i) =>
               active && 'id' in active && active.id === f.id ? (
                 <SavedQuestion
