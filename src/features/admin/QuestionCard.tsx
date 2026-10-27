@@ -1,11 +1,22 @@
 import { ChevronDown, ChevronUp, Copy, EllipsisVertical, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useId, useState } from 'react';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Field, TeamRule } from '@/features/fields/fields';
-import { cn } from '@/lib/utils';
 
 const TYPE_LABEL: Record<Field['type'], string> = {
   short_text: 'Short answer',
@@ -47,7 +58,7 @@ export function QuestionPreview({
       type="button"
       aria-label={`Edit ${question.label}`}
       onClick={onEdit}
-      className="grid w-full gap-2 rounded-lg border bg-card p-4 text-left text-sm transition-colors hover:bg-muted/40"
+      className="grid w-full gap-2 rounded-xl border bg-card p-4 text-left text-sm shadow-xs transition-colors outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div className="font-medium">
         {question.label}
@@ -111,31 +122,31 @@ export function QuestionEditor({
   const text = isText(question.type);
 
   return (
-    <div className="grid gap-4 rounded-lg border border-l-4 border-l-primary bg-card p-4 text-sm shadow-sm">
+    <div className="grid gap-4 rounded-xl border border-l-4 border-l-primary bg-card p-4 text-sm shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row">
         <TextCommit
           aria-label="Question"
           placeholder="Question"
-          className="h-11 flex-1 bg-muted/40 text-base"
+          className="h-10 flex-1 bg-muted/40 text-base md:text-base"
           value={question.label}
           live={!saved}
           autoFocus={!saved}
           onCommit={(label) => label && onChange({ label })}
         />
-        <Select
+        <NativeSelect
           aria-label="Question type"
-          className="h-11 sm:w-44"
+          className="w-full sm:w-44 [&_select]:h-10"
           value={question.type}
           disabled={saved}
           title={saved ? "A saved question's type can't change. Duplicate it instead." : undefined}
           onChange={(e) => onTypeChange?.(e.target.value as Field['type'])}
         >
           {Object.entries(TYPE_LABEL).map(([value, label]) => (
-            <option key={value} value={value}>
+            <NativeSelectOption key={value} value={value}>
               {label}
-            </option>
+            </NativeSelectOption>
           ))}
-        </Select>
+        </NativeSelect>
       </div>
 
       {showHelp && (
@@ -177,9 +188,11 @@ export function QuestionEditor({
 
       <div className="flex flex-wrap items-center justify-end gap-1 border-t pt-3">
         {footer}
-        <span className="mx-2 h-6 w-px bg-border" aria-hidden />
-        <Switch
-          label="Required"
+        <Separator
+          orientation="vertical"
+          className="mx-2 data-vertical:h-6 data-vertical:self-auto"
+        />
+        <RequiredSwitch
           checked={question.required}
           onChange={(required) => onChange({ required })}
         />
@@ -266,7 +279,7 @@ function Options({
             )}
             <Button
               type="button"
-              size="sm"
+              size="icon-sm"
               variant="ghost"
               aria-label={`Remove ${o}`}
               disabled={options.length === 1}
@@ -348,86 +361,45 @@ function TextCommit({
   );
 }
 
-function Switch({
-  label,
+function RequiredSwitch({
   checked,
   onChange,
 }: {
-  label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const id = useId();
   return (
-    <label className="flex cursor-pointer items-center gap-2 px-2">
-      {label}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          'relative h-5 w-9 rounded-full transition-colors',
-          checked ? 'bg-primary' : 'bg-muted-foreground/30',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 left-0.5 size-4 rounded-full bg-background transition-transform',
-            checked && 'translate-x-4',
-          )}
-        />
-      </button>
-    </label>
+    <div className="flex items-center gap-2 px-2">
+      <Label htmlFor={id} className="font-normal">
+        Required
+      </Label>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    </div>
   );
 }
 
 function MoreMenu({ items }: { items: { label: string; checked: boolean; toggle: () => void }[] }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
   return (
-    <div ref={ref} className="relative">
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        aria-label="More options"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <EllipsisVertical className="size-4" />
-      </Button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 bottom-full z-10 mb-1 grid min-w-48 rounded-md border bg-card p-1 shadow-md"
-        >
-          {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitemcheckbox"
-              aria-checked={item.checked}
-              className="flex items-center gap-2 rounded px-3 py-2 text-left hover:bg-muted"
-              onClick={() => {
-                item.toggle();
-                setOpen(false);
-              }}
-            >
-              <span className="w-4">{item.checked ? '✓' : ''}</span>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" size="icon-sm" variant="ghost" aria-label="More options">
+          <EllipsisVertical />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top" className="min-w-48">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Show</DropdownMenuLabel>
+        {items.map((item) => (
+          <DropdownMenuCheckboxItem
+            key={item.label}
+            checked={item.checked}
+            onCheckedChange={item.toggle}
+          >
+            {item.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -448,24 +420,39 @@ export function SavedActions({
   onDelete: () => void;
 }) {
   const icon = (name: string, Icon: typeof Copy, onClick: () => void, disabled = false) => (
-    <Button
-      type="button"
-      size="sm"
-      variant="ghost"
-      aria-label={`${name} ${label}`}
-      title={name}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Icon className="size-4" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          aria-label={`${name} ${label}`}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          <Icon />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{name}</TooltipContent>
+    </Tooltip>
   );
   return (
     <>
       {icon('Move up', ChevronUp, () => onMove(-1), !canMoveUp)}
       {icon('Move down', ChevronDown, () => onMove(1), !canMoveDown)}
       {icon('Duplicate', Copy, onDuplicate)}
-      {icon('Delete', Trash2, onDelete)}
+      <ConfirmButton
+        size="icon-sm"
+        variant="ghost"
+        aria-label={`Delete ${label}`}
+        title={`Delete "${label}"?`}
+        description="Its answers will no longer be shown."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={onDelete}
+      >
+        <Trash2 />
+      </ConfirmButton>
     </>
   );
 }

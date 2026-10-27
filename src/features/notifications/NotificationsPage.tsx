@@ -1,17 +1,29 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { BellOff, BellRing, Megaphone } from 'lucide-react';
+import { useId, useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { RolePicker } from '@/components/RolePicker';
 import { audienceText } from '@/lib/audience';
-import { Alert } from '@/components/ui/alert';
+import { EmptyState } from '@/components/PageState';
+import { PageHeader } from '@/components/PageHeader';
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -35,31 +47,37 @@ export function NotificationsPage() {
 
   return (
     <div className="grid gap-4">
+      <PageHeader
+        title="Notifications"
+        description="Announcements to participants and staff, by channel. Urgent ones also push to devices."
+      />
       <PushCard />
-      {sendable.length > 0 && <SendForm channels={sendable} />}
-      <Channels channels={channels.data ?? []} />
-      <section className="grid gap-2" aria-label="Notifications">
-        <ErrorAlert error={feed.error ?? channels.error} />
-        {feed.data?.length === 0 && (
-          <p className="text-sm text-muted-foreground">No notifications yet.</p>
-        )}
-        {feed.data?.map((n) => (
-          <Card key={n.id}>
-            <CardHeader>
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">{n.title}</CardTitle>
-                {n.priority === 'urgent' && <Badge className="bg-red-600 text-white">Urgent</Badge>}
-              </div>
-              <CardDescription>
-                {n.channel.name} · {n.sender.name} · {formatIST(n.sentAt)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap text-sm">{n.body}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="grid gap-3" aria-label="Notifications">
+          {sendable.length > 0 && <SendForm channels={sendable} />}
+          <ErrorAlert error={feed.error ?? channels.error} />
+          {feed.data?.length === 0 && <EmptyState icon={BellOff} title="No notifications yet." />}
+          {feed.data?.map((n) => (
+            <Card key={n.id} size="sm">
+              <CardHeader>
+                <CardTitle as="h3">{n.title}</CardTitle>
+                <CardDescription>
+                  {n.channel.name} · {n.sender.name} · {formatIST(n.sentAt)}
+                </CardDescription>
+                {n.priority === 'urgent' && (
+                  <CardAction>
+                    <Badge variant="destructive">Urgent</Badge>
+                  </CardAction>
+                )}
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{n.body}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+        <Channels channels={channels.data ?? []} />
+      </div>
     </div>
   );
 }
@@ -74,21 +92,24 @@ function PushCard() {
   if (!config.data?.enabled || !config.data.publicKey || !pushSupported()) return null;
   const key = config.data.publicKey;
   return (
-    <Alert>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm">
+    <div className="grid gap-2">
+      <Alert>
+        <BellRing aria-hidden />
+        <AlertDescription className="text-foreground">
           {enable.isSuccess
             ? 'Urgent notifications will reach this device.'
             : 'Get urgent notifications on this device, even when the app is closed.'}
-        </span>
+        </AlertDescription>
         {!enable.isSuccess && (
-          <Button size="sm" disabled={enable.isPending} onClick={() => enable.mutate(key)}>
-            Turn on
-          </Button>
+          <AlertAction>
+            <Button size="xs" disabled={enable.isPending} onClick={() => enable.mutate(key)}>
+              Turn on
+            </Button>
+          </AlertAction>
         )}
-      </div>
+      </Alert>
       <ErrorAlert error={enable.error} />
-    </Alert>
+    </div>
   );
 }
 
@@ -99,6 +120,7 @@ function SendForm({ channels }: { channels: Schemas['Channel'][] }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [urgent, setUrgent] = useState(false);
+  const urgentId = useId();
   const send = useEventMutation(event.id, () =>
     unwrap(
       api.POST('/v1/events/{eventId}/channels/{channelId}/notifications', {
@@ -110,11 +132,13 @@ function SendForm({ channels }: { channels: Schemas['Channel'][] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Send a notification</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Megaphone className="size-4" aria-hidden /> Send a notification
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form
-          className="grid gap-3"
+          className="grid gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             send.mutate(undefined, {
@@ -126,34 +150,41 @@ function SendForm({ channels }: { channels: Schemas['Channel'][] }) {
             });
           }}
         >
-          <div className="grid gap-2">
-            <Label htmlFor="send-channel">Channel</Label>
-            <Select
+          <Field>
+            <FieldLabel htmlFor="send-channel">Channel</FieldLabel>
+            <NativeSelect
               id="send-channel"
+              className="w-full"
               value={channelId}
               onChange={(e) => setChannelId(e.target.value)}
             >
               {channels.map((c) => (
-                <option key={c.id} value={c.id}>
+                <NativeSelectOption key={c.id} value={c.id}>
                   {c.name} ({audienceText(c.audience)})
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-          </div>
+            </NativeSelect>
+          </Field>
           <FormField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <div className="grid gap-2">
-            <Label htmlFor="send-body">Message</Label>
+          <Field>
+            <FieldLabel htmlFor="send-body">Message</FieldLabel>
             <Textarea
               id="send-body"
               rows={3}
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} />
-            Urgent: also push to devices
-          </label>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox
+              id={urgentId}
+              checked={urgent}
+              onCheckedChange={(c) => setUrgent(c === true)}
+            />
+            <FieldLabel htmlFor={urgentId} className="font-normal">
+              Urgent: also push to devices
+            </FieldLabel>
+          </Field>
           <ErrorAlert error={send.error} />
           {send.isSuccess && (
             <p className="text-sm text-muted-foreground" role="status">
@@ -197,16 +228,18 @@ function Channels({ channels }: { channels: Schemas['Channel'][] }) {
           audience.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3">
-        <ul className="grid gap-1 text-sm">
+      <CardContent className="grid gap-4">
+        <ul className="grid gap-2 text-sm">
           {channels.map((c) => (
-            <li key={c.id}>
-              {c.name} <span className="text-muted-foreground">· {audienceText(c.audience)}</span>
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{c.name}</span>
+              <Badge variant="secondary">{audienceText(c.audience)}</Badge>
             </li>
           ))}
         </ul>
+        <Separator />
         <form
-          className="grid gap-3 border-t pt-3"
+          className="grid gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             create.mutate(undefined, { onSuccess: () => setName('') });

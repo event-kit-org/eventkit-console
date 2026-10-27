@@ -1,7 +1,12 @@
 import { useId } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Field as FormFieldBox,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from '@/components/ui/field';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import type { Draft, Field } from './fields';
 
@@ -22,7 +27,7 @@ export function FieldInputs({
   const base = useId();
   if (fields.length === 0) return null;
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-5">
       {fields.map((f) => {
         const id = `${idPrefix ?? base}-${f.id}`;
         const value = draft[f.id] ?? '';
@@ -36,22 +41,27 @@ export function FieldInputs({
           'aria-required': f.required || undefined,
         } as const;
         return (
-          <div key={f.id} className="grid gap-1.5">
-            <Label htmlFor={id}>
+          <FormFieldBox key={f.id} data-invalid={error ? true : undefined}>
+            <FieldLabel htmlFor={id} className="block">
               {f.label}
               {!f.required && (
                 <span className="font-normal text-muted-foreground"> (optional)</span>
               )}
-            </Label>
+            </FieldLabel>
             {f.type === 'choice' ? (
-              <Select {...common} value={value} onChange={(e) => set(e.target.value)}>
-                <option value="">Choose…</option>
+              <NativeSelect
+                {...common}
+                className="w-full"
+                value={value}
+                onChange={(e) => set(e.target.value)}
+              >
+                <NativeSelectOption value="">Choose…</NativeSelectOption>
                 {f.options.map((o) => (
-                  <option key={o} value={o}>
+                  <NativeSelectOption key={o} value={o}>
                     {o}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </Select>
+              </NativeSelect>
             ) : f.type === 'long_text' ? (
               <Textarea {...common} value={value} onChange={(e) => set(e.target.value)} />
             ) : (
@@ -63,17 +73,11 @@ export function FieldInputs({
               />
             )}
             {error ? (
-              <p id={`${id}-error`} className="text-sm text-destructive">
-                {error}
-              </p>
+              <FieldError id={`${id}-error`}>{error}</FieldError>
             ) : (
-              f.help && (
-                <p id={`${id}-help`} className="text-sm text-muted-foreground">
-                  {f.help}
-                </p>
-              )
+              f.help && <FieldDescription id={`${id}-help`}>{f.help}</FieldDescription>
             )}
-          </div>
+          </FormFieldBox>
         );
       })}
     </div>
@@ -116,7 +120,10 @@ export function RuleChecklist({
   return (
     <ul className="grid gap-1 text-sm" aria-label="Team requirements">
       {checks.map(({ rule, count, met }) => (
-        <li key={rule.id} className={met ? 'text-green-700' : 'text-destructive'}>
+        <li
+          key={rule.id}
+          className={met ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}
+        >
           {met ? '✓' : '✗'} {rule.description} ({Math.min(count, rule.minCount)} of {rule.minCount})
         </li>
       ))}

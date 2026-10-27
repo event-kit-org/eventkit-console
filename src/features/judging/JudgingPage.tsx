@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
+import { PageHeader } from '@/components/PageHeader';
 import { useEventContext } from '@/features/events/event-context';
 import { CriteriaEditor } from './CriteriaEditor';
 import { Leaderboard } from './Leaderboard';
@@ -18,6 +19,10 @@ export function JudgingPage() {
   });
   return (
     <div className="grid gap-4">
+      <PageHeader
+        title="Judging"
+        description="Judges score teams on the event's portal against this rubric."
+      />
       <CriteriaEditor criteria={criteria.data ?? []} />
       <Leaderboard />
     </div>

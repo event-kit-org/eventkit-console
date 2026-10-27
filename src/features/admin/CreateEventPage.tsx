@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router';
@@ -7,9 +8,17 @@ import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { formatIST, fromISTInput } from '@/lib/datetime';
 import { formatMoney, rupeesToPaise } from '@/lib/money';
+import { cn } from '@/lib/utils';
 import { EventFields } from './EventFields';
 import {
   emptyEventForm,
@@ -45,18 +54,41 @@ export function CreateEventPage() {
     if (await form.trigger(fields)) setStep(step + 1);
   };
   const v = useWatch({ control: form.control }) as EventFormValues;
+  const titles = [...STEPS.map((s) => s.title), 'Review'];
 
   return (
-    <section className="mx-auto grid max-w-2xl gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Create an event</h1>
-      <ol className="flex flex-wrap gap-2 text-sm" aria-label="Steps">
-        {[...STEPS.map((s) => s.title), 'Review'].map((title, i) => (
+    <section className="mx-auto grid w-full max-w-2xl gap-6">
+      <div className="grid gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Create an event</h1>
+        <p className="text-sm text-muted-foreground">
+          Step {step + 1} of {titles.length}
+        </p>
+      </div>
+      <ol className="flex flex-wrap items-center gap-2 text-sm" aria-label="Steps">
+        {titles.map((title, i) => (
           <li
             key={title}
             aria-current={i === step ? 'step' : undefined}
-            className={i === step ? 'font-semibold' : 'text-muted-foreground'}
+            className={cn(
+              'flex items-center gap-2',
+              i === step ? 'font-medium text-foreground' : 'text-muted-foreground',
+            )}
           >
-            {i + 1}. {title}
+            <span
+              className={cn(
+                'flex size-6 items-center justify-center rounded-full border text-xs tabular-nums',
+                i < step && 'border-primary bg-primary text-primary-foreground',
+                i === step && 'border-primary text-foreground',
+              )}
+              aria-hidden
+            >
+              {i < step ? <Check className="size-3.5" /> : i + 1}
+            </span>
+            <span className={i === step ? undefined : 'hidden sm:inline'}>
+              <span className="sr-only">{i + 1}. </span>
+              {title}
+            </span>
+            {i < titles.length - 1 && <span className="mx-1 h-px w-4 bg-border" aria-hidden />}
           </li>
         ))}
       </ol>
@@ -69,7 +101,7 @@ export function CreateEventPage() {
         </CardHeader>
         <CardContent className="grid gap-4">
           {reviewing ? (
-            <dl className="grid gap-2 text-sm sm:grid-cols-[12rem_1fr]">
+            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
               <dt className="text-muted-foreground">Event</dt>
               <dd>
                 {v.name} · {v.hostedBy}
@@ -106,30 +138,30 @@ export function CreateEventPage() {
             <EventFields form={form} step={step} />
           )}
           <ErrorAlert error={create.error} />
-          <div className="flex justify-between gap-2">
+        </CardContent>
+        <CardFooter className="justify-between gap-2 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={step === 0}
+            onClick={() => setStep(step - 1)}
+          >
+            Back
+          </Button>
+          {reviewing ? (
             <Button
               type="button"
-              variant="outline"
-              disabled={step === 0}
-              onClick={() => setStep(step - 1)}
+              disabled={create.isPending}
+              onClick={form.handleSubmit((values) => create.mutate(values))}
             >
-              Back
+              {create.isPending ? 'Creating…' : 'Create event'}
             </Button>
-            {reviewing ? (
-              <Button
-                type="button"
-                disabled={create.isPending}
-                onClick={form.handleSubmit((values) => create.mutate(values))}
-              >
-                {create.isPending ? 'Creating…' : 'Create event'}
-              </Button>
-            ) : (
-              <Button type="button" onClick={next}>
-                Next
-              </Button>
-            )}
-          </div>
-        </CardContent>
+          ) : (
+            <Button type="button" onClick={next}>
+              Next
+            </Button>
+          )}
+        </CardFooter>
       </Card>
     </section>
   );

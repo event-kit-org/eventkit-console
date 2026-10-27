@@ -1,10 +1,33 @@
+import { UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { EmptyState, Loading } from '@/components/PageState';
+import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { teamDisplayStatus } from '@/lib/status';
-import { Select } from '@/components/ui/select';
 import { useTeams } from './queries';
+
+const FILTERS = [
+  ['all', 'All teams'],
+  ['registered', 'Registered'],
+  ['confirmation_pending', 'Confirmation pending'],
+  ['shortlisted', 'Shortlisted'],
+  ['confirmed', 'Confirmed'],
+  ['cancelled', 'Cancelled'],
+  ['flagged', 'Below minimum'],
+] as const;
 
 export function TeamsPage() {
   const teams = useTeams();
@@ -18,67 +41,70 @@ export function TeamsPage() {
   );
 
   return (
-    <div className="grid gap-3">
-      <div className="flex items-center gap-2">
-        <label htmlFor="team-filter" className="text-sm">
+    <div className="grid gap-4">
+      <PageHeader title="Teams" description="Every team that registered, newest first.">
+        <Label htmlFor="team-filter" className="text-muted-foreground">
           Show
-        </label>
-        <Select
+        </Label>
+        <NativeSelect
           id="team-filter"
-          className="w-48"
+          className="w-52"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
-          <option value="all">All teams</option>
-          <option value="registered">Registered</option>
-          <option value="confirmation_pending">Confirmation pending</option>
-          <option value="shortlisted">Shortlisted</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="flagged">Below minimum</option>
-        </Select>
-      </div>
+          {FILTERS.map(([value, label]) => (
+            <NativeSelectOption key={value} value={value}>
+              {label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </PageHeader>
       <ErrorAlert error={teams.error} />
-      {teams.isPending && <p className="text-muted-foreground">Loading…</p>}
-      {teams.data && list.length === 0 && (
-        <p className="text-muted-foreground">No teams here yet.</p>
+      {teams.isPending && <Loading />}
+      {teams.data && list.length === 0 ? (
+        <EmptyState icon={UsersRound} title="No teams here yet." />
+      ) : (
+        list.length > 0 && (
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Leader</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Members</TableHead>
+                  <TableHead>Payment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>
+                      <Link className="font-medium hover:underline" to={t.id}>
+                        {t.name}
+                      </Link>
+                      {t.belowMinimum && (
+                        <Badge variant="destructive" className="ml-2">
+                          below minimum
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {t.leader.name}
+                      <div className="text-xs text-muted-foreground">{t.leader.email}</div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={teamDisplayStatus(t)} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{t.memberCount}</TableCell>
+                    <TableCell className="capitalize">{t.latestProofStatus ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )
       )}
-      <div className="overflow-x-auto rounded-lg border bg-background">
-        <table className="w-full text-sm">
-          <thead className="border-b text-left text-muted-foreground">
-            <tr>
-              <th className="p-3 font-medium">Team</th>
-              <th className="p-3 font-medium">Leader</th>
-              <th className="p-3 font-medium">Status</th>
-              <th className="p-3 font-medium">Members</th>
-              <th className="p-3 font-medium">Payment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((t) => (
-              <tr key={t.id} className="border-b last:border-0">
-                <td className="p-3">
-                  <Link className="font-medium underline" to={t.id}>
-                    {t.name}
-                  </Link>
-                  {t.belowMinimum && (
-                    <span className="ml-2 text-xs text-destructive">below minimum</span>
-                  )}
-                </td>
-                <td className="p-3">
-                  {t.leader.name}
-                  <div className="text-xs text-muted-foreground">{t.leader.email}</div>
-                </td>
-                <td className="p-3">
-                  <StatusBadge status={teamDisplayStatus(t)} />
-                </td>
-                <td className="p-3">{t.memberCount}</td>
-                <td className="p-3 capitalize">{t.latestProofStatus ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

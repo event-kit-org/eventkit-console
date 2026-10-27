@@ -1,3 +1,5 @@
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Schemas } from '@/api/client';
 import { API, event, server } from './server';
@@ -113,4 +115,10 @@ export function capture(
     }),
   );
   return calls;
+}
+
+/** Answers the "are you sure?" dialog a ConfirmButton opened, with its `action` button. */
+export async function confirmDialog(action: string) {
+  const dialog = await screen.findByRole('alertdialog');
+  await userEvent.click(within(dialog).getByRole('button', { name: action }));
 }

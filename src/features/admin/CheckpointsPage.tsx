@@ -1,16 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { useForm, useWatch } from 'react-hook-form';
+import { Info, MapPin } from 'lucide-react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
-import { Alert } from '@/components/ui/alert';
+import { EmptyState } from '@/components/PageState';
+import { PageHeader } from '@/components/PageHeader';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST, fromISTInput } from '@/lib/datetime';
@@ -78,18 +84,29 @@ export function CheckpointsPage() {
   );
 
   if (!features.scanning) {
-    return <Alert>Checkpoints are part of the scanning feature. Turn it on in Settings.</Alert>;
+    return (
+      <Alert>
+        <Info aria-hidden />
+        <AlertDescription>
+          Checkpoints are part of the scanning feature. Turn it on in Settings.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   return (
     <div className="grid gap-4">
+      <PageHeader
+        title="Checkpoints"
+        description="Places where volunteers scan people's QR codes: the gate, meals, swag, sessions."
+      />
       <Card>
         <CardHeader>
           <CardTitle>New checkpoint</CardTitle>
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 sm:grid-cols-2"
+            className="grid gap-5 sm:grid-cols-2"
             onSubmit={form.handleSubmit((v) => create.mutate(v, { onSuccess: () => form.reset() }))}
             noValidate
           >
@@ -99,16 +116,16 @@ export function CheckpointsPage() {
               error={form.formState.errors.name?.message}
               {...form.register('name')}
             />
-            <div className="grid gap-2">
-              <Label htmlFor="cp-type">Type</Label>
-              <Select id="cp-type" {...form.register('type')}>
+            <Field>
+              <FieldLabel htmlFor="cp-type">Type</FieldLabel>
+              <NativeSelect id="cp-type" className="w-full" {...form.register('type')}>
                 {Object.entries(TYPE_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>
+                  <NativeSelectOption key={value} value={value}>
                     {label}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </Select>
-            </div>
+              </NativeSelect>
+            </Field>
             <FormField
               label="Opens (IST, optional)"
               type="datetime-local"
@@ -120,53 +137,79 @@ export function CheckpointsPage() {
               {...form.register('closesAt')}
             />
             {type === 'meal' && (
-              <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="cp-poll">Food poll (optional)</Label>
-                <Select id="cp-poll" {...form.register('pollId')}>
-                  <option value="">None</option>
+              <Field className="sm:col-span-2">
+                <FieldLabel htmlFor="cp-poll">Food poll (optional)</FieldLabel>
+                <NativeSelect id="cp-poll" className="w-full" {...form.register('pollId')}>
+                  <NativeSelectOption value="">None</NativeSelectOption>
                   {foodPolls.map((p) => (
-                    <option key={p.id} value={p.id}>
+                    <NativeSelectOption key={p.id} value={p.id}>
                       {p.question}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </Select>
-                <p className="text-xs text-muted-foreground">
+                </NativeSelect>
+                <FieldDescription>
                   Scanning shows each person&apos;s choice; people who didn&apos;t vote get the
                   poll&apos;s default. Only polls with a default option are listed.
-                </p>
-              </div>
+                </FieldDescription>
+              </Field>
             )}
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input type="checkbox" {...form.register('allowRepeat')} />
-              Allow repeat scans (e.g. re-entry)
-            </label>
-            <div className="sm:col-span-2">
+            <Controller
+              control={form.control}
+              name="allowRepeat"
+              render={({ field }) => (
+                <Field orientation="horizontal" className="sm:col-span-2">
+                  <Checkbox
+                    id="cp-repeat"
+                    checked={field.value}
+                    onCheckedChange={(c) => field.onChange(c === true)}
+                  />
+                  <FieldLabel htmlFor="cp-repeat" className="font-normal">
+                    Allow repeat scans (e.g. re-entry)
+                  </FieldLabel>
+                </Field>
+              )}
+            />
+            <div className="grid gap-3 sm:col-span-2">
               <ErrorAlert error={create.error} />
-              <Button type="submit" disabled={create.isPending}>
-                Add checkpoint
-              </Button>
+              <div>
+                <Button type="submit" disabled={create.isPending}>
+                  Add checkpoint
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>
       </Card>
       <ErrorAlert error={checkpoints.error ?? remove.error} />
+      {checkpoints.data?.length === 0 && <EmptyState icon={MapPin} title="No checkpoints yet." />}
       <ul className="grid gap-2">
         {checkpoints.data?.map((c) => (
           <li
             key={c.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background p-3 text-sm"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4 text-sm"
           >
-            <div>
-              <span className="font-medium">{c.name}</span> · {TYPE_LABEL[c.type]}
-              {c.allowRepeat && ' · repeats allowed'}
+            <div className="grid gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{c.name}</span>
+                <Badge variant="secondary">{TYPE_LABEL[c.type]}</Badge>
+                {c.allowRepeat && <Badge variant="outline">repeats allowed</Badge>}
+              </div>
               <div className="text-xs text-muted-foreground">
                 {c.opensAt ? `From ${formatIST(c.opensAt)}` : 'Always open'}
                 {c.closesAt && ` until ${formatIST(c.closesAt)}`}
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={() => remove.mutate(c.id)}>
+            <ConfirmButton
+              size="sm"
+              variant="outline"
+              title={`Delete ${c.name}?`}
+              description="This can't be undone."
+              confirmLabel="Delete"
+              destructive
+              onConfirm={() => remove.mutate(c.id)}
+            >
               Delete
-            </Button>
+            </ConfirmButton>
           </li>
         ))}
       </ul>

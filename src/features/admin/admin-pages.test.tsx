@@ -2,7 +2,16 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { asRole, capture, E, member, proof, registeredTeam, team } from '@/test/fixtures';
+import {
+  asRole,
+  capture,
+  confirmDialog,
+  E,
+  member,
+  proof,
+  registeredTeam,
+  team,
+} from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { apiError, BUCKET, event, server } from '@/test/server';
 
@@ -82,17 +91,16 @@ describe('teams', () => {
     const confirm = capture('post', `${E}/teams/${t.id}/confirm`, t);
     const cancel = capture('post', `${E}/registrations/r1/cancel`);
     const restore = capture('post', `${E}/registrations/r2/restore`);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     go(`/teams/${t.id}`);
     expect(await screen.findByText(/below the minimum of 2/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Confirm team' }));
     await waitFor(() => expect(confirm).toHaveLength(1));
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(cancel).toHaveLength(1));
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('the whole team will be cancelled'),
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'the whole team will be cancelled',
     );
+    await confirmDialog('Cancel registration');
+    await waitFor(() => expect(cancel).toHaveLength(1));
     await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
     await waitFor(() => expect(restore).toHaveLength(1));
   });
@@ -145,15 +153,16 @@ describe('teams', () => {
     });
     const rotate = capture('post', `${E}/registrations/r1/rotate-qr`, { qrToken: 'q' });
     const attach = capture('post', `${E}/teams/${t.id}/payment-proofs`, proof('pending'), 201);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { unmount } = go(`/teams/${t.id}`);
     expect(await screen.findByText('PX-0001')).toBeInTheDocument();
     expect(screen.getByText(/link last opened/)).toBeInTheDocument();
     expect(screen.getByText(/link never opened/)).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'New link' })[1]!);
+    await confirmDialog('New link');
     expect(await screen.findByText('https://portal.test/me/ek_new')).toBeInTheDocument();
     expect(reissue).toHaveLength(1);
     await userEvent.click(screen.getAllByRole('button', { name: 'New QR' })[0]!);
+    await confirmDialog('New QR');
     await waitFor(() => expect(rotate).toHaveLength(1));
     await userEvent.upload(
       screen.getByLabelText('Receipt file'),
@@ -227,7 +236,7 @@ describe('payments', () => {
     );
     go('/payments');
     expect(await screen.findByText('Nothing here.')).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Show'), 'rejected');
+    await userEvent.click(screen.getByRole('tab', { name: 'Rejected' }));
     expect(await screen.findByText('Rejected: Wrong amount')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(seen).toEqual(['pending', 'rejected']);
@@ -259,13 +268,13 @@ describe('people', () => {
     server.use(http.get(`${E}/members`, () => HttpResponse.json(members)));
     const change = capture('patch', `${E}/members/v1`, { userId: 'v1', role: 'judge' });
     const remove = capture('delete', `${E}/members/v1`);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     go('/people');
     expect(await screen.findByText(/vik@example.com · \+91 90000/)).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Role of Vik'), 'judge');
     await waitFor(() => expect(change[0]?.body).toEqual({ role: 'judge' }));
     expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await confirmDialog('Remove');
     await waitFor(() => expect(remove).toHaveLength(1));
   });
 
@@ -351,14 +360,15 @@ describe('invite links', () => {
       }),
     );
 
-    const first = screen.getAllByRole('listitem')[0]!;
+    const items = () =>
+      within(screen.getByRole('list', { name: 'Your links' })).getAllByRole('listitem');
+    const first = items()[0]!;
     await userEvent.click(within(first).getByRole('button', { name: 'Copy link' }));
     expect(writeText).toHaveBeenCalledWith('https://portal.test/register/tok123');
-    expect(
-      within(screen.getAllByRole('listitem')[1]!).getByText('Staff: Judge'),
-    ).toBeInTheDocument();
+    expect(within(items()[1]!).getByText('Staff: Judge')).toBeInTheDocument();
     expect(within(first).getByRole('button', { name: 'Copied' })).toBeInTheDocument();
     await userEvent.click(within(first).getByRole('button', { name: 'Revoke' }));
+    await confirmDialog('Revoke');
     await waitFor(() => expect(revoke).toHaveLength(1));
   });
 
@@ -443,6 +453,7 @@ describe('checkpoints', () => {
       }),
     );
     await userEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+    await confirmDialog('Delete');
     await waitFor(() => expect(remove).toHaveLength(1));
   });
 

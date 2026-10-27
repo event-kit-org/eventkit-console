@@ -1,7 +1,7 @@
 import { type UseFormReturn, useWatch } from 'react-hook-form';
 import { FormField } from '@/components/FormField';
-import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import type { EventFormValues } from './event-form';
 
@@ -16,7 +16,7 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
 
   if (step === 0) {
     return (
-      <div className="grid gap-4">
+      <div className="grid gap-5">
         <FormField label="Event name" error={e.name?.message} {...register('name')} />
         <FormField
           label="Hosted by"
@@ -30,7 +30,7 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
   }
   if (step === 1) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <FormField
           label="Starts (IST)"
           type="datetime-local"
@@ -60,7 +60,7 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
   }
   if (step === 2) {
     return (
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-3">
         <FormField
           label="Capacity (people)"
           type="number"
@@ -88,17 +88,17 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
   }
   const paid = paymentMode !== 'none';
   return (
-    <div className="grid gap-4">
-      <div className="grid gap-2">
-        <Label htmlFor="paymentMode">Participant payment</Label>
-        <Select id="paymentMode" {...register('paymentMode')}>
-          <option value="none">No payment</option>
-          <option value="at_registration">Pay at registration</option>
-          <option value="after_shortlist">Pay after shortlist</option>
-        </Select>
-      </div>
+    <div className="grid gap-5">
+      <Field>
+        <FieldLabel htmlFor="paymentMode">Participant payment</FieldLabel>
+        <NativeSelect id="paymentMode" className="w-full" {...register('paymentMode')}>
+          <NativeSelectOption value="none">No payment</NativeSelectOption>
+          <NativeSelectOption value="at_registration">Pay at registration</NativeSelectOption>
+          <NativeSelectOption value="after_shortlist">Pay after shortlist</NativeSelectOption>
+        </NativeSelect>
+      </Field>
       {paid && (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-3">
           <FormField
             label="Fee"
             type="number"
@@ -107,13 +107,13 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
             error={e.feeRupees?.message}
             {...register('feeRupees', num)}
           />
-          <div className="grid gap-2">
-            <Label htmlFor="feeBasis">Charged</Label>
-            <Select id="feeBasis" {...register('feeBasis')}>
-              <option value="per_person">Per person</option>
-              <option value="per_team">Once per team</option>
-            </Select>
-          </div>
+          <Field>
+            <FieldLabel htmlFor="feeBasis">Charged</FieldLabel>
+            <NativeSelect id="feeBasis" className="w-full" {...register('feeBasis')}>
+              <NativeSelectOption value="per_person">Per person</NativeSelectOption>
+              <NativeSelectOption value="per_team">Once per team</NativeSelectOption>
+            </NativeSelect>
+          </Field>
           <FormField label="Currency" error={e.currency?.message} {...register('currency')} />
         </div>
       )}
@@ -126,8 +126,8 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
         />
       )}
       {paid && (
-        <div className="grid gap-2">
-          <Label htmlFor="paymentInstructions">How to pay</Label>
+        <Field data-invalid={e.paymentInstructions ? true : undefined}>
+          <FieldLabel htmlFor="paymentInstructions">How to pay</FieldLabel>
           <Textarea
             id="paymentInstructions"
             rows={4}
@@ -139,16 +139,14 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
             {...register('paymentInstructions')}
           />
           {e.paymentInstructions ? (
-            <p id="paymentInstructions-hint" className="text-sm text-destructive">
-              {e.paymentInstructions.message}
-            </p>
+            <FieldError id="paymentInstructions-hint">{e.paymentInstructions.message}</FieldError>
           ) : (
-            <p id="paymentInstructions-hint" className="text-sm text-muted-foreground">
+            <FieldDescription id="paymentInstructions-hint">
               Shown to teams before they upload their receipt. You can also upload an instructions
               file (image or PDF) or a UPI QR code in Settings. You approve each receipt.
-            </p>
+            </FieldDescription>
           )}
-        </div>
+        </Field>
       )}
     </div>
   );

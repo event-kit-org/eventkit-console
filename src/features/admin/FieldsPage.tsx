@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { useEventContext } from '@/features/events/event-context';
 import type { Field, TeamRule } from '@/features/fields/fields';
@@ -53,12 +54,16 @@ export function FieldsPage() {
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-8">
+      <PageHeader
+        title="Registration form"
+        description="What the team leader fills in when registering. Click a question to edit it."
+      />
       <ErrorAlert error={fields.error ?? rules.error ?? move.error} />
       {(Object.keys(SECTIONS) as Section[]).map((section) => {
         const inSection = all.filter((f) => sectionOf(f) === section);
         return (
           <section key={section} aria-labelledby={`section-${section}`} className="grid gap-3">
-            <div className="rounded-lg border border-t-4 border-t-primary bg-card p-4">
+            <div className="rounded-xl border border-t-4 border-t-primary bg-card p-4 shadow-xs">
               <h2 id={`section-${section}`} className="text-lg font-semibold">
                 {SECTIONS[section].title}
               </h2>
@@ -97,7 +102,7 @@ export function FieldsPage() {
                 className="justify-self-start"
                 onClick={() => setActive({ draft: section })}
               >
-                <Plus className="size-4" /> Add question
+                <Plus aria-hidden /> Add question
               </Button>
             )}
           </section>
@@ -214,10 +219,7 @@ function SavedQuestion({
           canMoveDown={canMoveDown}
           onMove={onMove}
           onDuplicate={() => duplicate.mutate(undefined, { onSuccess: (f) => onDuplicated(f.id) })}
-          onDelete={() =>
-            window.confirm(`Delete "${field.label}"? Its answers will no longer be shown.`) &&
-            remove.mutate(undefined, { onSuccess: onDeleted })
-          }
+          onDelete={() => remove.mutate(undefined, { onSuccess: onDeleted })}
         />
       }
     />

@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from './context';
 
 /** Gate for logged-in pages. Sends anonymous visitors to /login and back afterwards. */
@@ -10,7 +11,11 @@ export function RequireAuth() {
     return <Navigate to={`/login?next=${next}`} replace />;
   }
   if (status === 'loading') {
-    return <p className="p-8 text-center text-muted-foreground">Loading…</p>;
+    return (
+      <div className="flex min-h-svh items-center justify-center gap-2 text-muted-foreground">
+        <Spinner /> Loading…
+      </div>
+    );
   }
   return <Outlet />;
 }

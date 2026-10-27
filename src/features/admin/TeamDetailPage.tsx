@@ -1,14 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, CircleAlert, Link2, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { Loading } from '@/components/PageState';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { AnswerList } from '@/features/fields/FieldInputs';
@@ -72,67 +77,88 @@ export function TeamDetailPage() {
     );
   });
 
-  if (team.isPending) return <p className="text-muted-foreground">Loading…</p>;
+  if (team.isPending) return <Loading />;
   if (team.isError) return <ErrorAlert error={team.error} />;
   const t = team.data;
 
   return (
     <div className="grid gap-4">
-      <Link to=".." relative="path" className="text-sm underline">
-        ← All teams
-      </Link>
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-semibold">{t.name}</h2>
-        <StatusBadge
-          status={teamDisplayStatus({
-            status: t.status,
-            latestProofStatus: t.payment.proofs[0]?.status ?? null,
-          })}
-        />
+      <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
+        <Link to=".." relative="path">
+          <ArrowLeft aria-hidden /> All teams
+        </Link>
+      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">{t.name}</h2>
+          <StatusBadge
+            status={teamDisplayStatus({
+              status: t.status,
+              latestProofStatus: t.payment.proofs[0]?.status ?? null,
+            })}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {event.paymentMode === 'after_shortlist' && t.status === 'registered' && (
+            <Button onClick={() => move.mutate('shortlist')} disabled={move.isPending}>
+              Shortlist team
+            </Button>
+          )}
+          {event.paymentMode === 'none' && t.status === 'registered' && (
+            <Button onClick={() => move.mutate('confirm')} disabled={move.isPending}>
+              Confirm team
+            </Button>
+          )}
+        </div>
       </div>
       {t.belowMinimum && (
         <Alert variant="destructive">
-          Cancellations left this team below the minimum of {event.minTeamSize}. Decide whether it
-          can still take part.
+          <CircleAlert aria-hidden />
+          <AlertDescription>
+            Cancellations left this team below the minimum of {event.minTeamSize}. Decide whether it
+            can still take part.
+          </AlertDescription>
         </Alert>
       )}
       <AnswerList fields={teamFields(fields)} answers={t.answers} />
       <ErrorAlert
         error={move.error ?? regAction.error ?? reissue.error ?? rotateQr.error ?? attach.error}
       />
-      <div className="flex flex-wrap gap-2">
-        {event.paymentMode === 'after_shortlist' && t.status === 'registered' && (
-          <Button onClick={() => move.mutate('shortlist')} disabled={move.isPending}>
-            Shortlist team
-          </Button>
-        )}
-        {event.paymentMode === 'none' && t.status === 'registered' && (
-          <Button onClick={() => move.mutate('confirm')} disabled={move.isPending}>
-            Confirm team
-          </Button>
-        )}
-      </div>
       <Card>
         <CardHeader>
           <CardTitle>Members</CardTitle>
+          <CardDescription>
+            {t.members.length} {t.members.length === 1 ? 'person' : 'people'}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid gap-3">
           {newLink && (
-            <Alert className="mb-3">
-              New personal link for {newLink.name} (shown once; send it to them):{' '}
-              <span className="break-all font-mono text-xs">{newLink.url ?? newLink.token}</span>
+            <Alert>
+              <Link2 aria-hidden />
+              <AlertTitle>New personal link for {newLink.name}</AlertTitle>
+              <AlertDescription>
+                Shown once; send it to them.{' '}
+                <code className="font-mono text-xs break-all text-foreground">
+                  {newLink.url ?? newLink.token}
+                </code>
+              </AlertDescription>
             </Alert>
           )}
-          <ul className="grid gap-3">
+          <ul className="divide-y">
             {t.members.map((m) => (
               <li
                 key={m.registrationId}
-                className="flex flex-wrap items-start justify-between gap-2 border-b pb-3 last:border-0"
+                className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
               >
-                <span>
-                  <span className="font-medium">{m.name}</span>{' '}
-                  <span className="font-mono text-xs">{m.participantCode}</span>
-                  {m.isLeader && <span className="ml-1 text-xs">(leader)</span>}
+                <div className="grid gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{m.name}</span>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {m.participantCode}
+                    </code>
+                    {m.isLeader && <Badge variant="outline">leader</Badge>}
+                    <StatusBadge status={m.status} />
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {m.email} · {m.phone} ·{' '}
                     {m.linkLastUsedAt
@@ -140,38 +166,32 @@ export function TeamDetailPage() {
                       : 'link never opened'}
                   </div>
                   <AnswerList fields={memberFields(fields)} answers={m.answers} />
-                </span>
-                <span className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={m.status} />
-                  <Button
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <ConfirmButton
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Give ${m.name} a new personal link? Their current link stops working.`,
-                        )
-                      ) {
-                        reissue.mutate(m.registrationId, {
-                          onSuccess: (link) => setNewLink({ name: m.name, ...link }),
-                        });
-                      }
-                    }}
+                    title={`Give ${m.name} a new personal link?`}
+                    description="Their current link stops working."
+                    confirmLabel="New link"
+                    onConfirm={() =>
+                      reissue.mutate(m.registrationId, {
+                        onSuccess: (link) => setNewLink({ name: m.name, ...link }),
+                      })
+                    }
                   >
-                    New link
-                  </Button>
-                  <Button
+                    <Link2 aria-hidden /> New link
+                  </ConfirmButton>
+                  <ConfirmButton
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      if (
-                        window.confirm(`Give ${m.name} a new QR code? The old one stops scanning.`)
-                      )
-                        rotateQr.mutate(m.registrationId);
-                    }}
+                    title={`Give ${m.name} a new QR code?`}
+                    description="The old one stops scanning."
+                    confirmLabel="New QR"
+                    onConfirm={() => rotateQr.mutate(m.registrationId)}
                   >
-                    New QR
-                  </Button>
+                    <QrCode aria-hidden /> New QR
+                  </ConfirmButton>
                   {m.status === 'cancelled' ? (
                     <Button
                       size="sm"
@@ -181,22 +201,23 @@ export function TeamDetailPage() {
                       Restore
                     </Button>
                   ) : (
-                    <Button
+                    <ConfirmButton
                       size="sm"
                       variant="outline"
-                      onClick={() => {
-                        const whole = m.isLeader
-                          ? ' This is the leader: the whole team will be cancelled.'
-                          : '';
-                        if (window.confirm(`Cancel ${m.name}'s registration?${whole}`)) {
-                          regAction.mutate({ id: m.registrationId, action: 'cancel' });
-                        }
-                      }}
+                      title={`Cancel ${m.name}'s registration?`}
+                      description={
+                        m.isLeader
+                          ? 'This is the leader: the whole team will be cancelled.'
+                          : undefined
+                      }
+                      confirmLabel="Cancel registration"
+                      destructive
+                      onConfirm={() => regAction.mutate({ id: m.registrationId, action: 'cancel' })}
                     >
                       Cancel
-                    </Button>
+                    </ConfirmButton>
                   )}
-                </span>
+                </div>
               </li>
             ))}
           </ul>
@@ -206,13 +227,14 @@ export function TeamDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Attach a receipt</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm">
-            <p className="text-muted-foreground">
+            <CardDescription>
               When the team paid but could not upload the receipt themselves.
-            </p>
-            <input
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Input
               type="file"
+              className="max-w-sm"
               aria-label="Receipt file"
               accept="image/jpeg,image/png,image/webp,application/pdf"
               onChange={(e) => {
@@ -232,11 +254,17 @@ export function TeamDetailPage() {
           <CardContent>
             <ul className="grid gap-2 text-sm">
               {t.payment.proofs.map((p) => (
-                <li key={p.id}>
-                  {formatMoney(p.amount, p.currency)} · uploaded {formatIST(p.uploadedAt)} ·{' '}
-                  <span className="capitalize">{p.status}</span>
+                <li key={p.id} className="flex flex-wrap items-center gap-2">
+                  <span className="tabular-nums">{formatMoney(p.amount, p.currency)}</span>
+                  <span className="text-muted-foreground">uploaded {formatIST(p.uploadedAt)}</span>
+                  <Badge
+                    variant={p.status === 'rejected' ? 'destructive' : 'secondary'}
+                    className="capitalize"
+                  >
+                    {p.status}
+                  </Badge>
                   {p.rejectionNote && (
-                    <span className="text-muted-foreground"> — {p.rejectionNote}</span>
+                    <span className="text-muted-foreground">— {p.rejectionNote}</span>
                   )}
                 </li>
               ))}

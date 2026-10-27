@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Schemas } from '@/api/client';
-import { asRole, capture, E, registeredTeam } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E, registeredTeam } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { event, server } from '@/test/server';
 
@@ -60,7 +60,8 @@ describe('registration form builder', () => {
     expect(within(leader).getByRole('button', { name: 'Edit SRN' })).toHaveTextContent(
       'Unique answers · Format: PES\\d+',
     );
-    expect(screen.getByRole('link', { name: 'Registration form' })).toHaveAttribute(
+    const nav = screen.getByRole('navigation', { name: 'Event sections' });
+    expect(within(nav).getByRole('link', { name: 'Registration form' })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -204,7 +205,6 @@ describe('registration form builder', () => {
     const srnMoves = capture('patch', `${E}/fields/srn`, SRN);
     const copy = capture('post', `${E}/fields`, { ...SRN, id: 'copy' }, 201);
     const remove = capture('delete', `${E}/fields/srn`, null, 204);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     open([
       { ...PROJECT, position: 0 },
       { ...DEPT, position: 1 },
@@ -230,6 +230,8 @@ describe('registration form builder', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Edit SRN' }));
     await userEvent.click(screen.getByRole('button', { name: 'Delete SRN' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Delete "SRN"?');
+    await confirmDialog('Delete');
     await waitFor(() => expect(remove).toHaveLength(1));
   });
 });

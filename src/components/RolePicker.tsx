@@ -1,6 +1,8 @@
+import { useId } from 'react';
 import type { Schemas } from '@/api/client';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { roleLabel } from '@/features/events/roles';
-
 import { ROLES } from '@/lib/audience';
 
 /** Checkboxes for an audience: any combination of roles (all four means everyone). */
@@ -13,23 +15,26 @@ export function RolePicker({
   onChange: (roles: Schemas['Role'][]) => void;
   legend?: string;
 }) {
+  const id = useId();
   return (
-    <fieldset className="grid gap-1">
-      <legend className="text-sm font-medium">{legend}</legend>
-      <div className="flex flex-wrap gap-3">
+    <FieldSet className="gap-2">
+      <FieldLegend variant="label">{legend}</FieldLegend>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
         {ROLES.map((r) => (
-          <label key={r} className="flex items-center gap-1.5 text-sm">
-            <input
-              type="checkbox"
+          <Field key={r} orientation="horizontal" className="w-auto">
+            <Checkbox
+              id={`${id}-${r}`}
               checked={value.includes(r)}
-              onChange={(e) =>
-                onChange(e.target.checked ? [...value, r] : value.filter((x) => x !== r))
+              onCheckedChange={(checked) =>
+                onChange(checked === true ? [...value, r] : value.filter((x) => x !== r))
               }
             />
-            {roleLabel[r]}s
-          </label>
+            <FieldLabel htmlFor={`${id}-${r}`} className="font-normal">
+              {roleLabel[r]}s
+            </FieldLabel>
+          </Field>
         ))}
       </div>
-    </fieldset>
+    </FieldSet>
   );
 }

@@ -49,11 +49,12 @@ export function CriteriaEditor({ criteria }: { criteria: Schemas['Criterion'][] 
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <ol className="grid gap-2 text-sm">
+        <ol className="grid divide-y rounded-lg border text-sm">
           {criteria.map((c) => (
-            <li key={c.id} className="flex items-start justify-between gap-2">
+            <li key={c.id} className="flex items-start justify-between gap-2 p-3">
               <span>
-                <strong>{c.name}</strong> · out of {c.maxScore}
+                <span className="font-medium">{c.name}</span>{' '}
+                <span className="text-muted-foreground">· out of {c.maxScore}</span>
                 {c.description && (
                   <span className="block text-muted-foreground">{c.description}</span>
                 )}
@@ -70,7 +71,7 @@ export function CriteriaEditor({ criteria }: { criteria: Schemas['Criterion'][] 
           ))}
         </ol>
         <form
-          className="grid gap-3 border-t pt-3"
+          className="grid gap-4 sm:grid-cols-[1fr_1fr_8rem]"
           onSubmit={(e) => {
             e.preventDefault();
             add.mutate(undefined, {
@@ -94,7 +95,7 @@ export function CriteriaEditor({ criteria }: { criteria: Schemas['Criterion'][] 
             value={maxScore}
             onChange={(e) => setMaxScore(e.target.value)}
           />
-          <div>
+          <div className="sm:col-span-3">
             <Button
               type="submit"
               variant="outline"
@@ -104,7 +105,7 @@ export function CriteriaEditor({ criteria }: { criteria: Schemas['Criterion'][] 
             </Button>
           </div>
         </form>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/50 p-3 text-sm">
           <span>
             Leaderboard:{' '}
             {event.leaderboardVisible ? 'everyone can see it' : 'admins and judges only'}

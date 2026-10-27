@@ -1,16 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { BarChart3, Plus } from 'lucide-react';
+import { useId, useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { RolePicker } from '@/components/RolePicker';
 import { audienceText } from '@/lib/audience';
+import { EmptyState } from '@/components/PageState';
+import { PageHeader } from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -31,10 +44,12 @@ export function PollsPage() {
     <div className="grid gap-4">
       <CreatePoll />
       <ErrorAlert error={polls.error} />
-      {polls.data?.length === 0 && <p className="text-sm text-muted-foreground">No polls yet.</p>}
-      {polls.data?.map((p) => (
-        <PollCard key={p.id} poll={p} />
-      ))}
+      {polls.data?.length === 0 && <EmptyState icon={BarChart3} title="No polls yet." />}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {polls.data?.map((p) => (
+          <PollCard key={p.id} poll={p} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -59,14 +74,16 @@ function PollCard({ poll }: { poll: Poll }) {
     unwrap(api.POST('/v1/events/{eventId}/polls/{pollId}/options', { ...p, body: { label } })),
   );
   const showResults = poll.totalVotes !== null;
+  const id = useId();
+  const total = poll.totalVotes ?? 0;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle>{poll.question}</CardTitle>
-          {poll.closed && <Badge>Closed</Badge>}
-          {poll.mealCheckpoints.length > 0 && <Badge>Meal</Badge>}
+          {poll.closed && <Badge variant="secondary">Closed</Badge>}
+          {poll.mealCheckpoints.length > 0 && <Badge variant="secondary">Meal</Badge>}
         </div>
         <CardDescription>
           {audienceText(poll.audience)}
@@ -76,32 +93,47 @@ function PollCard({ poll }: { poll: Poll }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <ul className="grid gap-2" aria-label="Options">
-          {poll.options.map((o) => (
-            <li key={o.id} className="flex items-center gap-2 text-sm">
-              {poll.canVote ? (
-                <label className="flex flex-1 items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`poll-${poll.id}`}
-                    checked={(option || poll.myVote) === o.id}
-                    onChange={() => setOption(o.id)}
+        <RadioGroup
+          aria-label={poll.question}
+          value={option || poll.myVote || ''}
+          onValueChange={setOption}
+          disabled={!poll.canVote}
+          className="gap-2"
+        >
+          <ul className="grid gap-2" aria-label="Options">
+            {poll.options.map((o) => (
+              <li
+                key={o.id}
+                className="relative grid gap-1.5 overflow-hidden rounded-lg border px-3 py-2 text-sm"
+              >
+                {showResults && total > 0 && (
+                  <div
+                    className="absolute inset-y-0 left-0 bg-muted"
+                    style={{ width: `${((o.votes ?? 0) / total) * 100}%` }}
+                    aria-hidden
                   />
-                  {o.label}
-                </label>
-              ) : (
-                <span className="flex-1">
-                  {o.label}
-                  {poll.myVote === o.id && ' (your choice)'}
-                </span>
-              )}
-              {poll.defaultOptionId === o.id && (
-                <span className="text-xs text-muted-foreground">default</span>
-              )}
-              {showResults && <span className="tabular-nums">{o.votes}</span>}
-            </li>
-          ))}
-        </ul>
+                )}
+                <div className="relative flex items-center gap-2">
+                  {poll.canVote ? (
+                    <>
+                      <RadioGroupItem value={o.id} id={`${id}-${o.id}`} />
+                      <label htmlFor={`${id}-${o.id}`} className="flex-1 cursor-pointer">
+                        {o.label}
+                      </label>
+                    </>
+                  ) : (
+                    <span className="flex-1">
+                      {o.label}
+                      {poll.myVote === o.id && ' (your choice)'}
+                    </span>
+                  )}
+                  {poll.defaultOptionId === o.id && <Badge variant="outline">default</Badge>}
+                  {showResults && <span className="font-medium tabular-nums">{o.votes}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </RadioGroup>
         {showResults && (
           <p className="text-xs text-muted-foreground">{poll.totalVotes} votes in total.</p>
         )}
@@ -116,23 +148,23 @@ function PollCard({ poll }: { poll: Poll }) {
             </Button>
           </div>
         )}
-        {poll.canManage && (
-          <div className="flex flex-wrap gap-2 border-t pt-3">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={toggleResults.isPending}
-              onClick={() => toggleResults.mutate(undefined)}
-            >
-              {poll.resultsVisible
-                ? 'Hide results from the audience'
-                : 'Show results to the audience'}
-            </Button>
-            <AddOption onAdd={(label) => addOption.mutate(label)} pending={addOption.isPending} />
-          </div>
-        )}
         <ErrorAlert error={vote.error ?? toggleResults.error ?? addOption.error} />
       </CardContent>
+      {poll.canManage && (
+        <CardFooter className="flex-wrap gap-2 border-t">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={toggleResults.isPending}
+            onClick={() => toggleResults.mutate(undefined)}
+          >
+            {poll.resultsVisible
+              ? 'Hide results from the audience'
+              : 'Show results to the audience'}
+          </Button>
+          <AddOption onAdd={(label) => addOption.mutate(label)} pending={addOption.isPending} />
+        </CardFooter>
+      )}
     </Card>
   );
 }
@@ -141,7 +173,7 @@ function AddOption({ onAdd, pending }: { onAdd: (label: string) => void; pending
   const [label, setLabel] = useState('');
   return (
     <form
-      className="flex gap-2"
+      className="flex flex-1 gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         onAdd(label.trim());
@@ -171,6 +203,7 @@ function CreatePoll() {
   const [closesAt, setClosesAt] = useState('');
   const [resultsVisible, setResultsVisible] = useState(false);
   const [defaultIndex, setDefaultIndex] = useState('');
+  const visibleId = useId();
   const labels = options
     .split('\n')
     .map((l) => l.trim())
@@ -191,97 +224,106 @@ function CreatePoll() {
     ),
   );
 
-  if (!open) {
-    return (
-      <div>
-        <Button onClick={() => setOpen(true)}>New poll</Button>
-      </div>
-    );
-  }
+  const header = (
+    <PageHeader title="Polls" description="Ask anything, from food choices to T-shirt sizes.">
+      {!open && (
+        <Button onClick={() => setOpen(true)}>
+          <Plus aria-hidden /> New poll
+        </Button>
+      )}
+    </PageHeader>
+  );
+  if (!open) return header;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>New poll</CardTitle>
-        <CardDescription>
-          A food poll needs a default option: checked-in people who don&apos;t vote get it. Link it
-          to meal checkpoints on the Checkpoints page.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate(undefined, {
-              onSuccess: () => {
-                setOpen(false);
-                setQuestion('');
-                setOptions('');
-              },
-            });
-          }}
-        >
-          <FormField
-            label="Question"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-          <div className="grid gap-2">
-            <Label htmlFor="poll-options">Options, one per line</Label>
-            <Textarea
-              id="poll-options"
-              rows={4}
-              value={options}
-              onChange={(e) => setOptions(e.target.value)}
+    <>
+      {header}
+      <Card>
+        <CardHeader>
+          <CardTitle>New poll</CardTitle>
+          <CardDescription>
+            A food poll needs a default option: checked-in people who don&apos;t vote get it. Link
+            it to meal checkpoints on the Checkpoints page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              create.mutate(undefined, {
+                onSuccess: () => {
+                  setOpen(false);
+                  setQuestion('');
+                  setOptions('');
+                },
+              });
+            }}
+          >
+            <FormField
+              label="Question"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
             />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="poll-default">Default option</Label>
-            <select
-              id="poll-default"
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={defaultIndex}
-              onChange={(e) => setDefaultIndex(e.target.value)}
-            >
-              <option value="">None</option>
-              {labels.map((l, i) => (
-                <option key={`${l}-${i}`} value={i}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </div>
-          <RolePicker value={audience} onChange={setAudience} />
-          <FormField
-            label="Closes (IST, optional)"
-            type="datetime-local"
-            value={closesAt}
-            onChange={(e) => setClosesAt(e.target.value)}
-          />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={resultsVisible}
-              onChange={(e) => setResultsVisible(e.target.checked)}
+            <Field>
+              <FieldLabel htmlFor="poll-options">Options, one per line</FieldLabel>
+              <Textarea
+                id="poll-options"
+                rows={4}
+                value={options}
+                onChange={(e) => setOptions(e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="poll-default">Default option</FieldLabel>
+              <NativeSelect
+                id="poll-default"
+                className="w-full"
+                value={defaultIndex}
+                onChange={(e) => setDefaultIndex(e.target.value)}
+              >
+                <NativeSelectOption value="">None</NativeSelectOption>
+                {labels.map((l, i) => (
+                  <NativeSelectOption key={`${l}-${i}`} value={i}>
+                    {l}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <FieldDescription>Needed for food polls.</FieldDescription>
+            </Field>
+            <RolePicker value={audience} onChange={setAudience} />
+            <FormField
+              label="Closes (IST, optional)"
+              type="datetime-local"
+              value={closesAt}
+              onChange={(e) => setClosesAt(e.target.value)}
             />
-            The audience can see the results
-          </label>
-          <ErrorAlert error={create.error} />
-          <div className="flex gap-2">
-            <Button
-              type="submit"
-              disabled={
-                !question.trim() || labels.length < 2 || audience.length === 0 || create.isPending
-              }
-            >
-              Create poll
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+            <Field orientation="horizontal">
+              <Checkbox
+                id={visibleId}
+                checked={resultsVisible}
+                onCheckedChange={(c) => setResultsVisible(c === true)}
+              />
+              <FieldLabel htmlFor={visibleId} className="font-normal">
+                The audience can see the results
+              </FieldLabel>
+            </Field>
+            <ErrorAlert error={create.error} />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                disabled={
+                  !question.trim() || labels.length < 2 || audience.length === 0 || create.isPending
+                }
+              >
+                Create poll
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </>
   );
 }

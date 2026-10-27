@@ -174,12 +174,12 @@ describe('settings', () => {
     });
     const toggle = capture('patch', `${E}/features/registration`, features()[1]);
     renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
-    expect(await screen.findByRole('button', { name: 'Switch off' })).toBeInTheDocument();
+    expect(await screen.findByRole('switch', { name: 'registration' })).toBeChecked();
     const activate = screen.getAllByRole('button', { name: 'Activate' });
     expect(activate[0]).toBeDisabled(); // mailing
     await userEvent.click(activate[1]!);
     await waitFor(() => expect(buy[0]?.body).toEqual({ features: ['scanning'] }));
-    await userEvent.click(screen.getByRole('button', { name: 'Switch off' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'registration' }));
     await waitFor(() => expect(toggle[0]?.body).toEqual({ enabled: false }));
     expect(screen.queryByText('UPI QR code')).not.toBeInTheDocument();
   });

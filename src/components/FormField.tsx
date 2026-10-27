@@ -1,19 +1,20 @@
 import { type ComponentProps, useId } from 'react';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 /** Label + input + error message, wired for accessibility. */
 export function FormField({
   label,
   error,
   hint,
+  className,
   ...inputProps
 }: ComponentProps<typeof Input> & { label: string; error?: string; hint?: string }) {
   const id = useId();
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    <Field data-invalid={error ? true : undefined} className={className}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input
         id={id}
         aria-invalid={error ? true : undefined}
@@ -21,14 +22,10 @@ export function FormField({
         {...inputProps}
       />
       {error ? (
-        <p id={`${id}-error`} className="text-sm text-destructive">
-          {error}
-        </p>
+        <FieldError id={`${id}-error`}>{error}</FieldError>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
+        <FieldDescription id={`${id}-hint`}>{hint}</FieldDescription>
       ) : null}
-    </div>
+    </Field>
   );
 }

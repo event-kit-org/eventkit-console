@@ -1,13 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { CameraOff, Info, WifiOff } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { ApiError, type Schemas, unwrap } from '@/api/client';
 import { useAuth } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils';
@@ -136,7 +138,14 @@ export function ScannerPage() {
     await submit(code);
   };
 
-  if (!features.scanning) return <Alert>Scanning is switched off for this event.</Alert>;
+  if (!features.scanning) {
+    return (
+      <Alert>
+        <Info aria-hidden />
+        <AlertDescription>Scanning is switched off for this event.</AlertDescription>
+      </Alert>
+    );
+  }
 
   const ready = online && checkpointId !== '' && !busy;
   const result = outcome?.kind === 'result' ? outcome.result : null;
@@ -146,30 +155,43 @@ export function ScannerPage() {
       {!online && (
         <div
           role="alert"
-          className="rounded-md bg-red-600 px-4 py-3 text-center font-semibold text-white"
+          className="flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-3 text-center font-semibold text-white"
         >
+          <WifiOff className="size-5 shrink-0" aria-hidden />
           You are offline. Scanning is paused until the connection is back.
         </div>
       )}
-      <div className="grid gap-1">
-        <label htmlFor="checkpoint" className="text-sm font-medium">
-          Checkpoint
-        </label>
-        <Select id="checkpoint" value={checkpointId} onChange={(e) => choose(e.target.value)}>
-          <option value="">Choose where you are scanning</option>
+      <Field>
+        <FieldLabel htmlFor="checkpoint">Checkpoint</FieldLabel>
+        <NativeSelect
+          id="checkpoint"
+          className="w-full [&_select]:h-10"
+          value={checkpointId}
+          onChange={(e) => choose(e.target.value)}
+        >
+          <NativeSelectOption value="">Choose where you are scanning</NativeSelectOption>
           {checkpoints.data?.map((c) => (
-            <option key={c.id} value={c.id}>
+            <NativeSelectOption key={c.id} value={c.id}>
               {c.name}
-            </option>
+            </NativeSelectOption>
           ))}
-        </Select>
+        </NativeSelect>
         <ErrorAlert error={checkpoints.error} />
-      </div>
-
+      </Field>
       {cameraError && (
-        <Alert>Camera unavailable ({cameraError}). Allow camera access, or type codes below.</Alert>
+        <Alert>
+          <CameraOff aria-hidden />
+          <AlertDescription>
+            Camera unavailable ({cameraError}). Allow camera access, or type codes below.
+          </AlertDescription>
+        </Alert>
       )}
-      <div className={cn('overflow-hidden rounded-lg border bg-black', !ready && 'opacity-60')}>
+      <div
+        className={cn(
+          'aspect-square overflow-hidden rounded-xl border bg-black transition-opacity',
+          !ready && 'opacity-60',
+        )}
+      >
         <Scanner
           onScan={(codes) => {
             const code = codes[0]?.rawValue;
@@ -188,8 +210,8 @@ export function ScannerPage() {
         <div
           role="status"
           className={cn(
-            'rounded-lg p-4 text-center',
-            result?.result === 'accepted' ? 'bg-green-600 text-white' : 'bg-red-600 text-white',
+            'rounded-xl p-4 text-center shadow-sm',
+            result?.result === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white',
           )}
         >
           {result ? (
@@ -210,8 +232,8 @@ export function ScannerPage() {
               <div className="text-sm opacity-90">Team {result.participant.teamName}</div>
               {result.reason === 'not_attending' && outcome.kind === 'result' && (
                 <Button
-                  variant="outline"
-                  className="mt-3 bg-white text-black"
+                  variant="secondary"
+                  className="mt-3"
                   disabled={!online || busy}
                   onClick={() => void markAttending(outcome.code)}
                 >

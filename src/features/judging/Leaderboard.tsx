@@ -3,6 +3,14 @@ import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useEventContext } from '@/features/events/event-context';
 
 /** Team totals, ranked. A team's total is the average across judges of each judge's total. */
@@ -29,28 +37,28 @@ export function Leaderboard() {
           <p className="text-sm text-muted-foreground">No scores yet.</p>
         )}
         {board.data && board.data.entries.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-1">#</th>
-                <th>Team</th>
-                <th className="text-right">Total</th>
-                <th className="text-right">Judges</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">#</TableHead>
+                <TableHead>Team</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Judges</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {board.data.entries.map((e) => (
-                <tr key={e.team.id} className="border-t">
-                  <td className="py-1">{e.rank}</td>
-                  <td>{e.team.name}</td>
-                  <td className="text-right tabular-nums">
+                <TableRow key={e.team.id}>
+                  <TableCell className="font-medium tabular-nums">{e.rank}</TableCell>
+                  <TableCell>{e.team.name}</TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {e.total.toFixed(2)} / {e.maxTotal}
-                  </td>
-                  <td className="text-right tabular-nums">{e.judges}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{e.judges}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

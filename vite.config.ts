@@ -55,6 +55,8 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/api/schema.d.ts',
+        // shadcn/ui components, copied in by its CLI (npx shadcn add) and tested upstream.
+        'src/components/ui/**',
         'src/main.tsx',
         'src/sw.ts',
         'src/test/**',

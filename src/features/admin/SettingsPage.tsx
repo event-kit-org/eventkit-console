@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
+import { ChevronRight, CircleAlert, CircleCheck, KeyRound } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useSearchParams } from 'react-router';
@@ -7,10 +8,24 @@ import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { PageHeader } from '@/components/PageHeader';
 import { FormField } from '@/components/FormField';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { FieldLegend, FieldSet } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { EventFields } from './EventFields';
@@ -31,15 +46,24 @@ const FEATURE_TEXT: Record<Schemas['Feature'], string> = {
 export function SettingsPage() {
   const [search] = useSearchParams();
   return (
-    <div className="grid gap-4">
+    <div className="grid max-w-3xl gap-6">
+      <PageHeader
+        title="Portal & settings"
+        description="Where your portal lives, which features are on, how teams pay, and the event's details."
+      />
       {search.get('new') && (
         <Alert>
-          Event created. Next: set your portal's URL, switch on the features you need, upload your
-          UPI QR if teams pay, then create an API key and{' '}
-          <Link className="underline" to="../links" relative="path">
-            links
-          </Link>
-          .
+          <CircleCheck aria-hidden />
+          <AlertDescription>
+            <p>
+              Event created. Next: set your portal's URL, switch on the features you need, upload
+              your UPI QR if teams pay, then create an API key and{' '}
+              <Link to="../links" relative="path">
+                links
+              </Link>
+              .
+            </p>
+          </AlertDescription>
         </Alert>
       )}
       <PortalCard />
@@ -110,11 +134,15 @@ function PortalCard() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
-          <details>
-            <summary className="cursor-pointer text-sm">
+          <Collapsible>
+            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                className="size-4 transition-transform group-data-[state=open]:rotate-90"
+                aria-hidden
+              />
               Paths (change only if your portal uses other routes)
-            </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3 grid gap-4 sm:grid-cols-2">
               {PATHS.map(([name, label, fallback]) => (
                 <FormField
                   key={name}
@@ -124,34 +152,43 @@ function PortalCard() {
                   onChange={(e) => setPaths({ ...paths, [name]: e.target.value })}
                 />
               ))}
-            </div>
-          </details>
+            </CollapsibleContent>
+          </Collapsible>
           <ErrorAlert error={save.error} />
-          {save.isSuccess && <Alert>Saved.</Alert>}
-          <div>
+          <div className="flex items-center gap-3">
             <Button type="submit" disabled={save.isPending}>
               Save portal
             </Button>
+            {save.isSuccess && <Saved />}
           </div>
         </form>
-        <div className="mt-6 grid gap-2 text-sm">
-          <div className="font-medium">API keys</div>
+        <Separator className="my-6" />
+        <FieldSet className="gap-3 text-sm">
+          <FieldLegend variant="label">API keys</FieldLegend>
           <p className="text-muted-foreground">
             The portal sends its key with every request. It identifies the portal and grants nothing
             by itself.
           </p>
-          <ul>
+          <ul className="grid gap-1.5">
             {keys.data
               ?.filter((k) => !k.revokedAt)
               .map((k) => (
-                <li key={k.id}>
-                  {k.name} · <span className="font-mono">{k.keyPrefix}…</span>
+                <li key={k.id} className="flex items-center gap-2">
+                  <KeyRound className="size-4 text-muted-foreground" aria-hidden />
+                  {k.name}
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    {k.keyPrefix}…
+                  </code>
                 </li>
               ))}
           </ul>
           {newKey && (
             <Alert>
-              New key (shown once): <span className="break-all font-mono">{newKey}</span>
+              <KeyRound aria-hidden />
+              <AlertDescription>
+                New key (shown once):{' '}
+                <code className="font-mono break-all text-foreground">{newKey}</code>
+              </AlertDescription>
             </Alert>
           )}
           <ErrorAlert error={keys.error ?? createKey.error} />
@@ -164,7 +201,7 @@ function PortalCard() {
               Create API key
             </Button>
           </div>
-        </div>
+        </FieldSet>
       </CardContent>
     </Card>
   );
@@ -204,31 +241,40 @@ function FeaturesCard() {
       </CardHeader>
       <CardContent className="grid gap-3">
         <ErrorAlert error={buy.error ?? toggle.error} />
-        {toggles.data?.map((t) => (
-          <div key={t.feature} className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="font-medium capitalize">{t.feature}</div>
-              <div className="text-sm text-muted-foreground">{FEATURE_TEXT[t.feature]}</div>
-            </div>
-            {!t.bought ? (
-              <Button
-                size="sm"
-                disabled={t.feature === 'mailing' || buy.isPending}
-                onClick={() => buy.mutate(t.feature)}
-              >
-                Activate
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant={t.enabled ? 'outline' : 'default'}
-                onClick={() => toggle.mutate({ feature: t.feature, enabled: !t.enabled })}
-              >
-                {t.enabled ? 'Switch off' : 'Switch on'}
-              </Button>
-            )}
-          </div>
-        ))}
+        <ul className="divide-y rounded-lg border">
+          {toggles.data?.map((t) => (
+            <li key={t.feature} className="flex items-center justify-between gap-4 p-4">
+              <div className="grid gap-0.5">
+                <div className="flex items-center gap-2 font-medium capitalize">
+                  {t.feature}
+                  {t.feature === 'mailing' && !t.bought && (
+                    <Badge variant="outline" className="normal-case">
+                      coming later
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-sm text-muted-foreground">{FEATURE_TEXT[t.feature]}</div>
+              </div>
+              {!t.bought ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={t.feature === 'mailing' || buy.isPending}
+                  onClick={() => buy.mutate(t.feature)}
+                >
+                  Activate
+                </Button>
+              ) : (
+                <Switch
+                  aria-label={t.feature}
+                  checked={t.enabled}
+                  disabled={toggle.isPending}
+                  onCheckedChange={(enabled) => toggle.mutate({ feature: t.feature, enabled })}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );
@@ -266,7 +312,12 @@ function PaymentInstructionsFileCard() {
         {event.hasPaymentInstructionsFile && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
             {file.data && (
-              <a href={file.data.url} target="_blank" rel="noreferrer" className="underline">
+              <a
+                href={file.data.url}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline underline-offset-4"
+              >
                 View the current file
               </a>
             )}
@@ -281,8 +332,9 @@ function PaymentInstructionsFileCard() {
           </div>
         )}
         <ErrorAlert error={upload.error ?? remove.error} />
-        <input
+        <Input
           type="file"
+          className="max-w-sm"
           accept="image/jpeg,image/png,image/webp,application/pdf"
           aria-label="Payment instructions file"
           onChange={(e) => {
@@ -324,18 +376,22 @@ function PaymentQrCard() {
           <img
             src={qr.data.url}
             alt="UPI QR code"
-            className="h-48 w-48 rounded border object-contain"
+            className="size-48 rounded-lg border bg-white object-contain p-2"
           />
         )}
         {!event.hasPaymentQr && !event.paymentInstructions && !event.hasPaymentInstructionsFile && (
           <Alert variant="destructive">
-            Teams don't know how to pay yet: add written instructions (Event details), an
-            instructions file, or a QR code.
+            <CircleAlert aria-hidden />
+            <AlertDescription>
+              Teams don't know how to pay yet: add written instructions (Event details), an
+              instructions file, or a QR code.
+            </AlertDescription>
           </Alert>
         )}
         <ErrorAlert error={upload.error} />
-        <input
+        <Input
           ref={input}
+          className="max-w-sm"
           type="file"
           accept="image/jpeg,image/png,image/webp"
           aria-label="UPI QR image"
@@ -367,23 +423,35 @@ function EditEventCard() {
         <CardTitle>Event details</CardTitle>
         <CardDescription>Payment settings lock once anyone has registered.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <form className="grid gap-6" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={form.handleSubmit((v) => save.mutate(v))}
+        noValidate
+      >
+        <CardContent className="grid gap-8">
           {STEPS.map((s, i) => (
-            <fieldset key={s.title} className="grid gap-3">
-              <legend className="mb-2 text-sm font-semibold">{s.title}</legend>
+            <FieldSet key={s.title}>
+              <FieldLegend>{s.title}</FieldLegend>
               <EventFields form={form} step={i} />
-            </fieldset>
+            </FieldSet>
           ))}
           <ErrorAlert error={save.error} />
-          {save.isSuccess && <Alert>Saved.</Alert>}
-          <div>
-            <Button type="submit" disabled={save.isPending}>
-              Save changes
-            </Button>
-          </div>
-        </form>
-      </CardContent>
+        </CardContent>
+        <CardFooter className="gap-3 border-t">
+          <Button type="submit" disabled={save.isPending}>
+            Save changes
+          </Button>
+          {save.isSuccess && <Saved />}
+        </CardFooter>
+      </form>
     </Card>
+  );
+}
+
+function Saved() {
+  return (
+    <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <CircleCheck className="size-4 text-emerald-600" aria-hidden /> Saved.
+    </span>
   );
 }

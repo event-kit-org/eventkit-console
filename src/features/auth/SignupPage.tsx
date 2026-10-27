@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { CircleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation } from 'react-router';
@@ -7,7 +8,7 @@ import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/context';
 import { safeNext } from '@/auth/safe-next';
 import { FormField } from '@/components/FormField';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AuthLayout } from './AuthLayout';
 
@@ -46,8 +47,13 @@ export function SignupPage() {
       title="Create your account"
       description="For event organisers: create events, then build or deploy their portals."
     >
-      <form className="grid gap-4" onSubmit={onSubmit} noValidate>
-        {error && <Alert variant="destructive">{error}</Alert>}
+      <form className="grid gap-5" onSubmit={onSubmit} noValidate>
+        {error && (
+          <Alert variant="destructive">
+            <CircleAlert aria-hidden />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         <FormField
           label="Name"
           autoComplete="name"
@@ -81,7 +87,10 @@ export function SignupPage() {
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link className="font-medium text-foreground underline" to={`/login${location.search}`}>
+          <Link
+            className="font-medium text-foreground underline underline-offset-4"
+            to={`/login${location.search}`}
+          >
             Log in
           </Link>
         </p>

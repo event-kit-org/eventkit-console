@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -37,9 +37,22 @@ describe('EventsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your events.');
   });
 
-  it('logs out from the header', async () => {
+  it('switches the colour theme from the account menu, and remembers it', async () => {
+    renderApp('/', { token: 'good-token' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Account' }));
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Dark' }));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(window.localStorage.getItem('eventkit.theme')).toBe('dark');
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }));
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'System' }));
+    expect(document.documentElement).not.toHaveClass('dark');
+    expect(window.localStorage.getItem('eventkit.theme')).toBeNull();
+  });
+
+  it('logs out from the account menu', async () => {
     const { router, session } = renderApp('/', { token: 'good-token' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Log out' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Account' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Log out' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(session.get()).toBeNull();
   });
@@ -58,26 +71,28 @@ describe('event layout', () => {
     expect(nav).toHaveTextContent('SetupStaffPortal & settings');
   });
 
-  it('opens and closes the phone menu, which names the open section', async () => {
+  it('names the open section in the breadcrumb, and collapses the sidebar', async () => {
     server.use(
       http.get(eventUrl, () => HttpResponse.json({ event, role: 'admin' })),
       http.get(`${eventUrl}/features`, () => HttpResponse.json([])),
       http.get(`${eventUrl}/teams`, () => HttpResponse.json([])),
       http.get(`${eventUrl}/payment-proofs`, () => HttpResponse.json([])),
     );
-    renderApp(`/events/${event.id}`, { token: 'good-token' });
-    const menu = await screen.findByRole('button', { name: 'Sections: Overview' });
-    expect(menu).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(menu);
-    expect(menu).toHaveAttribute('aria-expanded', 'true');
-    await userEvent.keyboard('{Escape}');
-    expect(menu).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(menu);
-    await userEvent.click(screen.getByRole('link', { name: 'Teams' }));
-    expect(await screen.findByRole('button', { name: 'Sections: Teams' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
+    const { container } = renderApp(`/events/${event.id}`, { token: 'good-token' });
+    const crumbs = await screen.findByRole('navigation', { name: 'breadcrumb' });
+    await waitFor(() => expect(crumbs).toHaveTextContent('EventsPESOS X Silicon'));
+    const nav = screen.getByRole('navigation', { name: 'Event sections' });
+    await userEvent.click(within(nav).getByRole('link', { name: 'Teams' }));
+    await waitFor(() => expect(crumbs).toHaveTextContent('EventsPESOS X SiliconTeams'));
+    expect(within(nav).getByRole('link', { name: 'Teams' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
+
+    const sidebar = () => container.querySelector('[data-slot="sidebar"]');
+    expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0]!);
+    expect(sidebar()).toHaveAttribute('data-state', 'collapsed');
   });
 
   it('sends staff to the portal', async () => {
