@@ -12,7 +12,6 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { FormField } from '@/components/FormField';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -41,7 +40,8 @@ import {
 const FEATURE_TEXT: Record<Schemas['Feature'], string> = {
   registration: 'Team registration on your portal, payments and registration links',
   scanning: 'Checkpoints and QR scanning',
-  mailing: 'Automatic emails (coming later)',
+  mailing:
+    "Email the team leader everyone's participant ID, QR code and dashboard link after registering",
 };
 
 export function SettingsPage() {
@@ -289,21 +289,14 @@ function FeaturesCard() {
           {toggles.data?.map((t) => (
             <li key={t.feature} className="flex items-center justify-between gap-4 p-4">
               <div className="grid gap-0.5">
-                <div className="flex items-center gap-2 font-medium capitalize">
-                  {t.feature}
-                  {t.feature === 'mailing' && !t.bought && (
-                    <Badge variant="outline" className="normal-case">
-                      coming later
-                    </Badge>
-                  )}
-                </div>
+                <div className="flex items-center gap-2 font-medium capitalize">{t.feature}</div>
                 <div className="text-sm text-muted-foreground">{FEATURE_TEXT[t.feature]}</div>
               </div>
               {!t.bought ? (
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={t.feature === 'mailing' || buy.isPending}
+                  disabled={buy.isPending}
                   onClick={() => buy.mutate(t.feature)}
                 >
                   Activate
