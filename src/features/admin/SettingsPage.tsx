@@ -29,6 +29,7 @@ import { Switch } from '@/components/ui/switch';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { EventFields } from './EventFields';
+import { ManageEventCard } from './ManageEventCard';
 import {
   eventFormSchema,
   type EventFormValues,
@@ -46,11 +47,12 @@ const FEATURE_TEXT: Record<Schemas['Feature'], string> = {
 
 export function SettingsPage() {
   const [search] = useSearchParams();
+  const { event } = useEventContext();
   return (
     <div className="grid max-w-3xl gap-6">
       <PageHeader
         title="Portal & settings"
-        description="Where your portal lives, which features are on, how teams pay, and the event's details."
+        description="Where your portal lives, which features are on, how teams pay, the event's details, and managing the event."
       />
       {search.get('new') && (
         <Alert>
@@ -71,7 +73,10 @@ export function SettingsPage() {
       <FeaturesCard />
       <PaymentInstructionsFileCard />
       <PaymentQrCard />
-      <EditEventCard />
+      {/* Remounts when the deadline changes elsewhere (Manage event), so saving the
+          details can't put the old deadline back. */}
+      <EditEventCard key={event.registrationDeadline} />
+      <ManageEventCard />
     </div>
   );
 }

@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CircleAlert, Link2, QrCode } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, CircleAlert, Link2, QrCode, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
@@ -67,6 +67,17 @@ export function TeamDetailPage() {
   const rotateQr = useEventMutation(event.id, (id: string) =>
     unwrap(api.POST('/v1/events/{eventId}/registrations/{registrationId}/rotate-qr', reg(id))),
   );
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  // Leaves the page first, so the deleted team isn't fetched again.
+  const remove = useMutation({
+    mutationFn: () => unwrap(api.DELETE('/v1/events/{eventId}/teams/{teamId}', params)),
+    onSuccess: () => {
+      navigate('..', { relative: 'path' });
+      queryClient.removeQueries({ queryKey: ['event', event.id, 'team', teamId] });
+      return queryClient.invalidateQueries({ queryKey: ['event', event.id] });
+    },
+  });
   const attach = useEventMutation(event.id, async (file: File) => {
     const receiptKey = await uploadFile(api, event.id, 'receipt', file, fetch, teamId);
     return unwrap(
@@ -109,6 +120,19 @@ export function TeamDetailPage() {
               Confirm team
             </Button>
           )}
+          <ConfirmButton
+            variant="outline"
+            title={`Delete ${t.name}?`}
+            description={`This deletes the team and its ${t.members.length} ${
+              t.members.length === 1 ? 'member' : 'members'
+            } for good: registrations, check-ins, votes, receipts and scores. Their places free up. This can't be undone; to keep a record, cancel the team instead.`}
+            confirmLabel="Delete team"
+            destructive
+            disabled={remove.isPending}
+            onConfirm={() => remove.mutate()}
+          >
+            <Trash2 aria-hidden /> Delete team
+          </ConfirmButton>
         </div>
       </div>
       {t.belowMinimum && (
@@ -122,7 +146,14 @@ export function TeamDetailPage() {
       )}
       <AnswerList fields={teamFields(fields)} answers={t.answers} />
       <ErrorAlert
-        error={move.error ?? regAction.error ?? reissue.error ?? rotateQr.error ?? attach.error}
+        error={
+          move.error ??
+          regAction.error ??
+          reissue.error ??
+          rotateQr.error ??
+          attach.error ??
+          remove.error
+        }
       />
       <Card>
         <CardHeader>
