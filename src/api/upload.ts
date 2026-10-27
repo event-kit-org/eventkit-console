@@ -1,11 +1,12 @@
 import { type ApiClient, ApiError, unwrap } from './client';
 
-export type UploadPurpose = 'receipt' | 'payment_qr';
+export type UploadPurpose = 'receipt' | 'payment_qr' | 'payment_instructions';
 
 type FileType = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
 const ALLOWED: Record<UploadPurpose, readonly FileType[]> = {
   receipt: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
   payment_qr: ['image/jpeg', 'image/png', 'image/webp'],
+  payment_instructions: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
 };
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 

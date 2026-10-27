@@ -41,13 +41,15 @@ describe('create event wizard', () => {
     await userEvent.selectOptions(screen.getByLabelText('Participant payment'), 'at_registration');
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByText('Enter the fee.')).toBeInTheDocument();
-    await setDate('Fee', '500');
+    await setDate('Fee', '1200');
+    await userEvent.selectOptions(screen.getByLabelText('Charged'), 'per_team');
+    await userEvent.type(screen.getByLabelText('How to pay'), '  UPI: club@upi  ');
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(
       await screen.findByText('31 Oct 2026, 9:00 am IST – 1 Nov 2026, 5:00 pm IST'),
     ).toBeInTheDocument();
-    expect(screen.getByText('₹500 per person, at registration')).toBeInTheDocument();
+    expect(screen.getByText('₹1,200 per team, at registration')).toBeInTheDocument();
     expect(screen.getByText('150 people, teams of 2–4')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Create event' }));
 
@@ -66,8 +68,10 @@ describe('create event wizard', () => {
       minTeamSize: 2,
       maxTeamSize: 4,
       paymentMode: 'at_registration',
-      registrationFee: 50000,
+      registrationFee: 120000,
+      feeBasis: 'per_team',
       currency: 'INR',
+      paymentInstructions: 'UPI: club@upi',
       paymentDeadline: null,
     });
     expect(await screen.findByText(/Event created. Next/)).toBeInTheDocument();
@@ -200,10 +204,41 @@ describe('settings', () => {
     );
   });
 
-  it('warns when a paid event has no QR', async () => {
+  it('warns when a paid event has no way to pay, but not once instructions exist', async () => {
     asRole('admin');
+    const { unmount } = renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    expect(await screen.findByText(/Teams don't know how to pay yet/)).toBeInTheDocument();
+    unmount();
+    asRole('admin', { paymentInstructions: 'UPI: club@upi' });
     renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
-    expect(await screen.findByText('No QR uploaded yet: teams cannot pay.')).toBeInTheDocument();
+    expect(await screen.findByText('Payment instructions file')).toBeInTheDocument();
+    expect(screen.queryByText(/Teams don't know how to pay yet/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('How to pay')).toHaveValue('UPI: club@upi');
+  });
+
+  it('uploads, shows and removes the payment instructions file', async () => {
+    asRole('admin', { hasPaymentInstructionsFile: true });
+    server.use(
+      http.get(`${E}/payment-instructions-file`, () =>
+        HttpResponse.json({ url: 'https://storage.test/pay.pdf?signed=1', expiresIn: 300 }),
+      ),
+    );
+    const set = capture('put', `${E}/payment-instructions-file`, { event, role: 'admin' });
+    const removed = capture('delete', `${E}/payment-instructions-file`, { event, role: 'admin' });
+    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    expect(await screen.findByRole('link', { name: 'View the current file' })).toHaveAttribute(
+      'href',
+      'https://storage.test/pay.pdf?signed=1',
+    );
+    await userEvent.upload(
+      screen.getByLabelText('Payment instructions file'),
+      new File(['%PDF'], 'pay.pdf', { type: 'application/pdf' }),
+    );
+    await waitFor(() =>
+      expect(set[0]?.body).toEqual({ key: `events/${event.id}/payment_instructions/k.pdf` }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(removed).toHaveLength(1));
   });
 
   it('edits the event and shows lock errors', async () => {

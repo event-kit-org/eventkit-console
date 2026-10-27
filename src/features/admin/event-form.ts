@@ -27,7 +27,10 @@ export const eventFormSchema = z
     feeRupees: z
       .union([z.nan().transform(() => undefined), z.number().min(0, 'Cannot be negative.')])
       .optional(),
+    // per_person: the fee × team members; per_team: the fee once per team.
+    feeBasis: z.enum(['per_person', 'per_team']),
     currency: z.string().regex(/^[A-Z]{3}$/, 'Use a 3-letter code, e.g. INR.'),
+    paymentInstructions: z.string().max(2000, 'At most 2000 characters.'),
     // After shortlist only: receipts are refused after this (IST datetime-local).
     paymentDeadline: z.string(),
   })
@@ -65,12 +68,24 @@ export const STEPS = [
   { title: 'Basics', fields: ['name', 'hostedBy', 'venue'] },
   { title: 'Dates', fields: ['startAt', 'endAt', 'registrationStart', 'registrationDeadline'] },
   { title: 'Teams and capacity', fields: ['maxParticipants', 'minTeamSize', 'maxTeamSize'] },
-  { title: 'Payment', fields: ['paymentMode', 'feeRupees', 'currency', 'paymentDeadline'] },
+  {
+    title: 'Payment',
+    fields: [
+      'paymentMode',
+      'feeRupees',
+      'feeBasis',
+      'currency',
+      'paymentDeadline',
+      'paymentInstructions',
+    ],
+  },
 ] as const satisfies { title: string; fields: (keyof EventFormValues)[] }[];
 
 export const emptyEventForm: Partial<EventFormValues> = {
   paymentMode: 'none',
+  feeBasis: 'per_person',
   currency: 'INR',
+  paymentInstructions: '',
   paymentDeadline: '',
   minTeamSize: 1,
   maxTeamSize: 4,
@@ -91,7 +106,9 @@ export function toEventPayload(v: EventFormValues) {
     maxTeamSize: v.maxTeamSize,
     paymentMode: v.paymentMode,
     registrationFee: paid ? rupeesToPaise(v.feeRupees ?? 0) : null,
+    feeBasis: v.feeBasis,
     currency: paid ? v.currency : null,
+    paymentInstructions: paid ? v.paymentInstructions.trim() || null : null,
     paymentDeadline:
       v.paymentMode === 'after_shortlist' && v.paymentDeadline
         ? fromISTInput(v.paymentDeadline)
@@ -113,7 +130,9 @@ export function fromEvent(e: Schemas['Event']): EventFormValues {
     maxTeamSize: e.maxTeamSize,
     paymentMode: e.paymentMode,
     feeRupees: e.registrationFee === null ? undefined : paiseToRupees(e.registrationFee),
+    feeBasis: e.feeBasis,
     currency: e.currency ?? 'INR',
+    paymentInstructions: e.paymentInstructions ?? '',
     paymentDeadline: e.paymentDeadline ? toISTInput(e.paymentDeadline) : '',
   };
 }

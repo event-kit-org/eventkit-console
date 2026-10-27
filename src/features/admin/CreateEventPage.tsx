@@ -93,7 +93,9 @@ export function CreateEventPage() {
               <dd>
                 {v.paymentMode === 'none'
                   ? 'None'
-                  : `${formatMoney(rupeesToPaise(v.feeRupees ?? 0), v.currency)} per person, ${
+                  : `${formatMoney(rupeesToPaise(v.feeRupees ?? 0), v.currency)} ${
+                      v.feeBasis === 'per_team' ? 'per team' : 'per person'
+                    }, ${
                       v.paymentMode === 'at_registration'
                         ? 'at registration'
                         : `after shortlist, by ${formatIST(fromISTInput(v.paymentDeadline))}`

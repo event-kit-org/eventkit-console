@@ -44,6 +44,7 @@ export function SettingsPage() {
       )}
       <PortalCard />
       <FeaturesCard />
+      <PaymentInstructionsFileCard />
       <PaymentQrCard />
       <EditEventCard />
     </div>
@@ -233,6 +234,68 @@ function FeaturesCard() {
   );
 }
 
+function PaymentInstructionsFileCard() {
+  const api = useApi();
+  const { event, path } = useEventContext();
+  const file = useQuery({
+    queryKey: ['event', event.id, 'payment-instructions-file'],
+    queryFn: () => unwrap(api.GET('/v1/events/{eventId}/payment-instructions-file', path)),
+    enabled: event.hasPaymentInstructionsFile,
+  });
+  const upload = useEventMutation(event.id, async (f: File) => {
+    const key = await uploadFile(api, event.id, 'payment_instructions', f);
+    return unwrap(
+      api.PUT('/v1/events/{eventId}/payment-instructions-file', { ...path, body: { key } }),
+    );
+  });
+  const remove = useEventMutation(event.id, () =>
+    unwrap(api.DELETE('/v1/events/{eventId}/payment-instructions-file', path)),
+  );
+
+  if (event.paymentMode === 'none') return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Payment instructions file</CardTitle>
+        <CardDescription>
+          Optional: bank details or steps as an image or PDF, shown to teams before they upload
+          their receipt. JPG, PNG, WebP or PDF, up to 5 MB.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {event.hasPaymentInstructionsFile && (
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            {file.data && (
+              <a href={file.data.url} target="_blank" rel="noreferrer" className="underline">
+                View the current file
+              </a>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+            >
+              Remove
+            </Button>
+          </div>
+        )}
+        <ErrorAlert error={upload.error ?? remove.error} />
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          aria-label="Payment instructions file"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) upload.mutate(f);
+          }}
+        />
+        {upload.isPending && <p className="text-sm text-muted-foreground">Uploading…</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PaymentQrCard() {
   const api = useApi();
   const { event, path } = useEventContext();
@@ -253,7 +316,7 @@ function PaymentQrCard() {
       <CardHeader>
         <CardTitle>UPI QR code</CardTitle>
         <CardDescription>
-          Teams pay to this and upload a receipt. JPG, PNG or WebP, up to 5 MB.
+          Optional. Shown with your payment instructions. JPG, PNG or WebP, up to 5 MB.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
@@ -264,8 +327,11 @@ function PaymentQrCard() {
             className="h-48 w-48 rounded border object-contain"
           />
         )}
-        {!event.hasPaymentQr && (
-          <Alert variant="destructive">No QR uploaded yet: teams cannot pay.</Alert>
+        {!event.hasPaymentQr && !event.paymentInstructions && !event.hasPaymentInstructionsFile && (
+          <Alert variant="destructive">
+            Teams don't know how to pay yet: add written instructions (Event details), an
+            instructions file, or a QR code.
+          </Alert>
         )}
         <ErrorAlert error={upload.error} />
         <input

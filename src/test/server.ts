@@ -28,9 +28,12 @@ export const event: Schemas['Event'] = {
   maxTeamSize: 4,
   paymentMode: 'at_registration',
   registrationFee: 50000,
+  feeBasis: 'per_person',
   currency: 'INR',
   paymentDeadline: null,
+  paymentInstructions: null,
   hasPaymentQr: false,
+  hasPaymentInstructionsFile: false,
   portalUrl: 'https://portal.test',
   portalPaths: {
     register: '/register/{token}',

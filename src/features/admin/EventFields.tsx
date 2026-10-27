@@ -2,6 +2,7 @@ import { type UseFormReturn, useWatch } from 'react-hook-form';
 import { FormField } from '@/components/FormField';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import type { EventFormValues } from './event-form';
 
 type Form = UseFormReturn<EventFormValues>;
@@ -106,8 +107,14 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
             error={e.feeRupees?.message}
             {...register('feeRupees', num)}
           />
+          <div className="grid gap-2">
+            <Label htmlFor="feeBasis">Charged</Label>
+            <Select id="feeBasis" {...register('feeBasis')}>
+              <option value="per_person">Per person</option>
+              <option value="per_team">Once per team</option>
+            </Select>
+          </div>
           <FormField label="Currency" error={e.currency?.message} {...register('currency')} />
-          <p className="self-end pb-2 text-sm text-muted-foreground">Per person</p>
         </div>
       )}
       {paymentMode === 'after_shortlist' && (
@@ -119,10 +126,29 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
         />
       )}
       {paid && (
-        <p className="text-sm text-muted-foreground">
-          Upload your UPI QR code in Settings after creating the event. Teams pay to it and upload a
-          receipt; you approve each one.
-        </p>
+        <div className="grid gap-2">
+          <Label htmlFor="paymentInstructions">How to pay</Label>
+          <Textarea
+            id="paymentInstructions"
+            rows={4}
+            placeholder={
+              'e.g. Bank: Canara Bank, A/c 1234567890, IFSC CNRB0001234\nor UPI: club@upi'
+            }
+            aria-invalid={e.paymentInstructions ? true : undefined}
+            aria-describedby="paymentInstructions-hint"
+            {...register('paymentInstructions')}
+          />
+          {e.paymentInstructions ? (
+            <p id="paymentInstructions-hint" className="text-sm text-destructive">
+              {e.paymentInstructions.message}
+            </p>
+          ) : (
+            <p id="paymentInstructions-hint" className="text-sm text-muted-foreground">
+              Shown to teams before they upload their receipt. You can also upload an instructions
+              file (image or PDF) or a UPI QR code in Settings. You approve each receipt.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
