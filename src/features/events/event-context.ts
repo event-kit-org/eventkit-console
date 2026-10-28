@@ -4,6 +4,8 @@ import type { Schemas } from '@/api/client';
 export interface EventContextValue {
   event: Schemas['Event'];
   role: Schemas['Role'];
+  /** The owner; co-admins have role admin too. */
+  isOwner: boolean;
   features: Record<Schemas['Feature'], boolean>;
   /** Path params for the typed client. */
   path: { params: { path: { eventId: string } } };

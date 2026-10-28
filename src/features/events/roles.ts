@@ -5,4 +5,8 @@ export const roleLabel: Record<Schemas['Role'], string> = {
   volunteer: 'Volunteer',
   judge: 'Judge',
   participant: 'Participant',
+  reviewer: 'Reviewer',
 };
+
+/** Console roles: the owner and co-admins (admin), and reviewers. */
+export const CONSOLE_ROLES: Schemas['Role'][] = ['admin', 'reviewer'];

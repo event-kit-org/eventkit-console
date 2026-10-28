@@ -74,6 +74,7 @@ export function TeamsPage() {
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Members</TableHead>
                   <TableHead>Payment</TableHead>
+                  <TableHead>Decided by</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -98,6 +99,9 @@ export function TeamsPage() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{t.memberCount}</TableCell>
                     <TableCell className="capitalize">{t.latestProofStatus ?? '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {t.confirmedBy ?? t.shortlistedBy ?? '—'}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

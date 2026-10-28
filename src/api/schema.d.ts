@@ -674,7 +674,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign in on the portal: this event's volunteers and judges, or its owner with their eventKit login */
+        /** Sign in on the portal: this event's volunteers and judges, or its owner and co-admins with their eventKit login */
         post: {
             parameters: {
                 query?: never;
@@ -1927,7 +1927,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Events the client owns */
+        /** Events the client owns or organises (co-admin, reviewer) */
         get: {
             parameters: {
                 query?: never;
@@ -2888,6 +2888,367 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/events/{eventId}/emails/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An email's template (eventKit's default until you save one) and its variables */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    kind: components["schemas"]["EmailKindInput"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EmailTemplate"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Save your own version of an email: a whole HTML document with Mustache variables ({{name}}, {{#section}}…{{/section}}). Values are escaped; {{{raw}}} is refused. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    kind: components["schemas"]["EmailKindInput"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        subject: string;
+                        /** @description A whole HTML document */
+                        html: string;
+                        text?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EmailTemplate"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Go back to eventKit's default email */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    kind: components["schemas"]["EmailKindInput"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EmailTemplate"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{eventId}/emails/{kind}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fill the template (or an unsaved draft) with a made-up team on this event */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    kind: components["schemas"]["EmailKindInput"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        subject?: string;
+                        /** @description A whole HTML document */
+                        html?: string;
+                        text?: string | null;
+                    } | null;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RenderedEmail"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{eventId}/emails/{kind}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send the template (or an unsaved draft), filled with a made-up team, to your own email */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    kind: components["schemas"]["EmailKindInput"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        subject?: string;
+                        /** @description A whole HTML document */
+                        html?: string;
+                        text?: string | null;
+                    } | null;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RenderedEmail"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/events/{eventId}/billing/purchases": {
         parameters: {
             query?: never;
@@ -3434,7 +3795,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The owner and the staff (volunteers, judges). Participants are under teams. */
+        /** The owner, organisers (co-admins, reviewers) and staff (volunteers, judges). Participants are under teams. */
         get: {
             parameters: {
                 query?: {
@@ -3487,7 +3848,82 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /** Owner: add a co-admin (role admin) or reviewer (teams and payments only) by the email of their eventKit account */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        email: string;
+                        /** @enum {string} */
+                        role: "admin" | "reviewer";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Member"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3504,7 +3940,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a volunteer or judge (their portal account stops working) */
+        /** Remove someone: admins remove staff (their portal account stops working), the owner removes organisers, and anyone but the owner can remove themselves */
         delete: {
             parameters: {
                 query?: never;
@@ -3564,7 +4000,7 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Switch a staff member between volunteer and judge */
+        /** Switch staff between volunteer and judge, or (owner only) an organiser between admin and reviewer */
         patch: {
             parameters: {
                 query?: never;
@@ -3579,7 +4015,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        role: "volunteer" | "judge";
+                        role: "volunteer" | "judge" | "admin" | "reviewer";
                     };
                 };
             };
@@ -7307,7 +7743,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        RoleInput: "admin" | "volunteer" | "judge" | "participant";
+        RoleInput: "admin" | "volunteer" | "judge" | "participant" | "reviewer";
         /** @enum {string} */
         FeatureInput: "mailing" | "registration" | "scanning";
         SignedUrlInput: {
@@ -7425,6 +7861,35 @@ export interface components {
         EventWithRoleInput: {
             event: components["schemas"]["EventInput"];
             role: components["schemas"]["RoleInput"];
+            /** @description The owner; co-admins have role admin too */
+            isOwner: boolean;
+        };
+        /** @enum {string} */
+        EmailKindInput: "registration";
+        EmailTemplateVariableInput: {
+            name: string;
+            description: string;
+            /** @description Only inside this list section */
+            in?: string;
+            /** @description A list: use it as a section only */
+            list?: boolean;
+        };
+        EmailTemplateInput: {
+            kind: components["schemas"]["EmailKindInput"];
+            /** @description False: eventKit's default is sent */
+            custom: boolean;
+            subject: string;
+            html: string;
+            /** @description Null: a custom HTML template is sent with eventKit's default text part */
+            text: string | null;
+            updatedAt: string | null;
+            variables: components["schemas"]["EmailTemplateVariableInput"][];
+        };
+        RenderedEmailInput: {
+            to: string;
+            subject: string;
+            html: string;
+            text: string;
         };
         FeatureToggleInput: {
             feature: components["schemas"]["FeatureInput"];
@@ -7478,6 +7943,7 @@ export interface components {
             email: string;
             phone: string | null;
             role: components["schemas"]["RoleInput"];
+            isOwner: boolean;
             /** Format: date-time */
             joinedAt: string;
         };
@@ -7539,6 +8005,12 @@ export interface components {
             verifiedAt: string | null;
             rejectionNote: string | null;
         };
+        TeamDecisionInput: {
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            at: string | null;
+        } | null;
         TeamInput: {
             /** Format: uuid */
             id: string;
@@ -7578,6 +8050,10 @@ export interface components {
                 /** @description Newest first */
                 proofs: components["schemas"]["PaymentProofInput"][];
             };
+            /** @description The organiser who shortlisted the team, and when (organisers only) */
+            shortlistedBy: components["schemas"]["TeamDecisionInput"];
+            /** @description The organiser who confirmed it, directly or by approving its receipt (organisers only) */
+            confirmedBy: components["schemas"]["TeamDecisionInput"];
         };
         PaymentProofForReviewInput: {
             /** Format: uuid */
@@ -7621,6 +8097,10 @@ export interface components {
                 phone: string | null;
             };
             status: components["schemas"]["RegistrationStatusInput"];
+            /** @description Who shortlisted it */
+            shortlistedBy: string | null;
+            /** @description Who confirmed it */
+            confirmedBy: string | null;
             memberCount: number;
             belowMinimum: boolean;
             latestProofStatus: ("pending" | "approved" | "rejected") | null;
@@ -7924,7 +8404,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        Role: "admin" | "volunteer" | "judge" | "participant";
+        Role: "admin" | "volunteer" | "judge" | "participant" | "reviewer";
         /** @enum {string} */
         Feature: "mailing" | "registration" | "scanning";
         SignedUrl: {
@@ -8042,6 +8522,35 @@ export interface components {
         EventWithRole: {
             event: components["schemas"]["Event"];
             role: components["schemas"]["Role"];
+            /** @description The owner; co-admins have role admin too */
+            isOwner: boolean;
+        };
+        /** @enum {string} */
+        EmailKind: "registration";
+        EmailTemplateVariable: {
+            name: string;
+            description: string;
+            /** @description Only inside this list section */
+            in?: string;
+            /** @description A list: use it as a section only */
+            list?: boolean;
+        };
+        EmailTemplate: {
+            kind: components["schemas"]["EmailKind"];
+            /** @description False: eventKit's default is sent */
+            custom: boolean;
+            subject: string;
+            html: string;
+            /** @description Null: a custom HTML template is sent with eventKit's default text part */
+            text: string | null;
+            updatedAt: string | null;
+            variables: components["schemas"]["EmailTemplateVariable"][];
+        };
+        RenderedEmail: {
+            to: string;
+            subject: string;
+            html: string;
+            text: string;
         };
         FeatureToggle: {
             feature: components["schemas"]["Feature"];
@@ -8095,6 +8604,7 @@ export interface components {
             email: string;
             phone: string | null;
             role: components["schemas"]["Role"];
+            isOwner: boolean;
             /** Format: date-time */
             joinedAt: string;
         };
@@ -8156,6 +8666,12 @@ export interface components {
             verifiedAt: string | null;
             rejectionNote: string | null;
         };
+        TeamDecision: {
+            /** Format: uuid */
+            userId: string;
+            name: string;
+            at: string | null;
+        } | null;
         Team: {
             /** Format: uuid */
             id: string;
@@ -8195,6 +8711,10 @@ export interface components {
                 /** @description Newest first */
                 proofs: components["schemas"]["PaymentProof"][];
             };
+            /** @description The organiser who shortlisted the team, and when (organisers only) */
+            shortlistedBy: components["schemas"]["TeamDecision"];
+            /** @description The organiser who confirmed it, directly or by approving its receipt (organisers only) */
+            confirmedBy: components["schemas"]["TeamDecision"];
         };
         PaymentProofForReview: {
             /** Format: uuid */
@@ -8238,6 +8758,10 @@ export interface components {
                 phone: string | null;
             };
             status: components["schemas"]["RegistrationStatus"];
+            /** @description Who shortlisted it */
+            shortlistedBy: string | null;
+            /** @description Who confirmed it */
+            confirmedBy: string | null;
             memberCount: number;
             belowMinimum: boolean;
             latestProofStatus: ("pending" | "approved" | "rejected") | null;

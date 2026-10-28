@@ -37,7 +37,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { SECTIONS, type Section } from '@/features/events/sections';
+import { canSee, SECTIONS, type Section } from '@/features/events/sections';
 import { useOpenEventId } from '@/hooks/useOpenEventId';
 import { type Theme, useTheme } from '@/lib/theme';
 
@@ -149,10 +149,18 @@ function HomeNav() {
 }
 
 function EventNav({ eventId }: { eventId: string }) {
+  const api = useApi();
   const base = `/events/${eventId}`;
+  const events = useQuery({ queryKey: ['events'], queryFn: () => unwrap(api.GET('/v1/events')) });
+  // Until the events load, assume admin: the pages check the role themselves.
+  const role = events.data?.find((e) => e.event.id === eventId)?.role ?? 'admin';
+  const groups = SECTIONS.map(({ group, links }) => ({
+    group,
+    links: links.filter((s) => canSee(s, role)),
+  })).filter((g) => g.links.length > 0);
   return (
     <nav aria-label="Event sections">
-      {SECTIONS.map(({ group, links }) => (
+      {groups.map(({ group, links }) => (
         <SidebarGroup key={group ?? 'top'}>
           {group && <SidebarGroupLabel>{group}</SidebarGroupLabel>}
           <SidebarGroupContent>

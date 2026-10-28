@@ -30,18 +30,26 @@ import { download, slug, teamsCsv } from './teams-csv';
 
 /** Registration window, exporting teams, and deleting the event. */
 export function ManageEventCard() {
+  const { isOwner } = useEventContext();
   return (
     <Card>
       <CardHeader>
         <CardTitle>Manage event</CardTitle>
-        <CardDescription>Registration, exports, and deleting the event.</CardDescription>
+        <CardDescription>
+          {isOwner ? 'Registration, exports, and deleting the event.' : 'Registration and exports.'}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
         <RegistrationWindow />
         <Separator />
         <ExportTeams />
-        <Separator />
-        <DeleteEvent />
+        {/* Only the owner deletes the event. */}
+        {isOwner && (
+          <>
+            <Separator />
+            <DeleteEvent />
+          </>
+        )}
       </CardContent>
     </Card>
   );

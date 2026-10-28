@@ -251,6 +251,7 @@ describe('people', () => {
       email: 'asha@example.com',
       phone: null,
       role: 'admin',
+      isOwner: true,
       respondedAt: event.createdAt,
     },
     {
@@ -259,9 +260,19 @@ describe('people', () => {
       email: 'vik@example.com',
       phone: '+91 90000',
       role: 'volunteer',
+      isOwner: false,
       respondedAt: event.createdAt,
     },
   ];
+  const reviewer = {
+    userId: 'u3',
+    name: 'Rhea',
+    email: 'rhea@example.com',
+    phone: null,
+    role: 'reviewer',
+    isOwner: false,
+    respondedAt: event.createdAt,
+  };
 
   it('changes roles and removes people, but not yourself', async () => {
     asRole('admin');
@@ -290,6 +301,77 @@ describe('people', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Role of Vik'), 'judge');
     expect(await screen.findByRole('alert')).toHaveTextContent('Not a member');
     expect(screen.queryByLabelText('Role of Asha')).not.toBeInTheDocument();
+  });
+
+  it('lets the owner add organisers by email, change their role and remove them', async () => {
+    asRole('admin');
+    server.use(http.get(`${E}/members`, () => HttpResponse.json([...members, reviewer])));
+    const add = capture('post', `${E}/members`, { ...reviewer, userId: 'u4' }, 201);
+    const change = capture('patch', `${E}/members/u3`, { userId: 'u3', role: 'admin' });
+    const remove = capture('delete', `${E}/members/u3`);
+    go('/people');
+    const organisers = within(
+      (await screen.findByText('Organisers')).closest('[data-slot="card"]') as HTMLElement,
+    );
+    expect(organisers.getByText('Owner')).toBeInTheDocument();
+    await userEvent.selectOptions(organisers.getByLabelText('Role of Rhea'), 'admin');
+    await waitFor(() => expect(change[0]?.body).toEqual({ role: 'admin' }));
+    await userEvent.type(organisers.getByLabelText('Their eventKit email'), 'new@example.com');
+    await userEvent.selectOptions(organisers.getByLabelText('Role'), 'admin');
+    await userEvent.click(organisers.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(add[0]?.body).toEqual({ email: 'new@example.com', role: 'admin' }));
+    await userEvent.click(organisers.getByRole('button', { name: 'Remove' }));
+    await confirmDialog('Remove');
+    await waitFor(() => expect(remove).toHaveLength(1));
+  });
+
+  it("shows a co-admin the organisers without the owner's controls", async () => {
+    asRole('admin', {}, undefined, false);
+    server.use(http.get(`${E}/members`, () => HttpResponse.json([...members, reviewer])));
+    go('/people');
+    const organisers = within(
+      (await screen.findByText('Organisers')).closest('[data-slot="card"]') as HTMLElement,
+    );
+    expect(organisers.getByText('Reviewer')).toBeInTheDocument();
+    expect(organisers.queryByLabelText('Role of Rhea')).not.toBeInTheDocument();
+    expect(organisers.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+    expect(organisers.queryByRole('form', { name: 'Add an organiser' })).not.toBeInTheDocument();
+  });
+});
+
+describe('reviewers', () => {
+  it('see teams and payments only, and can shortlist but not delete or reissue', async () => {
+    asRole('reviewer', { paymentMode: 'after_shortlist' });
+    const t = registeredTeam('registered', {
+      shortlistedBy: { userId: 'u3', name: 'Rhea', at: event.createdAt },
+    });
+    server.use(
+      http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)),
+      http.get(`${E}/fields`, () => HttpResponse.json([])),
+    );
+    const shortlist = capture('post', `${E}/teams/${t.id}/shortlist`, {
+      ...t,
+      status: 'shortlisted',
+      shortlistedBy: { userId: 'u3', name: 'Rhea', at: event.createdAt },
+    });
+    go(`/teams/${t.id}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Shortlist team' }));
+    await waitFor(() => expect(shortlist).toHaveLength(1));
+    expect(await screen.findByText(/Shortlisted by Rhea/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Delete team/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /New link/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Attach a receipt')).not.toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Event sections' });
+    await waitFor(() => expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments'));
+    expect(nav).not.toHaveTextContent('Portal & settings');
+  });
+
+  it("can't open admin pages directly", async () => {
+    asRole('reviewer');
+    go('/settings');
+    expect(
+      await screen.findByText('This page is not available for your role.'),
+    ).toBeInTheDocument();
   });
 });
 

@@ -61,14 +61,14 @@ describe('EventsPage', () => {
 describe('event layout', () => {
   it("shows the owner's tabs", async () => {
     server.use(
-      http.get(eventUrl, () => HttpResponse.json({ event, role: 'admin' })),
+      http.get(eventUrl, () => HttpResponse.json({ event, role: 'admin', isOwner: true })),
       http.get(`${eventUrl}/features`, () => HttpResponse.json([])),
     );
     renderApp(`/events/${event.id}`, { token: 'good-token' });
     expect(await screen.findByRole('heading', { name: 'PESOS X Silicon' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Event sections' });
     expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments');
-    expect(nav).toHaveTextContent('SetupStaffPortal & settings');
+    expect(nav).toHaveTextContent('SetupPeoplePortal & settings');
   });
 
   it('names the open section in the breadcrumb, and collapses the sidebar', async () => {

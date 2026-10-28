@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CircleAlert, Link2, QrCode, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { unwrap } from '@/api/client';
+import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
@@ -26,7 +26,9 @@ import { formatMoney } from '@/lib/money';
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
   const api = useApi();
-  const { event } = useEventContext();
+  const { event, role } = useEventContext();
+  // Reviewers shortlist, confirm and cancel; links, QR codes, receipts and deleting are for admins.
+  const admin = role === 'admin';
   const params = { params: { path: { eventId: event.id, teamId } } };
   const fields = useFields().data ?? [];
   const [newLink, setNewLink] = useState<{
@@ -120,21 +122,24 @@ export function TeamDetailPage() {
               Confirm team
             </Button>
           )}
-          <ConfirmButton
-            variant="outline"
-            title={`Delete ${t.name}?`}
-            description={`This deletes the team and its ${t.members.length} ${
-              t.members.length === 1 ? 'member' : 'members'
-            } for good: registrations, check-ins, votes, receipts and scores. Their places free up. This can't be undone; to keep a record, cancel the team instead.`}
-            confirmLabel="Delete team"
-            destructive
-            disabled={remove.isPending}
-            onConfirm={() => remove.mutate()}
-          >
-            <Trash2 aria-hidden /> Delete team
-          </ConfirmButton>
+          {admin && (
+            <ConfirmButton
+              variant="outline"
+              title={`Delete ${t.name}?`}
+              description={`This deletes the team and its ${t.members.length} ${
+                t.members.length === 1 ? 'member' : 'members'
+              } for good: registrations, check-ins, votes, receipts and scores. Their places free up. This can't be undone; to keep a record, cancel the team instead.`}
+              confirmLabel="Delete team"
+              destructive
+              disabled={remove.isPending}
+              onConfirm={() => remove.mutate()}
+            >
+              <Trash2 aria-hidden /> Delete team
+            </ConfirmButton>
+          )}
         </div>
       </div>
+      <Decisions team={t} />
       {t.belowMinimum && (
         <Alert variant="destructive">
           <CircleAlert aria-hidden />
@@ -204,30 +209,34 @@ export function TeamDetailPage() {
                   <AnswerList fields={memberFields(fields)} answers={m.answers} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <ConfirmButton
-                    size="sm"
-                    variant="outline"
-                    title={`Give ${m.name} a new personal link?`}
-                    description="Their current link stops working."
-                    confirmLabel="New link"
-                    onConfirm={() =>
-                      reissue.mutate(m.registrationId, {
-                        onSuccess: (link) => setNewLink({ name: m.name, ...link }),
-                      })
-                    }
-                  >
-                    <Link2 aria-hidden /> New link
-                  </ConfirmButton>
-                  <ConfirmButton
-                    size="sm"
-                    variant="outline"
-                    title={`Give ${m.name} a new QR code?`}
-                    description="The old one stops scanning."
-                    confirmLabel="New QR"
-                    onConfirm={() => rotateQr.mutate(m.registrationId)}
-                  >
-                    <QrCode aria-hidden /> New QR
-                  </ConfirmButton>
+                  {admin && (
+                    <>
+                      <ConfirmButton
+                        size="sm"
+                        variant="outline"
+                        title={`Give ${m.name} a new personal link?`}
+                        description="Their current link stops working."
+                        confirmLabel="New link"
+                        onConfirm={() =>
+                          reissue.mutate(m.registrationId, {
+                            onSuccess: (link) => setNewLink({ name: m.name, ...link }),
+                          })
+                        }
+                      >
+                        <Link2 aria-hidden /> New link
+                      </ConfirmButton>
+                      <ConfirmButton
+                        size="sm"
+                        variant="outline"
+                        title={`Give ${m.name} a new QR code?`}
+                        description="The old one stops scanning."
+                        confirmLabel="New QR"
+                        onConfirm={() => rotateQr.mutate(m.registrationId)}
+                      >
+                        <QrCode aria-hidden /> New QR
+                      </ConfirmButton>
+                    </>
+                  )}
                   {m.status === 'cancelled' ? (
                     <Button
                       size="sm"
@@ -259,7 +268,7 @@ export function TeamDetailPage() {
           </ul>
         </CardContent>
       </Card>
-      {event.paymentMode !== 'none' && t.status !== 'cancelled' && (
+      {admin && event.paymentMode !== 'none' && t.status !== 'cancelled' && (
         <Card>
           <CardHeader>
             <CardTitle>Attach a receipt</CardTitle>
@@ -309,5 +318,22 @@ export function TeamDetailPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+/** Who shortlisted and confirmed the team, so organisers sharing the list can see. */
+function Decisions({ team }: { team: Schemas['Team'] }) {
+  const lines = [
+    ['Shortlisted', team.shortlistedBy],
+    ['Confirmed', team.confirmedBy],
+  ] as const;
+  const shown = lines.filter(([, d]) => d);
+  if (shown.length === 0) return null;
+  return (
+    <p className="text-sm text-muted-foreground">
+      {shown
+        .map(([what, d]) => `${what} by ${d!.name}${d!.at ? ` · ${formatIST(d!.at)}` : ''}`)
+        .join('. ')}
+    </p>
   );
 }

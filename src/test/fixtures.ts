@@ -16,14 +16,19 @@ export const features = (
     updatedAt: event.createdAt,
   }));
 
-/** The event as seen by someone with `role`, with these features on. */
+/** The event as seen by someone with `role` (the owner, for admin, unless `isOwner` is false). */
 export function asRole(
   role: Schemas['Role'],
   overrides: Partial<Schemas['Event']> = {},
   on?: Partial<Record<Schemas['Feature'], boolean>>,
+  isOwner = role === 'admin',
 ) {
   server.use(
-    http.get(E, () => HttpResponse.json({ event: { ...event, ...overrides }, role })),
+    http.get(E, () => HttpResponse.json({ event: { ...event, ...overrides }, role, isOwner })),
+    // The sidebar reads the role from the events list.
+    http.get(`${API}/v1/events`, () =>
+      HttpResponse.json([{ event: { ...event, ...overrides }, role, isOwner }]),
+    ),
     http.get(`${E}/features`, () => HttpResponse.json(features(on))),
   );
 }
@@ -62,6 +67,8 @@ export function team(overrides: Partial<Schemas['Team']> = {}): Schemas['Team'] 
       deadline: null,
       proofs: [],
     },
+    shortlistedBy: null,
+    confirmedBy: null,
     ...overrides,
   };
 }

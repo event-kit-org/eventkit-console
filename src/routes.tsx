@@ -46,11 +46,16 @@ export const routes: RouteObject[] = [
                 children: [{ path: 'scan', element: <ScannerPage /> }],
               },
               {
-                element: <RequireRole roles={['admin']} />,
+                element: <RequireRole roles={['admin', 'reviewer']} />,
                 children: [
                   { path: 'teams', element: <TeamsPage /> },
                   { path: 'teams/:teamId', element: <TeamDetailPage /> },
                   { path: 'payments', element: <PaymentsPage /> },
+                ],
+              },
+              {
+                element: <RequireRole roles={['admin']} />,
+                children: [
                   { path: 'people', element: <PeoplePage /> },
                   { path: 'links', element: <LinksPage /> },
                   { path: 'form', element: <FieldsPage /> },

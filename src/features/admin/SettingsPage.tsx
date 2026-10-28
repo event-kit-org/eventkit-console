@@ -41,8 +41,7 @@ import {
 const FEATURE_TEXT: Record<Schemas['Feature'], string> = {
   registration: 'Team registration on your portal, payments and registration links',
   scanning: 'Checkpoints and QR scanning',
-  mailing:
-    "Email the team leader everyone's participant ID, QR code and dashboard link after registering",
+  mailing: "Email the team leader everyone's participant ID and dashboard link after registering",
 };
 
 export function SettingsPage() {
@@ -92,7 +91,7 @@ type PathName = (typeof PATHS)[number][0];
 /** Where the event's portal lives, and the paths its links use. */
 function PortalCard() {
   const api = useApi();
-  const { event, path } = useEventContext();
+  const { event, path, isOwner } = useEventContext();
   const [url, setUrl] = useState(event.portalUrl ?? '');
   const [paths, setPaths] = useState<Partial<Record<PathName, string>>>(
     () => (event.portalPaths ?? {}) as Partial<Record<PathName, string>>,
@@ -111,6 +110,8 @@ function PortalCard() {
   const keys = useQuery({
     queryKey: ['event', event.id, 'api-keys'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/api-keys', path)),
+    // API keys are the owner's.
+    enabled: isOwner,
   });
   const [newKey, setNewKey] = useState<string | null>(null);
   // The address the console reaches the API on, made absolute for a portal elsewhere.
@@ -205,51 +206,58 @@ function PortalCard() {
           <p className="text-muted-foreground">
             The portal sends its key with every request. It identifies the portal and grants nothing
             by itself.
+            {!isOwner && " Only the event's owner sees and creates keys."}
           </p>
-          <ul className="grid gap-1.5">
-            {keys.data
-              ?.filter((k) => !k.revokedAt)
-              .map((k) => (
-                <li key={k.id} className="flex items-center gap-2">
-                  <KeyRound className="size-4 text-muted-foreground" aria-hidden />
-                  {k.name}
-                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                    {k.keyPrefix}…
-                  </code>
-                </li>
-              ))}
-          </ul>
-          {newKey && (
-            <Alert>
-              <KeyRound aria-hidden />
-              <AlertDescription className="grid gap-2">
-                <p>
-                  New key (shown once):{' '}
-                  <code className="font-mono break-all text-foreground">{newKey}</code>
-                </p>
-                <p>Your portal's settings, ready to paste into its environment:</p>
-                <pre
-                  aria-label="Portal settings"
-                  className="overflow-x-auto rounded bg-muted p-2 font-mono text-xs text-foreground"
+          {isOwner && (
+            <>
+              <ul className="grid gap-1.5">
+                {keys.data
+                  ?.filter((k) => !k.revokedAt)
+                  .map((k) => (
+                    <li key={k.id} className="flex items-center gap-2">
+                      <KeyRound className="size-4 text-muted-foreground" aria-hidden />
+                      {k.name}
+                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                        {k.keyPrefix}…
+                      </code>
+                    </li>
+                  ))}
+              </ul>
+              {newKey && (
+                <Alert>
+                  <KeyRound aria-hidden />
+                  <AlertDescription className="grid gap-2">
+                    <p>
+                      New key (shown once):{' '}
+                      <code className="font-mono break-all text-foreground">{newKey}</code>
+                    </p>
+                    <p>Your portal's settings, ready to paste into its environment:</p>
+                    <pre
+                      aria-label="Portal settings"
+                      className="overflow-x-auto rounded bg-muted p-2 font-mono text-xs text-foreground"
+                    >
+                      {portalEnv(newKey)}
+                    </pre>
+                    <div>
+                      <CopyButton value={portalEnv(newKey)} label="portal settings" />
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <ErrorAlert error={keys.error ?? createKey.error} />
+              <div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    createKey.mutate(undefined, { onSuccess: (k) => setNewKey(k.key) })
+                  }
                 >
-                  {portalEnv(newKey)}
-                </pre>
-                <div>
-                  <CopyButton value={portalEnv(newKey)} label="portal settings" />
-                </div>
-              </AlertDescription>
-            </Alert>
+                  Create API key
+                </Button>
+              </div>
+            </>
           )}
-          <ErrorAlert error={keys.error ?? createKey.error} />
-          <div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => createKey.mutate(undefined, { onSuccess: (k) => setNewKey(k.key) })}
-            >
-              Create API key
-            </Button>
-          </div>
         </FieldSet>
       </CardContent>
     </Card>
@@ -258,7 +266,7 @@ function PortalCard() {
 
 function FeaturesCard() {
   const api = useApi();
-  const { event, path } = useEventContext();
+  const { event, path, isOwner } = useEventContext();
   const toggles = useQuery({
     queryKey: ['event', event.id, 'features'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/features', path)),
@@ -298,14 +306,18 @@ function FeaturesCard() {
                 <div className="text-sm text-muted-foreground">{FEATURE_TEXT[t.feature]}</div>
               </div>
               {!t.bought ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={buy.isPending}
-                  onClick={() => buy.mutate(t.feature)}
-                >
-                  Activate
-                </Button>
+                isOwner ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={buy.isPending}
+                    onClick={() => buy.mutate(t.feature)}
+                  >
+                    Activate
+                  </Button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">The owner activates it</span>
+                )
               ) : (
                 <Switch
                   aria-label={t.feature}
