@@ -74,6 +74,10 @@ describe('teams', () => {
     );
     go('/teams');
     expect(await screen.findByRole('link', { name: 'Byte Club' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Review Byte Club' })).toHaveAttribute(
+      'href',
+      `/events/${event.id}/teams/44444444-4444-4444-8444-444444444444`,
+    );
     await userEvent.selectOptions(screen.getByLabelText('Show'), 'registered');
     expect(screen.queryByRole('link', { name: 'Byte Club' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Waiting One' })).toBeInTheDocument();
@@ -337,6 +341,32 @@ describe('people', () => {
     expect(organisers.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
     expect(organisers.queryByRole('form', { name: 'Add an organiser' })).not.toBeInTheDocument();
   });
+
+  it('lets a co-admin leave from their own row, and never offers it to the owner', async () => {
+    asRole('admin', {}, undefined, false);
+    const me = { ...members[0]!, isOwner: false };
+    const owner = { ...members[0]!, userId: 'owner-1', name: 'Olu', email: 'olu@example.com' };
+    server.use(http.get(`${E}/members`, () => HttpResponse.json([owner, me])));
+    const leave = capture('delete', `${E}/members/${me.userId}`, null, 204);
+    const { router } = go('/people');
+    const organisers = within(
+      (await screen.findByText('Organisers')).closest('[data-slot="card"]') as HTMLElement,
+    );
+    expect(organisers.getAllByRole('button', { name: 'Leave' })).toHaveLength(1);
+    await userEvent.click(organisers.getByRole('button', { name: 'Leave' }));
+    await confirmDialog('Leave');
+    await waitFor(() => expect(leave).toHaveLength(1));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it("doesn't offer the owner a way to leave", async () => {
+    asRole('admin');
+    server.use(http.get(`${E}/members`, () => HttpResponse.json(members)));
+    go('/people');
+    await screen.findByText('Organisers');
+    expect(screen.queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Leave this event/ })).not.toBeInTheDocument();
+  });
 });
 
 describe('reviewers', () => {
@@ -363,6 +393,7 @@ describe('reviewers', () => {
     expect(screen.queryByText('Attach a receipt')).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Event sections' });
     await waitFor(() => expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments'));
+    expect(nav).not.toHaveTextContent('Scanner');
     expect(nav).not.toHaveTextContent('Portal & settings');
   });
 

@@ -70,7 +70,7 @@ export function FieldsPage() {
         const inSection = all.filter((f) => sectionOf(f) === section);
         return (
           <section key={section} aria-labelledby={`section-${section}`} className="grid gap-3">
-            <div className="rounded-xl border border-t-4 border-t-primary bg-card p-4 shadow-xs">
+            <div className="rounded-xl border bg-card p-4 shadow-xs">
               <h2 id={`section-${section}`} className="text-lg font-semibold">
                 {SECTIONS[section].title}
               </h2>

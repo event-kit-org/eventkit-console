@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => vi.restoreAllMocks());
-import { asRole, capture, E, features } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E, features } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { API, apiError, event, server } from '@/test/server';
 
@@ -147,6 +147,10 @@ describe('settings', () => {
     renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
     expect(await screen.findByText(/ek_ab…/)).toBeInTheDocument();
     expect(screen.queryByText(/ek_cd…/)).not.toBeInTheDocument();
+    const del = capture('delete', `${E}/api-keys/k1`, { id: 'k1' });
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await confirmDialog('Delete key');
+    await waitFor(() => expect(del).toHaveLength(1));
     await userEvent.type(screen.getByLabelText('Portal URL'), 'https://machzero.vercel.app');
     await userEvent.click(screen.getByText(/^Paths/));
     await userEvent.clear(screen.getByLabelText('Personal link'));

@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi, useAuth } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { CopyButton } from '@/components/CopyButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
@@ -121,6 +122,13 @@ function PortalCard() {
   const createKey = useEventMutation(event.id, () =>
     unwrap(api.POST('/v1/events/{eventId}/api-keys', { ...path, body: { name: 'Portal' } })),
   );
+  const deleteKey = useEventMutation(event.id, (keyId: string) =>
+    unwrap(
+      api.DELETE('/v1/events/{eventId}/api-keys/{keyId}', {
+        params: { path: { eventId: event.id, keyId } },
+      }),
+    ),
+  );
 
   return (
     <Card>
@@ -220,6 +228,19 @@ function PortalCard() {
                       <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                         {k.keyPrefix}…
                       </code>
+                      <ConfirmButton
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto"
+                        title={`Delete the key ${k.keyPrefix}…?`}
+                        description="A portal using this key stops working until you give it a new one."
+                        confirmLabel="Delete key"
+                        destructive
+                        disabled={deleteKey.isPending}
+                        onConfirm={() => deleteKey.mutate(k.id)}
+                      >
+                        Delete
+                      </ConfirmButton>
                     </li>
                   ))}
               </ul>
@@ -244,7 +265,7 @@ function PortalCard() {
                   </AlertDescription>
                 </Alert>
               )}
-              <ErrorAlert error={keys.error ?? createKey.error} />
+              <ErrorAlert error={keys.error ?? createKey.error ?? deleteKey.error} />
               <div>
                 <Button
                   size="sm"

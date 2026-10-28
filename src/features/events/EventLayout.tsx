@@ -1,10 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { CircleAlert } from 'lucide-react';
-import { Outlet, useNavigate, useParams } from 'react-router';
+import { Outlet, useParams } from 'react-router';
 import { ApiError, unwrap } from '@/api/client';
-import { useApi, useAuth } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
-import { ErrorAlert } from '@/components/ErrorAlert';
+import { useApi } from '@/auth/context';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,7 +70,6 @@ export function EventLayout() {
           <Badge variant="secondary">
             {isOwner ? 'Owner' : role === 'admin' ? 'Co-admin' : roleLabel[role]}
           </Badge>
-          {!isOwner && <LeaveEvent eventId={eventId} name={event.name} />}
         </div>
         <p className="text-sm text-muted-foreground">
           {event.hostedBy} · {event.venue} · {formatDateIST(event.startAt)} –{' '}
@@ -80,42 +77,6 @@ export function EventLayout() {
         </p>
       </header>
       <div className="min-w-0">{features.isSuccess && <Outlet context={context} />}</div>
-    </div>
-  );
-}
-
-/** Co-admins and reviewers can take themselves out of an event. */
-function LeaveEvent({ eventId, name }: { eventId: string; name: string }) {
-  const api = useApi();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const leave = useMutation({
-    mutationFn: () =>
-      unwrap(
-        api.DELETE('/v1/events/{eventId}/members/{userId}', {
-          params: { path: { eventId, userId: user!.id } },
-        }),
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['events'] });
-      void navigate('/');
-    },
-  });
-  return (
-    <div className="ml-auto">
-      <ConfirmButton
-        size="sm"
-        variant="ghost"
-        title={`Leave ${name}?`}
-        description="It disappears from your console. The owner can add you again."
-        confirmLabel="Leave"
-        destructive
-        onConfirm={() => leave.mutate()}
-      >
-        Leave this event
-      </ConfirmButton>
-      <ErrorAlert error={leave.error} />
     </div>
   );
 }

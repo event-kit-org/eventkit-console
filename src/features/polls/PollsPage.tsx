@@ -225,7 +225,7 @@ function CreatePoll() {
   );
 
   const header = (
-    <PageHeader title="Polls" description="Ask anything, from food choices to T-shirt sizes.">
+    <PageHeader title="Polls">
       {!open && (
         <Button onClick={() => setOpen(true)}>
           <Plus aria-hidden /> New poll

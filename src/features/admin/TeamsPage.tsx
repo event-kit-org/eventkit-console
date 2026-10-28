@@ -1,4 +1,4 @@
-import { UsersRound } from 'lucide-react';
+import { ArrowRight, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -6,6 +6,7 @@ import { EmptyState, Loading } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import {
@@ -75,6 +76,9 @@ export function TeamsPage() {
                   <TableHead className="text-right">Members</TableHead>
                   <TableHead>Payment</TableHead>
                   <TableHead>Decided by</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Review</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -101,6 +105,13 @@ export function TeamsPage() {
                     <TableCell className="capitalize">{t.latestProofStatus ?? '—'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {t.confirmedBy ?? t.shortlistedBy ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="icon-sm" variant="outline" asChild>
+                        <Link to={t.id} aria-label={`Review ${t.name}`}>
+                          <ArrowRight aria-hidden />
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

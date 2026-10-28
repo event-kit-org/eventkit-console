@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserCog } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi, useAuth } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
@@ -92,7 +93,8 @@ function Organisers(props: {
         <CardDescription>
           Co-admins can do everything except delete the event, billing, API keys and organisers.
           Reviewers work through teams and payments: shortlisting, confirming and receipts. Both
-          need an eventKit account and work in this console.
+          need an eventKit account and work in this console. Reviewers who want to leave ask the
+          owner to remove them.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -149,7 +151,7 @@ function Organisers(props: {
                         Remove
                       </ConfirmButton>
                     )}
-                    {!m.isOwner && m.userId === user?.id && <span className="text-xs">You</span>}
+                    {!m.isOwner && m.userId === user?.id && <LeaveEvent />}
                   </TableCell>
                 </TableRow>
               ))}
@@ -286,5 +288,43 @@ function Staff(props: {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** A co-admin takes themselves out of the event. The owner never can. */
+function LeaveEvent() {
+  const api = useApi();
+  const { user } = useAuth();
+  const { event } = useEventContext();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const leave = useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.DELETE('/v1/events/{eventId}/members/{userId}', {
+          params: { path: { eventId: event.id, userId: user!.id } },
+        }),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['events'] });
+      void navigate('/');
+    },
+  });
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <span className="text-xs text-muted-foreground">You</span>
+      <ConfirmButton
+        size="sm"
+        variant="outline"
+        title={`Leave ${event.name}?`}
+        description="It disappears from your console. The owner can add you again."
+        confirmLabel="Leave"
+        destructive
+        onConfirm={() => leave.mutate()}
+      >
+        Leave
+      </ConfirmButton>
+      <ErrorAlert error={leave.error} />
+    </div>
   );
 }

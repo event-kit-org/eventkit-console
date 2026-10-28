@@ -69,6 +69,8 @@ describe('event layout', () => {
     const nav = screen.getByRole('navigation', { name: 'Event sections' });
     expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments');
     expect(nav).toHaveTextContent('SetupPeoplePortal & settings');
+    // Scanning happens on the portal; the page still opens by its address.
+    expect(nav).toHaveTextContent('Event dayCheckpointsPollsNotificationsJudging');
   });
 
   it('names the open section in the breadcrumb, and collapses the sidebar', async () => {

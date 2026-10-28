@@ -6,7 +6,6 @@ import {
   Gauge,
   Link2,
   MapPin,
-  ScanLine,
   Settings,
   Trophy,
   UserCog,
@@ -42,7 +41,6 @@ export const SECTIONS: { group: string | null; links: Section[] }[] = [
     group: 'Event day',
     links: [
       { to: 'checkpoints', label: 'Checkpoints', icon: MapPin },
-      { to: 'scan', label: 'Scanner', icon: ScanLine },
       { to: 'polls', label: 'Polls', icon: BarChart3 },
       { to: 'notifications', label: 'Notifications', icon: Bell },
       { to: 'judging', label: 'Judging', icon: Trophy },
