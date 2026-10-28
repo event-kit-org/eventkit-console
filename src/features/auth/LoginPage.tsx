@@ -62,6 +62,14 @@ export function LoginPage() {
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? 'Logging in…' : 'Log in'}
         </Button>
+        <p className="-mt-2 text-center text-sm">
+          <Link
+            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            to="/forgot-password"
+          >
+            Forgot password?
+          </Link>
+        </p>
         <p className="text-center text-sm text-muted-foreground">
           New here?{' '}
           <Link

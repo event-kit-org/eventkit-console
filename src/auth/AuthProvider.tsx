@@ -55,6 +55,7 @@ export function AuthProvider({
         session.set(null);
         queryClient.clear();
       },
+      start,
     };
   }, [api, config, me.data, token, session, queryClient]);
 

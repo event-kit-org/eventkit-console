@@ -20,11 +20,16 @@ import { JudgingPage } from '@/features/judging/JudgingPage';
 import { NotificationsPage } from '@/features/notifications/NotificationsPage';
 import { PollsPage } from '@/features/polls/PollsPage';
 import { ScannerPage } from '@/features/scanner/ScannerPage';
+import { AccountPage } from '@/features/account/AccountPage';
+import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { NotFoundPage } from '@/NotFoundPage';
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/signup', element: <SignupPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -32,6 +37,7 @@ export const routes: RouteObject[] = [
         element: <AppShell />,
         children: [
           { index: true, element: <EventsPage /> },
+          { path: 'account', element: <AccountPage /> },
           { path: 'events/new', element: <CreateEventPage /> },
           {
             path: 'events/:eventId',

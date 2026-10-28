@@ -12,6 +12,8 @@ export interface AuthState {
   login(email: string, password: string): Promise<void>;
   signup(input: { email: string; name: string; password: string; phone?: string }): Promise<void>;
   logout(): void;
+  /** Signs in with a session the API returned (after changing or resetting a password). */
+  start(session: Schemas['Session']): void;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);

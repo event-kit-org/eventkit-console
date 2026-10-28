@@ -8,6 +8,7 @@ import {
   Moon,
   Plus,
   Sun,
+  UserCog,
 } from 'lucide-react';
 import { Link, NavLink, useMatch } from 'react-router';
 import { unwrap } from '@/api/client';
@@ -242,6 +243,11 @@ function UserMenu() {
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/account">
+                <UserCog aria-hidden /> Account settings
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={logout}>
               <LogOut aria-hidden /> Log out
             </DropdownMenuItem>
