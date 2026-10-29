@@ -254,10 +254,10 @@ describe('settings', () => {
     );
     await userEvent.upload(
       screen.getByLabelText('Payment instructions file'),
-      new File(['x'], 'pay.png', { type: 'image/png' }),
+      new File(['webp'], 'pay.webp', { type: 'image/webp' }),
     );
     await waitFor(() =>
-      expect(set[0]?.body).toEqual({ key: `events/${event.id}/payment_instructions/k.png` }),
+      expect(set[0]?.body).toEqual({ key: `events/${event.id}/payment_instructions/k.webp` }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(removed).toHaveLength(1));

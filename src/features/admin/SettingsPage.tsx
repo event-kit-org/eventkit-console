@@ -445,8 +445,8 @@ function PaymentInstructionsFileCard() {
       <CardHeader>
         <CardTitle>Payment instructions file</CardTitle>
         <CardDescription>
-          Optional: bank details or steps as an image, shown to teams before they upload
-          their receipt. JPG, PNG or WebP, up to 5 MB.
+          Optional: bank details or steps as an image, shown to teams before they upload their
+          receipt. JPG, PNG or WebP, up to 5 MB.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
