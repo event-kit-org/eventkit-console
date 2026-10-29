@@ -135,7 +135,7 @@ function PortalCard() {
       <CardHeader>
         <CardTitle>Portal</CardTitle>
         <CardDescription>
-          Your event's own site, built with @eventkit-sdk/client or deployed from the template portal.
+          Your event's own site, built with @eventkit/sdk or deployed from the template portal.
           Registration, staff and personal links are made on this address.
         </CardDescription>
       </CardHeader>
