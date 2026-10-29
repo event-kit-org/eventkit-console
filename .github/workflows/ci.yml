@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  console:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Tests with coverage gate
+        run: npm run test:coverage
+      - run: npm run build
+
+  api-types:
+    # Fails when src/api/schema.d.ts no longer matches the API's committed spec.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/eventkit-core
+          path: eventkit-core
+          # Needed only if eventkit-core is private: a fine-grained token with read access.
+          token: ${{ secrets.API_REPO_TOKEN || github.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: OPENAPI_SPEC=eventkit-core/openapi.json npm run gen:api
+      - run: git diff --exit-code src/api/schema.d.ts
