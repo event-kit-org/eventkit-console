@@ -13,8 +13,10 @@ import {
   memberFields,
   missingRequired,
   teamFields,
+  answerText,
   toAnswers,
   toDraft,
+  toggleOption,
 } from './fields';
 
 const f = (over: Partial<Field>): Field => ({
@@ -108,6 +110,29 @@ describe('field helpers', () => {
   });
 });
 
+describe('multi-select and date-time helpers', () => {
+  const stack = f({ id: 'stack', type: 'multi_choice', options: ['A', 'B'], required: true });
+  const at = f({ id: 'at', type: 'datetime' });
+  it('turn drafts into answers and back', () => {
+    expect(toAnswers([stack, at], { stack: ['B'], at: '2026-10-31T09:30' })).toEqual({
+      stack: ['B'],
+      at: '2026-10-31T09:30+05:30',
+    });
+    expect(toAnswers([stack, at], { stack: [], at: '' })).toEqual({ stack: null, at: null });
+    expect(toDraft({ stack: ['A'], at: '2026-10-31T04:00:00Z' }, [stack, at])).toEqual({
+      stack: ['A'],
+      at: '2026-10-31T09:30',
+    });
+    expect(missingRequired([stack], { stack: [] })).toEqual([stack]);
+    expect(toggleOption(['A'], 'A')).toEqual([]);
+    expect(toggleOption(undefined, 'B')).toEqual(['B']);
+    expect(answerText(['A', 'B'])).toBe('A, B');
+    expect(answerText('2026-10-31T04:00:00Z', 'datetime')).toBe('31 Oct 2026, 9:30 am IST');
+    expect(answerText(undefined)).toBe('');
+    expect(answerText(4)).toBe('4');
+  });
+});
+
 describe('FieldInputs', () => {
   function Harness({ fields, errors }: { fields: Field[]; errors?: Record<string, string> }) {
     const [draft, setDraft] = useState<Draft>({});
@@ -130,6 +155,17 @@ describe('FieldInputs', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       '{"dept":"CSE","srn":"PES1","idea":"Queue app"}',
     );
+  });
+
+  it('ticks checkboxes for a multi-select and takes a date and time', async () => {
+    const stack = f({ id: 'stack', label: 'Stack', type: 'multi_choice', options: ['A', 'B'] });
+    const at = f({ id: 'at', label: 'Demo at', type: 'datetime' });
+    render(<Harness fields={[stack, at]} />);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'B' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'A' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'B' }));
+    expect(screen.getByLabelText(/Demo at/)).toHaveAttribute('type', 'datetime-local');
+    expect(screen.getByRole('status')).toHaveTextContent('{"stack":["A"]}');
   });
 
   it('shows errors in place of help', () => {

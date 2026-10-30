@@ -1,6 +1,6 @@
 import { Copy, FileUp, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { PhaseBadge, useRounds } from '@/features/judging/rounds';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { formatIST, fromISTInput } from '@/lib/datetime';
 import { useSubmissions } from './queries';
 
 /** Admin: what teams submit in each round (a project link, a deck...), grouped by round. */
@@ -75,7 +76,9 @@ export function SubmissionsPage() {
                   <Link to={s.id} className="grid gap-0.5 hover:underline">
                     <span className="font-medium">{s.title}</span>
                     <span className="text-muted-foreground">
-                      {s.fields.length} questions · {s.entryCount} submitted
+                      {s.fields.length} {s.fields.length === 1 ? 'question' : 'questions'} ·{' '}
+                      {s.entryCount} submitted
+                      {s.deadline && <> · due {formatIST(s.deadline)}</>}
                     </span>
                   </Link>
                   <span className="flex shrink-0">
@@ -119,6 +122,9 @@ function CreateDialog() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [roundId, setRoundId] = useState('');
+  const [question, setQuestion] = useState('');
+  const [deadline, setDeadline] = useState('');
+  const navigate = useNavigate();
   const chosen = roundId || rounds.data?.[0]?.id || '';
   const create = useEventMutation(event.id, () =>
     unwrap(
@@ -128,6 +134,9 @@ function CreateDialog() {
           title: title.trim(),
           roundId: chosen,
           ...(description.trim() ? { description: description.trim() } : {}),
+          ...(deadline ? { deadline: fromISTInput(deadline) } : {}),
+          // Every submission has at least one question; more are added on its page.
+          fields: [{ label: question.trim(), type: 'long_text', required: true }],
         },
       }),
     ),
@@ -145,10 +154,13 @@ function CreateDialog() {
           onSubmit={(e) => {
             e.preventDefault();
             create.mutate(undefined, {
-              onSuccess: () => {
+              onSuccess: (created) => {
                 setOpen(false);
                 setTitle('');
                 setDescription('');
+                setQuestion('');
+                setDeadline('');
+                void navigate(created.id);
               },
             });
           }}
@@ -156,7 +168,8 @@ function CreateDialog() {
           <DialogHeader>
             <DialogTitle>New submission</DialogTitle>
             <DialogDescription>
-              Create it here, then add the questions teams answer.
+              Start with its first question; add more questions and change their types on the next
+              page.
             </DialogDescription>
           </DialogHeader>
           <FormField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -168,6 +181,19 @@ function CreateDialog() {
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
+          <FormField
+            label="First question"
+            placeholder="e.g. Link to your project repository"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+          />
+          <FormField
+            label="Deadline (optional, IST)"
+            type="datetime-local"
+            hint="Teams can still submit after it; late entries are marked."
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+          />
           <div className="grid gap-2">
             <Label htmlFor="new-submission-round">Round</Label>
             <NativeSelect
@@ -184,7 +210,10 @@ function CreateDialog() {
           </div>
           <ErrorAlert error={create.error} />
           <DialogFooter>
-            <Button type="submit" disabled={!title.trim() || !chosen || create.isPending}>
+            <Button
+              type="submit"
+              disabled={!title.trim() || !question.trim() || !chosen || create.isPending}
+            >
               Create submission
             </Button>
           </DialogFooter>

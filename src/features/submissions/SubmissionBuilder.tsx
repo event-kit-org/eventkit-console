@@ -9,6 +9,7 @@ import {
   SavedActions,
 } from '@/features/admin/QuestionCard';
 import { useEventContext } from '@/features/events/event-context';
+import { hasOptions } from '@/features/fields/fields';
 import { useEventMutation } from '@/hooks/useEventMutation';
 
 type SubmissionField = Schemas['SubmissionField'];
@@ -22,7 +23,7 @@ function createBody(q: Question) {
     required: q.required,
     unique: q.unique,
     ...(q.help ? { help: q.help } : {}),
-    ...(q.type === 'choice' ? { options: q.options } : {}),
+    ...(hasOptions(q.type) ? { options: q.options } : {}),
     ...(text && q.pattern ? { pattern: q.pattern } : {}),
   };
 }
@@ -61,6 +62,7 @@ export function SavedQuestion({
   field,
   canMoveUp,
   canMoveDown,
+  canDelete,
   onMove,
   onDuplicated,
   onDeleted,
@@ -69,6 +71,8 @@ export function SavedQuestion({
   field: SubmissionField;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  /** False for a form's only question: every submission keeps at least one. */
+  canDelete: boolean;
   onMove: (by: -1 | 1) => void;
   onDuplicated: (id: string) => void;
   onDeleted: () => void;
@@ -108,6 +112,7 @@ export function SavedQuestion({
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
           onMove={onMove}
+          canDelete={canDelete}
           onDuplicate={() => duplicate.mutate(undefined, { onSuccess: (f) => onDuplicated(f.id) })}
           onDelete={() => remove.mutate(undefined, { onSuccess: onDeleted })}
         />
@@ -144,7 +149,7 @@ export function DraftQuestion({
       }),
     ),
   );
-  const missingOptions = q.type === 'choice' && q.options.length === 0;
+  const missingOptions = hasOptions(q.type) && q.options.length === 0;
   return (
     <QuestionEditor
       question={q}
@@ -155,8 +160,9 @@ export function DraftQuestion({
         setQ({
           ...q,
           type,
-          options: type === 'choice' && q.options.length === 0 ? ['Option 1'] : q.options,
+          options: hasOptions(type) && q.options.length === 0 ? ['Option 1'] : q.options,
           pattern: type === 'short_text' || type === 'long_text' ? q.pattern : null,
+          unique: type === 'multi_choice' ? false : q.unique,
         })
       }
       footer={

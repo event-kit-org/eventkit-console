@@ -25,14 +25,17 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { Field, TeamRule } from '@/features/fields/fields';
+import { Textarea } from '@/components/ui/textarea';
+import { type Field, hasOptions, type TeamRule } from '@/features/fields/fields';
 
 const TYPE_LABEL: Record<Field['type'], string> = {
   short_text: 'Short answer',
   long_text: 'Paragraph',
+  choice: 'Multiple choice',
+  multi_choice: 'Checkboxes',
   number: 'Number',
   phone: 'Phone number',
-  choice: 'Dropdown',
+  datetime: 'Date and time',
 };
 
 /** What a question card edits. A saved field, or a draft not created yet. */
@@ -48,12 +51,25 @@ export type QuestionPatch = Partial<Omit<Question, 'scope' | 'type'>>;
 export type MinCounts = Record<string, number>;
 
 /** What a text question's answer line says, as in Google Forms. */
-const ANSWER_HINT: Record<Exclude<Field['type'], 'choice'>, string> = {
+const ANSWER_HINT: Record<Exclude<Field['type'], 'choice' | 'multi_choice'>, string> = {
   short_text: 'Short answer text',
   long_text: 'Long answer text',
   number: 'Number',
   phone: 'Phone number',
+  datetime: 'Date and time (IST)',
 };
+
+/** A radio circle for multiple choice, a box for checkboxes. */
+function OptionMark({ type }: { type: Field['type'] }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block size-3.5 shrink-0 border border-muted-foreground/60 ${
+        type === 'multi_choice' ? 'rounded-[3px]' : 'rounded-full'
+      }`}
+    />
+  );
+}
 
 const isText = (type: Field['type']) => type === 'short_text' || type === 'long_text';
 
@@ -94,19 +110,24 @@ export function QuestionPreview({
         {question.label}
         {question.required && <span className="text-destructive"> *</span>}
       </div>
-      {question.help && <div className="text-xs text-muted-foreground">{question.help}</div>}
-      {question.type === 'choice' ? (
-        <ol className="grid gap-1 text-muted-foreground">
-          {question.options.map((o, i) => {
+      {question.help && (
+        <div className="text-xs whitespace-pre-line text-muted-foreground">{question.help}</div>
+      )}
+      {hasOptions(question.type) ? (
+        <ul className="grid gap-1 text-muted-foreground">
+          {question.options.map((o) => {
             const rule = rules.find((r) => r.value === o);
             return (
-              <li key={o}>
-                {i + 1}. {o}
-                {rule && <span className="text-xs"> · at least {rule.minCount} per team</span>}
+              <li key={o} className="flex items-center gap-2">
+                <OptionMark type={question.type} />
+                <span>
+                  {o}
+                  {rule && <span className="text-xs"> · at least {rule.minCount} per team</span>}
+                </span>
               </li>
             );
           })}
-        </ol>
+        </ul>
       ) : (
         <div className="w-1/2 border-b border-dashed pb-1 text-muted-foreground">
           {ANSWER_HINT[question.type]}
@@ -148,7 +169,6 @@ export function QuestionEditor({
   onMinCount?: (option: string, min: number | null) => void;
   footer: React.ReactNode;
 }) {
-  const [showHelp, setShowHelp] = useState(Boolean(question.help));
   const [showPattern, setShowPattern] = useState(Boolean(question.pattern));
   const text = isText(question.type);
 
@@ -180,20 +200,19 @@ export function QuestionEditor({
         </NativeSelect>
       </div>
 
-      {showHelp && (
-        <TextCommit
-          aria-label="Description"
-          placeholder="Description"
-          value={question.help ?? ''}
-          live={!saved}
-          onCommit={(help) => onChange({ help: help || null })}
-        />
-      )}
+      <TextareaCommit
+        aria-label="Description"
+        placeholder="Description (optional): what to write, an example, a link"
+        value={question.help ?? ''}
+        live={!saved}
+        onCommit={(help) => onChange({ help: help || null })}
+      />
 
-      {question.type === 'choice' ? (
+      {hasOptions(question.type) ? (
         <Options
+          type={question.type}
           options={question.options}
-          withMinCounts={question.scope === 'member'}
+          withMinCounts={question.scope === 'member' && question.type === 'choice'}
           minCounts={minCounts}
           onChange={(options) => onChange({ options })}
           onMinCount={onMinCount}
@@ -229,19 +248,15 @@ export function QuestionEditor({
         />
         <MoreMenu
           items={[
-            {
-              label: 'Description',
-              checked: showHelp,
-              toggle: () => {
-                if (showHelp && question.help) onChange({ help: null });
-                setShowHelp(!showHelp);
-              },
-            },
-            {
-              label: 'Unique answers',
-              checked: question.unique,
-              toggle: () => onChange({ unique: !question.unique }),
-            },
+            ...(question.type === 'multi_choice'
+              ? []
+              : [
+                  {
+                    label: 'Unique answers',
+                    checked: question.unique,
+                    toggle: () => onChange({ unique: !question.unique }),
+                  },
+                ]),
             ...(text
               ? [
                   {
@@ -262,12 +277,14 @@ export function QuestionEditor({
 }
 
 function Options({
+  type,
   options,
   withMinCounts,
   minCounts,
   onChange,
   onMinCount,
 }: {
+  type: Field['type'];
   options: string[];
   withMinCounts: boolean;
   minCounts: MinCounts;
@@ -286,7 +303,7 @@ function Options({
       <ol className="grid gap-2">
         {options.map((o, i) => (
           <li key={`${i}:${o}`} className="flex items-center gap-2">
-            <span className="w-5 text-right text-muted-foreground">{i + 1}.</span>
+            <OptionMark type={type} />
             <TextCommit
               aria-label={`Option ${i + 1}`}
               className="flex-1"
@@ -322,7 +339,7 @@ function Options({
         ))}
       </ol>
       <div className="flex items-center gap-2">
-        <Plus className="size-4 w-5 text-muted-foreground" aria-hidden />
+        <Plus className="size-3.5 text-muted-foreground" aria-hidden />
         <TextCommit
           aria-label="Add option"
           placeholder="Add option"
@@ -392,6 +409,46 @@ function TextCommit({
   );
 }
 
+/** Like TextCommit, for longer text: Enter adds a line, blur reports. */
+function TextareaCommit({
+  value,
+  onCommit,
+  live = false,
+  ...props
+}: Omit<React.ComponentProps<typeof Textarea>, 'value' | 'onChange'> & {
+  value: string;
+  onCommit: (value: string) => void;
+  live?: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [committed, setCommitted] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setDraft(value);
+    setCommitted(value);
+  }
+  return (
+    <Textarea
+      {...props}
+      rows={1}
+      className="min-h-9 resize-y"
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        if (live) onCommit(e.target.value.trim());
+      }}
+      onBlur={() => {
+        const next = draft.trim();
+        if (!live && next !== committed) {
+          setCommitted(next);
+          onCommit(next);
+        }
+      }}
+    />
+  );
+}
+
 function RequiredSwitch({
   checked,
   onChange,
@@ -411,6 +468,7 @@ function RequiredSwitch({
 }
 
 function MoreMenu({ items }: { items: { label: string; checked: boolean; toggle: () => void }[] }) {
+  if (items.length === 0) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -439,6 +497,7 @@ export function SavedActions({
   label,
   canMoveUp,
   canMoveDown,
+  canDelete = true,
   onMove,
   onDuplicate,
   onDelete,
@@ -446,6 +505,7 @@ export function SavedActions({
   label: string;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  canDelete?: boolean;
   onMove: (by: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -480,6 +540,7 @@ export function SavedActions({
         description="Its answers will no longer be shown."
         confirmLabel="Delete"
         destructive
+        disabled={!canDelete}
         onConfirm={onDelete}
       >
         <Trash2 />

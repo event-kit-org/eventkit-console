@@ -55,8 +55,8 @@ describe('registration form builder', () => {
     ).toBeInTheDocument();
     const leader = section('Member details');
     const dept = within(leader).getByRole('button', { name: 'Edit Department' });
-    expect(dept).toHaveTextContent('1. CSE · at least 2 per team');
-    expect(dept).toHaveTextContent('2. ECE');
+    expect(dept).toHaveTextContent('CSE · at least 2 per team');
+    expect(dept).toHaveTextContent('ECE');
     expect(within(leader).getByRole('button', { name: 'Edit SRN' })).toHaveTextContent(
       'Unique answers · Format: PES\\d+',
     );
@@ -114,14 +114,14 @@ describe('registration form builder', () => {
     );
   });
 
-  it('adds a description and an answer format from the menu', async () => {
+  it('edits the description in place and the answer format from the menu', async () => {
     const patch = capture('patch', `${E}/fields/srn`, SRN);
     open();
     await userEvent.click(await screen.findByRole('button', { name: 'Edit SRN' }));
     expect(screen.getByLabelText('Answer format')).toHaveValue('PES\\d+');
-    await userEvent.click(screen.getByRole('button', { name: 'More options' }));
-    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: /Description/ }));
-    await userEvent.type(screen.getByLabelText('Description'), 'From your ID card{Enter}');
+    // The description box is always there, under the question.
+    await userEvent.type(screen.getByLabelText('Description'), 'From your ID card');
+    await userEvent.tab();
     await userEvent.click(screen.getByRole('button', { name: 'More options' }));
     await userEvent.click(screen.getByRole('menuitemcheckbox', { name: /Answer format/ }));
     expect(screen.queryByLabelText('Answer format')).not.toBeInTheDocument();

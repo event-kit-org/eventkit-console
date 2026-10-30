@@ -366,7 +366,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a whole team at once through a registration link (no accounts). Returns each member's participant ID and QR token, and the leader's own personal secret link (shown once). Each member gets their own link by email, when mailing is on. */
+        /** Register a whole team at once through a registration link (no accounts). Returns each member's participant ID and QR token, and the leader's own personal secret link (shown once). The leader is emailed every member's link, when mailing is on. */
         post: {
             parameters: {
                 query?: never;
@@ -1394,7 +1394,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Polls for participants, with your vote */
+        /** Polls for participants, with your vote (none before the event day) */
         get: {
             parameters: {
                 query?: never;
@@ -1440,7 +1440,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Vote, or change your vote, until the poll closes */
+        /** Vote, or change your vote, until the poll closes (from the event day: NOT_EVENT_DAY before) */
         put: {
             parameters: {
                 query?: never;
@@ -1596,7 +1596,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A round's team totals, ranked, once the organiser shows the leaderboard (released and closed rounds only) */
+        /** A round's team totals, ranked, once the organiser shows the leaderboard (released and closed rounds only), from the event day */
         get: {
             parameters: {
                 query?: {
@@ -1662,7 +1662,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Submission forms of released and closed rounds, with your team's entries */
+        /** Submission forms of released and closed rounds, with your team's entries (none before the event day) */
         get: {
             parameters: {
                 query?: never;
@@ -1708,7 +1708,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Save your team's entry (any active member; replaces earlier answers). Only while the round is released. */
+        /** Save your team's entry (any active member; replaces earlier answers). Only while the round is released, from the event day. After the deadline it is saved and marked late. */
         put: {
             parameters: {
                 query?: never;
@@ -8100,7 +8100,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Add a submission form to a round */
+        /** Add a submission form to a round, with its questions (at least one) */
         post: {
             parameters: {
                 query?: never;
@@ -8116,8 +8116,21 @@ export interface paths {
                         title: string;
                         description?: string;
                         position?: number;
+                        /** @description Saves after it are still accepted, and marked late. Null: no deadline */
+                        deadline?: string | null;
                         /** Format: uuid */
                         roundId: string;
+                        fields: {
+                            label: string;
+                            help?: string | null;
+                            options?: string[];
+                            required?: boolean;
+                            unique?: boolean;
+                            pattern?: string | null;
+                            position?: number;
+                            /** @enum {string} */
+                            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+                        }[];
                     };
                 };
             };
@@ -8160,6 +8173,15 @@ export interface paths {
                 };
                 /** @description Default Response */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -8262,6 +8284,8 @@ export interface paths {
                         title?: string;
                         description?: string;
                         position?: number;
+                        /** @description Saves after it are still accepted, and marked late. Null: no deadline */
+                        deadline?: string | null;
                     };
                 };
             };
@@ -8478,7 +8502,7 @@ export interface paths {
                         pattern?: string | null;
                         position?: number;
                         /** @enum {string} */
-                        type: "short_text" | "long_text" | "number" | "choice" | "phone";
+                        type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
                     };
                 };
             };
@@ -8546,7 +8570,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a submission field (teams' answers to it are no longer shown) */
+        /** Delete a submission field (teams' answers to it are no longer shown). The last one cannot be deleted: SUBMISSION_NEEDS_FIELD */
         delete: {
             parameters: {
                 query?: never;
@@ -8587,6 +8611,15 @@ export interface paths {
                 };
                 /** @description Default Response */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -8763,7 +8796,7 @@ export interface paths {
                         /** @enum {string} */
                         scope: "team" | "member";
                         /** @enum {string} */
-                        type: "short_text" | "long_text" | "number" | "choice" | "phone";
+                        type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
                     };
                 };
             };
@@ -9388,11 +9421,16 @@ export interface components {
              * @enum {string}
              */
             scope: "team" | "member";
+            /** @description The question */
             label: string;
+            /** @description The question's description, shown under it */
             help: string | null;
-            /** @enum {string} */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone";
-            /** @description Choices, for type choice */
+            /**
+             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @enum {string}
+             */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+            /** @description Choices, for types choice and multi_choice */
             options: string[];
             required: boolean;
             /** @description Answers may not repeat within the event (case-insensitive) */
@@ -9413,11 +9451,11 @@ export interface components {
             description: string;
         };
         AnswersBodyInput: {
-            [key: string]: string | number | null;
+            [key: string]: string | number | string[] | null;
         };
-        /** @description Answers keyed by field id */
+        /** @description Answers keyed by field id: a list for multi_choice fields */
         AnswersInput: {
-            [key: string]: string | number;
+            [key: string]: string | number | string[];
         };
         /** @enum {string} */
         RegistrationStatusInput: "registered" | "shortlisted" | "confirmed" | "attending" | "checked_in" | "cancelled";
@@ -9692,11 +9730,16 @@ export interface components {
         SubmissionFieldInput: {
             /** Format: uuid */
             id: string;
+            /** @description The question */
             label: string;
+            /** @description The question's description, shown under it */
             help: string | null;
-            /** @enum {string} */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone";
-            /** @description Choices, for type choice */
+            /**
+             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @enum {string}
+             */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+            /** @description Choices, for types choice and multi_choice */
             options: string[];
             required: boolean;
             /** @description No two teams' answers may match (case-insensitive) */
@@ -9712,6 +9755,8 @@ export interface components {
             title: string;
             description: string;
             position: number;
+            /** @description Saves after it are still accepted, and marked late */
+            deadline: string | null;
             fields: components["schemas"]["SubmissionFieldInput"][];
             /** @description Teams that have submitted */
             entryCount: number;
@@ -9737,9 +9782,17 @@ export interface components {
                 registrationId: string;
                 name: string;
             } | null;
-            /** Format: date-time */
+            /** @description Last saved after the deadline */
+            late: boolean;
+            /**
+             * Format: date-time
+             * @description First submitted
+             */
             createdAt: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description Last saved
+             */
             updatedAt: string;
         };
         PortalSubmissionInput: {
@@ -9749,6 +9802,8 @@ export interface components {
             title: string;
             description: string;
             position: number;
+            /** @description Saves after it are still accepted, and marked late */
+            deadline: string | null;
             fields: components["schemas"]["SubmissionFieldInput"][];
             /** @description Whether your team can still save (round released) */
             open: boolean;
@@ -9807,6 +9862,11 @@ export interface components {
                 leaderboardVisible: boolean;
                 /** @description False: no RSVP step (hide the RSVP buttons); confirmed means attending */
                 rsvpEnabled: boolean;
+                /**
+                 * Format: date-time
+                 * @description Polls, submissions and the leaderboard reach participants from then on: 00:00 IST on the start date
+                 */
+                activitiesFrom: string;
             };
             /** @description Feature on and inside the window */
             registrationOpen: boolean;
@@ -9851,6 +9911,13 @@ export interface components {
             accessEndsAt: string;
             /** @description The event's RSVP setting. False: hide the RSVP buttons */
             rsvpEnabled: boolean;
+            /**
+             * Format: date-time
+             * @description Polls, submissions and the leaderboard open then (00:00 IST on the start date); hide them before
+             */
+            activitiesFrom: string;
+            /** @description Whether activitiesFrom has passed */
+            activitiesOpen: boolean;
         };
         ParticipantSessionInput: {
             session: components["schemas"]["AccessTokenInput"];
@@ -10152,11 +10219,16 @@ export interface components {
              * @enum {string}
              */
             scope: "team" | "member";
+            /** @description The question */
             label: string;
+            /** @description The question's description, shown under it */
             help: string | null;
-            /** @enum {string} */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone";
-            /** @description Choices, for type choice */
+            /**
+             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @enum {string}
+             */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+            /** @description Choices, for types choice and multi_choice */
             options: string[];
             required: boolean;
             /** @description Answers may not repeat within the event (case-insensitive) */
@@ -10177,11 +10249,11 @@ export interface components {
             description: string;
         };
         AnswersBody: {
-            [key: string]: string | number | null;
+            [key: string]: string | number | string[] | null;
         };
-        /** @description Answers keyed by field id */
+        /** @description Answers keyed by field id: a list for multi_choice fields */
         Answers: {
-            [key: string]: string | number;
+            [key: string]: string | number | string[];
         };
         /** @enum {string} */
         RegistrationStatus: "registered" | "shortlisted" | "confirmed" | "attending" | "checked_in" | "cancelled";
@@ -10456,11 +10528,16 @@ export interface components {
         SubmissionField: {
             /** Format: uuid */
             id: string;
+            /** @description The question */
             label: string;
+            /** @description The question's description, shown under it */
             help: string | null;
-            /** @enum {string} */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone";
-            /** @description Choices, for type choice */
+            /**
+             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @enum {string}
+             */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+            /** @description Choices, for types choice and multi_choice */
             options: string[];
             required: boolean;
             /** @description No two teams' answers may match (case-insensitive) */
@@ -10476,6 +10553,8 @@ export interface components {
             title: string;
             description: string;
             position: number;
+            /** @description Saves after it are still accepted, and marked late */
+            deadline: string | null;
             fields: components["schemas"]["SubmissionField"][];
             /** @description Teams that have submitted */
             entryCount: number;
@@ -10501,9 +10580,17 @@ export interface components {
                 registrationId: string;
                 name: string;
             } | null;
-            /** Format: date-time */
+            /** @description Last saved after the deadline */
+            late: boolean;
+            /**
+             * Format: date-time
+             * @description First submitted
+             */
             createdAt: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description Last saved
+             */
             updatedAt: string;
         };
         PortalSubmission: {
@@ -10513,6 +10600,8 @@ export interface components {
             title: string;
             description: string;
             position: number;
+            /** @description Saves after it are still accepted, and marked late */
+            deadline: string | null;
             fields: components["schemas"]["SubmissionField"][];
             /** @description Whether your team can still save (round released) */
             open: boolean;
@@ -10571,6 +10660,11 @@ export interface components {
                 leaderboardVisible: boolean;
                 /** @description False: no RSVP step (hide the RSVP buttons); confirmed means attending */
                 rsvpEnabled: boolean;
+                /**
+                 * Format: date-time
+                 * @description Polls, submissions and the leaderboard reach participants from then on: 00:00 IST on the start date
+                 */
+                activitiesFrom: string;
             };
             /** @description Feature on and inside the window */
             registrationOpen: boolean;
@@ -10615,6 +10709,13 @@ export interface components {
             accessEndsAt: string;
             /** @description The event's RSVP setting. False: hide the RSVP buttons */
             rsvpEnabled: boolean;
+            /**
+             * Format: date-time
+             * @description Polls, submissions and the leaderboard open then (00:00 IST on the start date); hide them before
+             */
+            activitiesFrom: string;
+            /** @description Whether activitiesFrom has passed */
+            activitiesOpen: boolean;
         };
         ParticipantSession: {
             session: components["schemas"]["AccessToken"];

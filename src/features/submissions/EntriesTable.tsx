@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { answerText } from '@/features/fields/fields';
 import { formatIST } from '@/lib/datetime';
 import { type Submission, useEntries } from './queries';
 
@@ -22,6 +24,11 @@ export function EntriesTable({ submission }: { submission: Submission }) {
   return (
     <section aria-label="Entries" className="grid gap-3">
       <h3 className="font-medium">Entries</h3>
+      {submission.deadline && (
+        <p className="text-sm text-muted-foreground">
+          Deadline {formatIST(submission.deadline)}. Entries last saved after it are marked late.
+        </p>
+      )}
       <ErrorAlert error={entries.error} />
       {entries.isPending && <TableSkeleton rows={3} cols={3} />}
       {entries.data?.length === 0 && (
@@ -32,8 +39,8 @@ export function EntriesTable({ submission }: { submission: Submission }) {
           <TableHeader>
             <TableRow>
               <TableHead>Team</TableHead>
-              <TableHead>Submitted</TableHead>
-              <TableHead>Updated</TableHead>
+              <TableHead>First submitted</TableHead>
+              <TableHead>Last saved</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -53,7 +60,14 @@ export function EntriesTable({ submission }: { submission: Submission }) {
                     </Button>
                   </TableCell>
                   <TableCell>{formatIST(e.createdAt)}</TableCell>
-                  <TableCell>{formatIST(e.updatedAt)}</TableCell>
+                  <TableCell>
+                    {formatIST(e.updatedAt)}
+                    {e.late && (
+                      <Badge variant="destructive" className="ml-2">
+                        Late
+                      </Badge>
+                    )}
+                  </TableCell>
                 </TableRow>
                 {open === e.id && (
                   <TableRow>
@@ -68,7 +82,9 @@ export function EntriesTable({ submission }: { submission: Submission }) {
                           <div key={f.id}>
                             <dt className="text-muted-foreground">{f.label}</dt>
                             <dd className="whitespace-pre-wrap">
-                              {e.answers[f.id] === undefined ? '–' : String(e.answers[f.id])}
+                              {e.answers[f.id] === undefined
+                                ? '–'
+                                : answerText(e.answers[f.id], f.type)}
                             </dd>
                           </div>
                         ))}

@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Draft, Field } from './fields';
+import { type AnswerValue, answerText, type Draft, type Field, toggleOption } from './fields';
 
 /** Inputs for a list of organiser-defined fields. */
 export function FieldInputs({
@@ -30,8 +30,9 @@ export function FieldInputs({
     <div className="grid gap-5">
       {fields.map((f) => {
         const id = `${idPrefix ?? base}-${f.id}`;
-        const value = draft[f.id] ?? '';
-        const set = (v: string) => onChange({ ...draft, [f.id]: v });
+        const raw = draft[f.id];
+        const value = typeof raw === 'string' ? raw : '';
+        const set = (v: string | string[]) => onChange({ ...draft, [f.id]: v });
         const error = errors[f.id];
         const describedBy = error ? `${id}-error` : f.help ? `${id}-help` : undefined;
         const common = {
@@ -42,13 +43,27 @@ export function FieldInputs({
         } as const;
         return (
           <FormFieldBox key={f.id} data-invalid={error ? true : undefined}>
-            <FieldLabel htmlFor={id} className="block">
+            <FieldLabel id={`${id}-label`} htmlFor={id} className="block">
               {f.label}
               {!f.required && (
                 <span className="font-normal text-muted-foreground"> (optional)</span>
               )}
             </FieldLabel>
-            {f.type === 'choice' ? (
+            {f.type === 'multi_choice' ? (
+              <div role="group" aria-labelledby={`${id}-label`} className="grid gap-2">
+                {f.options.map((o) => (
+                  <label key={o} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={Array.isArray(raw) && raw.includes(o)}
+                      onChange={() => set(toggleOption(raw, o))}
+                    />
+                    {o}
+                  </label>
+                ))}
+              </div>
+            ) : f.type === 'choice' ? (
               <NativeSelect
                 {...common}
                 className="w-full"
@@ -67,7 +82,9 @@ export function FieldInputs({
             ) : (
               <Input
                 {...common}
-                type={f.type === 'number' ? 'number' : 'text'}
+                type={
+                  f.type === 'number' ? 'number' : f.type === 'datetime' ? 'datetime-local' : 'text'
+                }
                 value={value}
                 onChange={(e) => set(e.target.value)}
               />
@@ -90,7 +107,7 @@ export function AnswerList({
   answers,
 }: {
   fields: Field[];
-  answers: Record<string, string | number>;
+  answers: Record<string, AnswerValue>;
 }) {
   const shown = fields.filter((f) => answers[f.id] !== undefined);
   if (shown.length === 0) return null;
@@ -99,7 +116,7 @@ export function AnswerList({
       {shown.map((f) => (
         <div key={f.id} className="flex gap-1">
           <dt>{f.label}:</dt>
-          <dd className="text-foreground">{answers[f.id]}</dd>
+          <dd className="text-foreground">{answerText(answers[f.id], f.type)}</dd>
         </div>
       ))}
     </dl>

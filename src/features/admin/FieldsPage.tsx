@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { QuestionsSkeleton } from '@/components/PageState';
 import { Button } from '@/components/ui/button';
 import { useEventContext } from '@/features/events/event-context';
-import type { Field, TeamRule } from '@/features/fields/fields';
+import { type Field, hasOptions, type TeamRule } from '@/features/fields/fields';
 import { useFields, useTeamRules } from '@/features/fields/queries';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import {
@@ -284,7 +284,7 @@ function DraftQuestion({
     }
     return field;
   });
-  const missingOptions = q.type === 'choice' && q.options.length === 0;
+  const missingOptions = hasOptions(q.type) && q.options.length === 0;
 
   return (
     <QuestionEditor
@@ -297,8 +297,9 @@ function DraftQuestion({
         setQ({
           ...q,
           type,
-          options: type === 'choice' && q.options.length === 0 ? ['Option 1'] : q.options,
+          options: hasOptions(type) && q.options.length === 0 ? ['Option 1'] : q.options,
           pattern: type === 'short_text' || type === 'long_text' ? q.pattern : null,
+          unique: type === 'multi_choice' ? false : q.unique,
         })
       }
       onMinCount={(value, min) => {
@@ -334,7 +335,7 @@ function createBody(q: Question & { scope: Field['scope'] }) {
     required: q.required,
     unique: q.unique,
     ...(q.help ? { help: q.help } : {}),
-    ...(q.type === 'choice' ? { options: q.options } : {}),
+    ...(hasOptions(q.type) ? { options: q.options } : {}),
     ...(text && q.pattern ? { pattern: q.pattern } : {}),
   };
 }

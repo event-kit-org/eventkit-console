@@ -32,6 +32,7 @@ const sub = (over: Partial<Schemas['Submission']> = {}): Schemas['Submission'] =
   title: 'Prototype',
   description: 'Show it',
   position: 0,
+  deadline: null,
   fields: [
     f({}),
     f({ id: 'q2', label: 'Track', type: 'choice', options: ['A', 'B'], position: 1 }),
@@ -47,6 +48,7 @@ const entry: Schemas['SubmissionEntry'] = {
   team: { id: 't1', name: 'Byte Club' },
   answers: { q1: 'https://git.test/x' },
   submittedBy: { registrationId: 'r1', name: 'Asha' },
+  late: false,
   createdAt: stamp,
   updatedAt: stamp,
 };
@@ -84,19 +86,6 @@ describe('submissions list', () => {
       within(screen.getByRole('region', { name: 'Finals' })).getByText('Pitch'),
     ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /New submission/ }));
-    await userEvent.type(screen.getByLabelText('Title'), 'Demo video');
-    await userEvent.type(screen.getByLabelText('Description'), 'Two minutes');
-    await userEvent.selectOptions(screen.getByLabelText('Round'), R2);
-    await userEvent.click(screen.getByRole('button', { name: 'Create submission' }));
-    await waitFor(() =>
-      expect(made[0]?.body).toEqual({
-        title: 'Demo video',
-        roundId: R2,
-        description: 'Two minutes',
-      }),
-    );
-
     await userEvent.click(screen.getByRole('button', { name: 'Duplicate Prototype' }));
     await waitFor(() => expect(dup).toHaveLength(1));
 
@@ -108,6 +97,25 @@ describe('submissions list', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Delete Prototype' }));
     await confirmDialog('Delete');
     expect(await screen.findByText('Teams have submitted this.')).toBeInTheDocument();
+
+    // Creating opens the new submission, to add more questions.
+    await userEvent.click(screen.getByRole('button', { name: /New submission/ }));
+    await userEvent.type(screen.getByLabelText('Title'), 'Demo video');
+    await userEvent.type(screen.getByLabelText('Description'), 'Two minutes');
+    await userEvent.type(screen.getByLabelText('First question'), 'Video link');
+    await userEvent.type(screen.getByLabelText('Deadline (optional, IST)'), '2026-10-31T17:00');
+    await userEvent.selectOptions(screen.getByLabelText('Round'), R2);
+    await userEvent.click(screen.getByRole('button', { name: 'Create submission' }));
+    await waitFor(() =>
+      expect(made[0]?.body).toEqual({
+        title: 'Demo video',
+        roundId: R2,
+        description: 'Two minutes',
+        deadline: '2026-10-31T11:30:00.000Z',
+        fields: [{ label: 'Video link', type: 'long_text', required: true }],
+      }),
+    );
+    expect(await screen.findByRole('link', { name: /All submissions/ })).toBeInTheDocument();
   });
 
   it('deletes a submission nobody answered', async () => {
@@ -148,7 +156,11 @@ describe('submission detail', () => {
     await userEvent.type(title, 'Prototype v2');
     await userEvent.click(screen.getByRole('button', { name: 'Save details' }));
     await waitFor(() =>
-      expect(details[0]?.body).toEqual({ title: 'Prototype v2', description: 'Show it' }),
+      expect(details[0]?.body).toEqual({
+        title: 'Prototype v2',
+        description: 'Show it',
+        deadline: null,
+      }),
     );
 
     // Edit a saved question, then delete it.

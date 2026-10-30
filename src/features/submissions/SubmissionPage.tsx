@@ -15,6 +15,7 @@ import { QuestionPreview } from '@/features/admin/QuestionCard';
 import { useEventContext } from '@/features/events/event-context';
 import { PhaseBadge } from '@/features/judging/rounds';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { fromISTInput, toISTInput } from '@/lib/datetime';
 import { useSubmissions, type Submission } from './queries';
 import { DraftQuestion, SavedQuestion, useMoveField } from './SubmissionBuilder';
 
@@ -51,18 +52,25 @@ function Editor({ submission }: { submission: Submission }) {
   const { event } = useEventContext();
   const [title, setTitle] = useState(submission.title);
   const [description, setDescription] = useState(submission.description);
+  const savedDeadline = submission.deadline ? toISTInput(submission.deadline) : '';
+  const [deadline, setDeadline] = useState(savedDeadline);
   const [active, setActive] = useState<Active>(null);
   const fields = [...submission.fields].sort((a, b) => a.position - b.position);
   const move = useMoveField(submission.id, fields);
-  const save = useEventMutation(event.id, (body: { title: string; description: string }) =>
-    unwrap(
-      api.PATCH('/v1/events/{eventId}/submissions/{submissionId}', {
-        params: { path: { eventId: event.id, submissionId: submission.id } },
-        body,
-      }),
-    ),
+  const save = useEventMutation(
+    event.id,
+    (body: { title: string; description: string; deadline: string | null }) =>
+      unwrap(
+        api.PATCH('/v1/events/{eventId}/submissions/{submissionId}', {
+          params: { path: { eventId: event.id, submissionId: submission.id } },
+          body,
+        }),
+      ),
   );
-  const dirty = title.trim() !== submission.title || description !== submission.description;
+  const dirty =
+    title.trim() !== submission.title ||
+    description !== submission.description ||
+    deadline !== savedDeadline;
 
   return (
     <>
@@ -73,7 +81,11 @@ function Editor({ submission }: { submission: Submission }) {
         className="grid gap-4 rounded-xl border bg-card p-4"
         onSubmit={(e) => {
           e.preventDefault();
-          save.mutate({ title: title.trim(), description });
+          save.mutate({
+            title: title.trim(),
+            description,
+            deadline: deadline ? fromISTInput(deadline) : null,
+          });
         }}
       >
         <FormField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -85,6 +97,13 @@ function Editor({ submission }: { submission: Submission }) {
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+        <FormField
+          label="Deadline (optional, IST)"
+          type="datetime-local"
+          hint="Teams can still submit after it; their entries are marked late. Clear it for no deadline."
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+        />
         <p className="text-sm text-muted-foreground">
           Round: <span className="font-medium text-foreground">{submission.round.name}</span>. A
           submission stays in the round it was created in; duplicate it to use it elsewhere.
@@ -109,6 +128,7 @@ function Editor({ submission }: { submission: Submission }) {
               canMoveUp={i > 0}
               canMoveDown={i < fields.length - 1}
               onMove={(by) => move.mutate({ field: f, neighbour: fields[i + by]! })}
+              canDelete={fields.length > 1}
               onDuplicated={(id) => setActive({ id })}
               onDeleted={() => setActive(null)}
             />

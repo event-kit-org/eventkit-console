@@ -1,5 +1,5 @@
 import type { Schemas } from '@/api/client';
-import { type Field, memberFields, teamFields } from '@/features/fields/fields';
+import { answerText, type Field, memberFields, teamFields } from '@/features/fields/fields';
 import { formatIST } from '@/lib/datetime';
 
 type Team = Schemas['Team'];
@@ -32,8 +32,8 @@ export function teamsCsv(teams: Team[], fields: Field[]): string {
       m.status,
       t.payment.proofs[0]?.status ?? (t.payment.mode === 'none' ? '' : 'not uploaded'),
       formatIST(t.createdAt),
-      ...tf.map((f) => String(t.answers[f.id] ?? '')),
-      ...mf.map((f) => String(m.answers[f.id] ?? '')),
+      ...tf.map((f) => answerText(t.answers[f.id], f.type)),
+      ...mf.map((f) => answerText(m.answers[f.id], f.type)),
     ]),
   );
   return [header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
