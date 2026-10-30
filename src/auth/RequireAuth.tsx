@@ -12,7 +12,7 @@ export function RequireAuth() {
   }
   if (status === 'loading') {
     return (
-      <div className="flex min-h-svh items-center justify-center gap-2 text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center gap-2 text-muted-foreground">
         <Spinner /> Loading…
       </div>
     );

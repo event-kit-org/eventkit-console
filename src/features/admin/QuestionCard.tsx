@@ -38,8 +38,11 @@ const TYPE_LABEL: Record<Field['type'], string> = {
 /** What a question card edits. A saved field, or a draft not created yet. */
 export type Question = Pick<
   Field,
-  'scope' | 'label' | 'help' | 'type' | 'options' | 'required' | 'unique' | 'pattern'
->;
+  'label' | 'help' | 'type' | 'options' | 'required' | 'unique' | 'pattern'
+> & {
+  /** Registration questions only; submission questions have no scope. */
+  scope?: Field['scope'];
+};
 export type QuestionPatch = Partial<Omit<Question, 'scope' | 'type'>>;
 /** Minimum members per team, keyed by dropdown option. */
 export type MinCounts = Record<string, number>;
@@ -73,11 +76,11 @@ export function BuiltInQuestion({ label, hint }: { label: string; hint: string }
 /** A question as the person filling in the form will see it. Click to edit. */
 export function QuestionPreview({
   question,
-  rules,
+  rules = [],
   onEdit,
 }: {
   question: Question;
-  rules: TeamRule[];
+  rules?: TeamRule[];
   onEdit: () => void;
 }) {
   return (
@@ -126,7 +129,7 @@ export function QuestionPreview({
  */
 export function QuestionEditor({
   question,
-  minCounts,
+  minCounts = {},
   saved,
   error,
   onChange,
@@ -135,13 +138,14 @@ export function QuestionEditor({
   footer,
 }: {
   question: Question;
-  minCounts: MinCounts;
+  minCounts?: MinCounts;
   saved: boolean;
   error?: unknown;
   onChange: (patch: QuestionPatch) => void;
   /** Drafts only: a saved question's type is fixed. */
   onTypeChange?: (type: Field['type']) => void;
-  onMinCount: (option: string, min: number | null) => void;
+  /** Registration forms only (team rules). */
+  onMinCount?: (option: string, min: number | null) => void;
   footer: React.ReactNode;
 }) {
   const [showHelp, setShowHelp] = useState(Boolean(question.help));
@@ -268,7 +272,7 @@ function Options({
   withMinCounts: boolean;
   minCounts: MinCounts;
   onChange: (options: string[]) => void;
-  onMinCount: (option: string, min: number | null) => void;
+  onMinCount?: (option: string, min: number | null) => void;
 }) {
   const rename = (i: number, value: string) => {
     if (!value || value === options[i] || options.includes(value)) return;
@@ -300,7 +304,7 @@ function Options({
                 onCommit={(v) => {
                   const n = Number(v);
                   const next = v && n > 0 ? n : null;
-                  if (next !== (minCounts[o] ?? null)) onMinCount(o, next);
+                  if (next !== (minCounts[o] ?? null)) onMinCount?.(o, next);
                 }}
               />
             )}

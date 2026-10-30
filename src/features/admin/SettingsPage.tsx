@@ -13,6 +13,16 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { FormField } from '@/components/FormField';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -25,7 +35,10 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { RowsSkeleton } from '@/components/PageState';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -70,6 +83,7 @@ export function SettingsPage() {
         </Alert>
       )}
       <PortalCard />
+      <RsvpCard />
       <FeaturesCard />
       <PaymentInstructionsFileCard />
       <PaymentQrCard />
@@ -78,6 +92,56 @@ export function SettingsPage() {
       <EditEventCard key={event.registrationDeadline} />
       <ManageEventCard />
     </div>
+  );
+}
+
+/** Whether confirmed teams must RSVP, or count as attending as soon as they are confirmed. */
+function RsvpCard() {
+  const api = useApi();
+  const { event, path } = useEventContext();
+  const [confirming, setConfirming] = useState(false);
+  const save = useEventMutation(event.id, (rsvpEnabled: boolean) =>
+    unwrap(api.PATCH('/v1/events/{eventId}', { ...path, body: { rsvpEnabled } })),
+  );
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>RSVP</CardTitle>
+        <CardDescription>
+          When RSVP is off, confirmed registrations count as attending automatically. Turning it off
+          marks everyone already confirmed as attending.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="rsvp-enabled"
+            checked={event.rsvpEnabled}
+            disabled={save.isPending}
+            onCheckedChange={(on) => (on ? save.mutate(true) : setConfirming(true))}
+          />
+          <Label htmlFor="rsvp-enabled" className="font-normal">
+            Ask participants to RSVP
+          </Label>
+        </div>
+        <ErrorAlert error={save.error} />
+      </CardContent>
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop asking participants to RSVP?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Everyone already confirmed will be marked as attending, and new confirmations will
+              count as attending automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep asking</AlertDialogCancel>
+            <AlertDialogAction onClick={() => save.mutate(false)}>Turn off RSVP</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }
 
@@ -218,6 +282,7 @@ function PortalCard() {
           </p>
           {isOwner && (
             <>
+              {keys.isPending && <Skeleton className="h-6 w-64 max-w-full" />}
               <ul className="grid gap-1.5">
                 {keys.data
                   ?.filter((k) => !k.revokedAt)
@@ -319,6 +384,7 @@ function FeaturesCard() {
       </CardHeader>
       <CardContent className="grid gap-3">
         <ErrorAlert error={buy.error ?? toggle.error} />
+        {toggles.isPending && <RowsSkeleton rows={3} />}
         <ul className="divide-y rounded-lg border">
           {toggles.data?.map((t) => (
             <li key={t.feature} className="flex items-center justify-between gap-4 p-4">
@@ -379,13 +445,14 @@ function PaymentInstructionsFileCard() {
       <CardHeader>
         <CardTitle>Payment instructions file</CardTitle>
         <CardDescription>
-          Optional: bank details or steps as an image or PDF, shown to teams before they upload
-          their receipt. JPG, PNG, WebP or PDF, up to 5 MB.
+          Optional: bank details or steps as an image, shown to teams before they upload
+          their receipt. JPG, PNG or WebP, up to 5 MB.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         {event.hasPaymentInstructionsFile && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            {file.isLoading && <Skeleton className="h-5 w-48" />}
             {file.data && (
               <a
                 href={file.data.url}
@@ -410,7 +477,7 @@ function PaymentInstructionsFileCard() {
         <Input
           type="file"
           className="max-w-sm"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
+          accept="image/jpeg,image/png,image/webp"
           aria-label="Payment instructions file"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -447,6 +514,7 @@ function PaymentQrCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
+        {qr.isLoading && <Skeleton className="size-48" />}
         {qr.data && (
           <img
             src={qr.data.url}

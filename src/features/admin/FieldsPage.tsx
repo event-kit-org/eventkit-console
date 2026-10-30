@@ -5,6 +5,7 @@ import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
+import { QuestionsSkeleton } from '@/components/PageState';
 import { Button } from '@/components/ui/button';
 import { useEventContext } from '@/features/events/event-context';
 import type { Field, TeamRule } from '@/features/fields/fields';
@@ -79,6 +80,7 @@ export function FieldsPage() {
             {SECTIONS[section].builtIn.map((q) => (
               <BuiltInQuestion key={q.label} label={q.label} hint={q.hint} />
             ))}
+            {fields.isPending && <QuestionsSkeleton />}
             {inSection.map((f, i) =>
               active && 'id' in active && active.id === f.id ? (
                 <SavedQuestion
@@ -248,7 +250,7 @@ function DraftQuestion({
   const api = useApi();
   const { event, path } = useEventContext();
   const queryClient = useQueryClient();
-  const [q, setQ] = useState<Question>({
+  const [q, setQ] = useState<Question & { scope: Field['scope'] }>({
     scope: SECTIONS[section].scope,
     label: '',
     help: null,
@@ -323,7 +325,7 @@ function DraftQuestion({
 }
 
 /** The POST body for a new field with these settings. */
-function createBody(q: Question) {
+function createBody(q: Question & { scope: Field['scope'] }) {
   const text = q.type === 'short_text' || q.type === 'long_text';
   return {
     scope: q.scope,

@@ -38,8 +38,8 @@ export function ForgotPasswordPage() {
           <Alert>
             <MailCheck aria-hidden />
             <AlertDescription>
-              If an account uses that email, we've sent a link. It works once and expires in an
-              hour. Check your spam folder too.
+              If an account uses that email, we've sent a link. It works once and expires in 10
+              minutes. Check your spam folder too.
             </AlertDescription>
           </Alert>
         ) : (

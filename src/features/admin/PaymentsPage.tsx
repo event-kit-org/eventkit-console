@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { EmptyState, Loading } from '@/components/PageState';
+import { CardsSkeleton, EmptyState } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ export function PaymentsPage() {
         </TabsList>
       </Tabs>
       <ErrorAlert error={proofs.error} />
-      {proofs.isPending && <Loading rows={2} />}
+      {proofs.isPending && <CardsSkeleton />}
       {proofs.data?.length === 0 && <EmptyState icon={Receipt} title="Nothing here." />}
       <div className="grid gap-4 lg:grid-cols-2">
         {proofs.data?.map((p) => (

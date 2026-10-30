@@ -18,6 +18,8 @@ import { EventLayout } from '@/features/events/EventLayout';
 import { EventsPage } from '@/features/events/EventsPage';
 import { JudgingPage } from '@/features/judging/JudgingPage';
 import { NotificationsPage } from '@/features/notifications/NotificationsPage';
+import { SubmissionPage } from '@/features/submissions/SubmissionPage';
+import { SubmissionsPage } from '@/features/submissions/SubmissionsPage';
 import { PollsPage } from '@/features/polls/PollsPage';
 import { ScannerPage } from '@/features/scanner/ScannerPage';
 import { AccountPage } from '@/features/account/AccountPage';
@@ -65,6 +67,8 @@ export const routes: RouteObject[] = [
                   { path: 'people', element: <PeoplePage /> },
                   { path: 'links', element: <LinksPage /> },
                   { path: 'form', element: <FieldsPage /> },
+                  { path: 'submissions', element: <SubmissionsPage /> },
+                  { path: 'submissions/:submissionId', element: <SubmissionPage /> },
                   { path: 'checkpoints', element: <CheckpointsPage /> },
                   { path: 'settings', element: <SettingsPage /> },
                 ],

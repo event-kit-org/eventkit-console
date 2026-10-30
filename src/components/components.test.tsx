@@ -1,6 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { FormField } from './FormField';
+import {
+  CardsSkeleton,
+  QuestionsSkeleton,
+  RowsSkeleton,
+  TableSkeleton,
+  TilesSkeleton,
+} from './PageState';
 import { Button } from './ui/button';
 
 describe('Button', () => {
@@ -21,5 +28,21 @@ describe('FormField', () => {
     rerender(<FormField label="Name" hint="Your full name" error="Required" />);
     expect(screen.getByLabelText('Name')).toHaveAccessibleDescription('Required');
     expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+describe('page skeletons', () => {
+  it('are busy regions that announce loading to screen readers', () => {
+    render(
+      <>
+        <RowsSkeleton rows={2} />
+        <CardsSkeleton count={1} />
+        <TableSkeleton rows={1} cols={2} />
+        <TilesSkeleton count={1} />
+        <QuestionsSkeleton rows={1} />
+      </>,
+    );
+    expect(screen.getAllByText('Loading…')).toHaveLength(5);
+    expect(document.querySelectorAll('[aria-busy="true"]')).toHaveLength(5);
   });
 });

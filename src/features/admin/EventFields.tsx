@@ -143,7 +143,7 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
           ) : (
             <FieldDescription id="paymentInstructions-hint">
               Shown to teams before they upload their receipt. You can also upload an instructions
-              file (image or PDF) or a UPI QR code in Settings. You approve each receipt.
+              file image or a UPI QR code in Settings. You approve each receipt.
             </FieldDescription>
           )}
         </Field>

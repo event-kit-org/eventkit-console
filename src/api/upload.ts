@@ -2,11 +2,11 @@ import { type ApiClient, ApiError, unwrap } from './client';
 
 export type UploadPurpose = 'receipt' | 'payment_qr' | 'payment_instructions';
 
-type FileType = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
+type FileType = 'image/jpeg' | 'image/png' | 'image/webp';
 const ALLOWED: Record<UploadPurpose, readonly FileType[]> = {
-  receipt: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+  receipt: ['image/jpeg', 'image/png', 'image/webp'],
   payment_qr: ['image/jpeg', 'image/png', 'image/webp'],
-  payment_instructions: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+  payment_instructions: ['image/jpeg', 'image/png', 'image/webp'],
 };
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -37,7 +37,12 @@ export async function uploadFile(
   const ticket = await unwrap(
     api.POST('/v1/events/{eventId}/uploads', {
       params: { path: { eventId } },
-      body: { purpose, contentType: type, size: file.size, ...(teamId ? { teamId } : {}) },
+      body: {
+        purpose,
+        contentType: type,
+        size: file.size,
+        ...(teamId ? { teamId } : {}),
+      },
     }),
   );
   const res = await put(ticket.url, { method: ticket.method, headers: ticket.headers, body: file });

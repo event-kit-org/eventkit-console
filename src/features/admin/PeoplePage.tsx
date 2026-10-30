@@ -6,7 +6,7 @@ import { type Schemas, unwrap } from '@/api/client';
 import { useApi, useAuth } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { EmptyState, Loading } from '@/components/PageState';
+import { EmptyState, TableSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ export function PeoplePage() {
         description="Who runs this event with you, and its volunteers and judges."
       />
       <ErrorAlert error={members.error ?? change.error ?? remove.error} />
-      {members.isPending && <Loading rows={2} />}
+      {members.isPending && <TableSkeleton rows={4} cols={3} />}
       {members.data && (
         <>
           <Organisers

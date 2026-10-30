@@ -7,7 +7,8 @@ import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { Loading } from '@/components/PageState';
+import { CardsSkeleton } from '@/components/PageState';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -90,7 +91,18 @@ export function TeamDetailPage() {
     );
   });
 
-  if (team.isPending) return <Loading />;
+  if (team.isPending) {
+    return (
+      <div className="grid gap-4">
+        <Skeleton className="h-8 w-28" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-6 w-20 rounded-full" />
+        </div>
+        <CardsSkeleton count={2} />
+      </div>
+    );
+  }
   if (team.isError) return <ErrorAlert error={team.error} />;
   const t = team.data;
 
@@ -281,7 +293,7 @@ export function TeamDetailPage() {
               type="file"
               className="max-w-sm"
               aria-label="Receipt file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
+              accept="image/jpeg,image/png,image/webp"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) attach.mutate(file);

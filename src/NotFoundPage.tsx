@@ -12,7 +12,7 @@ import {
 
 export function NotFoundPage() {
   return (
-    <main className="grid min-h-svh place-content-center p-4">
+    <main className="grid min-h-dvh place-content-center p-4">
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">

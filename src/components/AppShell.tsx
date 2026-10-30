@@ -30,9 +30,9 @@ export function AppShell() {
           />
           <Crumbs />
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
+        <div className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
           <Outlet />
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -163,19 +164,23 @@ export function ScannerPage() {
       )}
       <Field>
         <FieldLabel htmlFor="checkpoint">Checkpoint</FieldLabel>
-        <NativeSelect
-          id="checkpoint"
-          className="w-full [&_select]:h-10"
-          value={checkpointId}
-          onChange={(e) => choose(e.target.value)}
-        >
-          <NativeSelectOption value="">Choose where you are scanning</NativeSelectOption>
-          {checkpoints.data?.map((c) => (
-            <NativeSelectOption key={c.id} value={c.id}>
-              {c.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        {checkpoints.isLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : (
+          <NativeSelect
+            id="checkpoint"
+            className="w-full [&_select]:h-10"
+            value={checkpointId}
+            onChange={(e) => choose(e.target.value)}
+          >
+            <NativeSelectOption value="">Choose where you are scanning</NativeSelectOption>
+            {checkpoints.data?.map((c) => (
+              <NativeSelectOption key={c.id} value={c.id}>
+                {c.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        )}
         <ErrorAlert error={checkpoints.error} />
       </Field>
       {cameraError && (

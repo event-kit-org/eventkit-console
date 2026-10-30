@@ -5,6 +5,7 @@ import { ApiError, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Loading } from '@/components/PageState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateIST } from '@/lib/datetime';
 import type { EventContextValue } from './event-context';
@@ -76,7 +77,9 @@ export function EventLayout() {
           {formatDateIST(event.endAt)}
         </p>
       </header>
-      <div className="min-w-0">{features.isSuccess && <Outlet context={context} />}</div>
+      <div className="min-w-0">
+        {features.isSuccess ? <Outlet context={context} /> : !features.isError && <Loading />}
+      </div>
     </div>
   );
 }

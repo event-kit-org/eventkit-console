@@ -8,7 +8,7 @@ import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
-import { EmptyState } from '@/components/PageState';
+import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -181,6 +181,7 @@ export function CheckpointsPage() {
         </CardContent>
       </Card>
       <ErrorAlert error={checkpoints.error ?? remove.error} />
+      {checkpoints.isPending && <RowsSkeleton />}
       {checkpoints.data?.length === 0 && <EmptyState icon={MapPin} title="No checkpoints yet." />}
       <ul className="grid gap-2">
         {checkpoints.data?.map((c) => (

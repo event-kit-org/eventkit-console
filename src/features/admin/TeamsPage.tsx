@@ -2,7 +2,7 @@ import { ArrowRight, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { EmptyState, Loading } from '@/components/PageState';
+import { EmptyState, TableSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +61,7 @@ export function TeamsPage() {
         </NativeSelect>
       </PageHeader>
       <ErrorAlert error={teams.error} />
-      {teams.isPending && <Loading />}
+      {teams.isPending && <TableSkeleton cols={6} />}
       {teams.data && list.length === 0 ? (
         <EmptyState icon={UsersRound} title="No teams here yet." />
       ) : (

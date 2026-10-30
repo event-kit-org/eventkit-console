@@ -3,7 +3,7 @@ import { CalendarDays, CalendarPlus, MapPin, Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
-import { Loading } from '@/components/PageState';
+import { CardsSkeleton } from '@/components/PageState';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,7 @@ export function EventsPage() {
           </Link>
         </Button>
       </div>
-      {events.isPending && <Loading rows={2} />}
+      {events.isPending && <CardsSkeleton count={3} className="sm:grid-cols-2 lg:grid-cols-3" />}
       {events.isError && (
         <Alert variant="destructive">
           <AlertDescription>Could not load your events. {events.error.message}</AlertDescription>

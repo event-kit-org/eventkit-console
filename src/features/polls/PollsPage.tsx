@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { RolePicker } from '@/components/RolePicker';
 import { audienceText } from '@/lib/audience';
-import { EmptyState } from '@/components/PageState';
+import { CardsSkeleton, EmptyState } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ export function PollsPage() {
     <div className="grid gap-4">
       <CreatePoll />
       <ErrorAlert error={polls.error} />
+      {polls.isPending && <CardsSkeleton />}
       {polls.data?.length === 0 && <EmptyState icon={BarChart3} title="No polls yet." />}
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {polls.data?.map((p) => (
