@@ -26,13 +26,14 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
-import { type Field, hasOptions, type TeamRule } from '@/features/fields/fields';
+import { type Field, hasOptions, isSingleChoice, type TeamRule } from '@/features/fields/fields';
 
 const TYPE_LABEL: Record<Field['type'], string> = {
   short_text: 'Short answer',
   long_text: 'Paragraph',
   choice: 'Multiple choice',
   multi_choice: 'Checkboxes',
+  dropdown: 'Dropdown',
   number: 'Number',
   phone: 'Phone number',
   datetime: 'Date and time',
@@ -47,11 +48,14 @@ export type Question = Pick<
   scope?: Field['scope'];
 };
 export type QuestionPatch = Partial<Omit<Question, 'scope' | 'type'>>;
-/** Minimum members per team, keyed by dropdown option. */
+/** Minimum members per team, keyed by option. */
 export type MinCounts = Record<string, number>;
 
 /** What a text question's answer line says, as in Google Forms. */
-const ANSWER_HINT: Record<Exclude<Field['type'], 'choice' | 'multi_choice'>, string> = {
+const ANSWER_HINT: Record<
+  Exclude<Field['type'], 'choice' | 'multi_choice' | 'dropdown'>,
+  string
+> = {
   short_text: 'Short answer text',
   long_text: 'Long answer text',
   number: 'Number',
@@ -59,8 +63,15 @@ const ANSWER_HINT: Record<Exclude<Field['type'], 'choice' | 'multi_choice'>, str
   datetime: 'Date and time (IST)',
 };
 
-/** A radio circle for multiple choice, a box for checkboxes. */
-function OptionMark({ type }: { type: Field['type'] }) {
+/** A radio circle for multiple choice, a box for checkboxes, a number for a dropdown. */
+function OptionMark({ type, index }: { type: Field['type']; index: number }) {
+  if (type === 'dropdown') {
+    return (
+      <span aria-hidden className="w-3.5 shrink-0 text-right text-xs tabular-nums">
+        {index + 1}.
+      </span>
+    );
+  }
   return (
     <span
       aria-hidden
@@ -115,11 +126,11 @@ export function QuestionPreview({
       )}
       {hasOptions(question.type) ? (
         <ul className="grid gap-1 text-muted-foreground">
-          {question.options.map((o) => {
+          {question.options.map((o, i) => {
             const rule = rules.find((r) => r.value === o);
             return (
               <li key={o} className="flex items-center gap-2">
-                <OptionMark type={question.type} />
+                <OptionMark type={question.type} index={i} />
                 <span>
                   {o}
                   {rule && <span className="text-xs"> · at least {rule.minCount} per team</span>}
@@ -173,7 +184,7 @@ export function QuestionEditor({
   const text = isText(question.type);
 
   return (
-    <div className="grid gap-4 rounded-xl border border-l-4 border-l-primary bg-card p-4 text-sm shadow-sm">
+    <div className="grid gap-4 rounded-xl border bg-card p-4 text-sm shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row">
         <TextCommit
           aria-label="Question"
@@ -212,7 +223,7 @@ export function QuestionEditor({
         <Options
           type={question.type}
           options={question.options}
-          withMinCounts={question.scope === 'member' && question.type === 'choice'}
+          withMinCounts={question.scope === 'member' && isSingleChoice(question.type)}
           minCounts={minCounts}
           onChange={(options) => onChange({ options })}
           onMinCount={onMinCount}
@@ -303,7 +314,7 @@ function Options({
       <ol className="grid gap-2">
         {options.map((o, i) => (
           <li key={`${i}:${o}`} className="flex items-center gap-2">
-            <OptionMark type={type} />
+            <OptionMark type={type} index={i} />
             <TextCommit
               aria-label={`Option ${i + 1}`}
               className="flex-1"

@@ -8129,7 +8129,7 @@ export interface paths {
                             pattern?: string | null;
                             position?: number;
                             /** @enum {string} */
-                            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+                            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
                         }[];
                     };
                 };
@@ -8502,7 +8502,7 @@ export interface paths {
                         pattern?: string | null;
                         position?: number;
                         /** @enum {string} */
-                        type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+                        type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
                     };
                 };
             };
@@ -8796,7 +8796,7 @@ export interface paths {
                         /** @enum {string} */
                         scope: "team" | "member";
                         /** @enum {string} */
-                        type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
+                        type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
                     };
                 };
             };
@@ -9056,7 +9056,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Add a rule: at least N members with a given answer to a member dropdown */
+        /** Add a rule: at least N members with a given answer to a member multiple-choice or dropdown question */
         post: {
             parameters: {
                 query?: never;
@@ -9426,11 +9426,11 @@ export interface components {
             /** @description The question's description, shown under it */
             help: string | null;
             /**
-             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @description choice: one option (multiple choice, shown as radio buttons); dropdown: one option, shown as a dropdown list; multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
              * @enum {string}
              */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
-            /** @description Choices, for types choice and multi_choice */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
+            /** @description Choices, for types choice, dropdown and multi_choice */
             options: string[];
             required: boolean;
             /** @description Answers may not repeat within the event (case-insensitive) */
@@ -9735,11 +9735,11 @@ export interface components {
             /** @description The question's description, shown under it */
             help: string | null;
             /**
-             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @description choice: one option (multiple choice, shown as radio buttons); dropdown: one option, shown as a dropdown list; multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
              * @enum {string}
              */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
-            /** @description Choices, for types choice and multi_choice */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
+            /** @description Choices, for types choice, dropdown and multi_choice */
             options: string[];
             required: boolean;
             /** @description No two teams' answers may match (case-insensitive) */
@@ -10224,11 +10224,11 @@ export interface components {
             /** @description The question's description, shown under it */
             help: string | null;
             /**
-             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @description choice: one option (multiple choice, shown as radio buttons); dropdown: one option, shown as a dropdown list; multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
              * @enum {string}
              */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
-            /** @description Choices, for types choice and multi_choice */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
+            /** @description Choices, for types choice, dropdown and multi_choice */
             options: string[];
             required: boolean;
             /** @description Answers may not repeat within the event (case-insensitive) */
@@ -10533,11 +10533,11 @@ export interface components {
             /** @description The question's description, shown under it */
             help: string | null;
             /**
-             * @description choice: one option (multiple choice); multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
+             * @description choice: one option (multiple choice, shown as radio buttons); dropdown: one option, shown as a dropdown list; multi_choice: any number of options, answered as a list; datetime: an ISO 8601 date and time with offset
              * @enum {string}
              */
-            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime";
-            /** @description Choices, for types choice and multi_choice */
+            type: "short_text" | "long_text" | "number" | "choice" | "phone" | "multi_choice" | "datetime" | "dropdown";
+            /** @description Choices, for types choice, dropdown and multi_choice */
             options: string[];
             required: boolean;
             /** @description No two teams' answers may match (case-insensitive) */

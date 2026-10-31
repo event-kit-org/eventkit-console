@@ -17,6 +17,8 @@ import {
   toAnswers,
   toDraft,
   toggleOption,
+  hasOptions,
+  isSingleChoice,
 } from './fields';
 
 const f = (over: Partial<Field>): Field => ({
@@ -110,6 +112,16 @@ describe('field helpers', () => {
   });
 });
 
+describe('question types', () => {
+  it('treats dropdown like multiple choice: one option from a list', () => {
+    expect(isSingleChoice('dropdown')).toBe(true);
+    expect(isSingleChoice('choice')).toBe(true);
+    expect(isSingleChoice('multi_choice')).toBe(false);
+    expect(hasOptions('dropdown')).toBe(true);
+    expect(hasOptions('short_text')).toBe(false);
+  });
+});
+
 describe('multi-select and date-time helpers', () => {
   const stack = f({ id: 'stack', type: 'multi_choice', options: ['A', 'B'], required: true });
   const at = f({ id: 'at', type: 'datetime' });
@@ -166,6 +178,13 @@ describe('FieldInputs', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'B' }));
     expect(screen.getByLabelText(/Demo at/)).toHaveAttribute('type', 'datetime-local');
     expect(screen.getByRole('status')).toHaveTextContent('{"stack":["A"]}');
+  });
+
+  it('shows a dropdown question as a select', async () => {
+    const size = f({ id: 'size', label: 'T-shirt', type: 'dropdown', options: ['S', 'M'] });
+    render(<Harness fields={[size]} />);
+    await userEvent.selectOptions(screen.getByLabelText(/T-shirt/), 'M');
+    expect(screen.getByRole('status')).toHaveTextContent('{"size":"M"}');
   });
 
   it('shows errors in place of help', () => {

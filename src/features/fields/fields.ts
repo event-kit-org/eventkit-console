@@ -14,8 +14,10 @@ export type Draft = Record<string, string | string[]>;
 /** What a form's fields have in common: registration and submission fields both fit. */
 type FieldLike = Pick<Field, 'id' | 'type' | 'required'>;
 
+/** One option from a list: multiple choice (radio buttons) or a dropdown. */
+export const isSingleChoice = (type: Field['type']) => type === 'choice' || type === 'dropdown';
 /** Types answered by picking from the question's options. */
-export const hasOptions = (type: Field['type']) => type === 'choice' || type === 'multi_choice';
+export const hasOptions = (type: Field['type']) => isSingleChoice(type) || type === 'multi_choice';
 
 export const teamFields = (fields: Field[]) => fields.filter((f) => f.scope === 'team');
 export const memberFields = (fields: Field[]) => fields.filter((f) => f.scope === 'member');

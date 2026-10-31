@@ -8,7 +8,14 @@ import {
 } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import { type AnswerValue, answerText, type Draft, type Field, toggleOption } from './fields';
+import {
+  type AnswerValue,
+  answerText,
+  type Draft,
+  type Field,
+  isSingleChoice,
+  toggleOption,
+} from './fields';
 
 /** Inputs for a list of organiser-defined fields. */
 export function FieldInputs({
@@ -63,7 +70,7 @@ export function FieldInputs({
                   </label>
                 ))}
               </div>
-            ) : f.type === 'choice' ? (
+            ) : isSingleChoice(f.type) ? (
               <NativeSelect
                 {...common}
                 className="w-full"
