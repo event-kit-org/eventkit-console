@@ -27,6 +27,8 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
 import { type Field, hasOptions, isSingleChoice, type TeamRule } from '@/features/fields/fields';
+import { Markdown } from '@/components/Markdown';
+import { MarkdownTextarea } from '@/components/MarkdownTextarea';
 
 const TYPE_LABEL: Record<Field['type'], string> = {
   short_text: 'Short answer',
@@ -122,7 +124,9 @@ export function QuestionPreview({
         {question.required && <span className="text-destructive"> *</span>}
       </div>
       {question.help && (
-        <div className="text-xs whitespace-pre-line text-muted-foreground">{question.help}</div>
+        <Markdown inert className="text-xs text-muted-foreground">
+          {question.help}
+        </Markdown>
       )}
       {hasOptions(question.type) ? (
         <ul className="grid gap-1 text-muted-foreground">
@@ -440,7 +444,7 @@ function TextareaCommit({
     setCommitted(value);
   }
   return (
-    <Textarea
+    <MarkdownTextarea
       {...props}
       rows={1}
       className="min-h-9 resize-y"

@@ -10,7 +10,6 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, QuestionsSkeleton } from '@/components/PageState';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { QuestionPreview } from '@/features/admin/QuestionCard';
 import { useEventContext } from '@/features/events/event-context';
 import { PhaseBadge } from '@/features/judging/rounds';
@@ -18,6 +17,7 @@ import { useEventMutation } from '@/hooks/useEventMutation';
 import { fromISTInput, toISTInput } from '@/lib/datetime';
 import { useSubmissions, type Submission } from './queries';
 import { DraftQuestion, SavedQuestion, useMoveField } from './SubmissionBuilder';
+import { MarkdownTextarea } from '@/components/MarkdownTextarea';
 
 /** Admin: one submission's title, description, questions and the entries teams made. */
 export function SubmissionPage() {
@@ -91,7 +91,7 @@ function Editor({ submission }: { submission: Submission }) {
         <FormField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <div className="grid gap-2">
           <Label htmlFor="submission-description">Description</Label>
-          <Textarea
+          <MarkdownTextarea
             id="submission-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}

@@ -1,11 +1,7 @@
 import { useId } from 'react';
+import { Markdown } from '@/components/Markdown';
 import { Input } from '@/components/ui/input';
-import {
-  Field as FormFieldBox,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field as FormFieldBox, FieldError, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -99,7 +95,11 @@ export function FieldInputs({
             {error ? (
               <FieldError id={`${id}-error`}>{error}</FieldError>
             ) : (
-              f.help && <FieldDescription id={`${id}-help`}>{f.help}</FieldDescription>
+              f.help && (
+                <Markdown id={`${id}-help`} className="text-sm text-muted-foreground">
+                  {f.help}
+                </Markdown>
+              )
             )}
           </FormFieldBox>
         );

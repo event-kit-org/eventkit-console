@@ -2,8 +2,8 @@ import { type UseFormReturn, useWatch } from 'react-hook-form';
 import { FormField } from '@/components/FormField';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { Textarea } from '@/components/ui/textarea';
 import type { EventFormValues } from './event-form';
+import { MarkdownTextarea } from '@/components/MarkdownTextarea';
 
 type Form = UseFormReturn<EventFormValues>;
 
@@ -11,6 +11,7 @@ type Form = UseFormReturn<EventFormValues>;
 export function EventFields({ form, step }: { form: Form; step: number }) {
   const { register, formState, control } = form;
   const paymentMode = useWatch({ control, name: 'paymentMode' });
+  const paymentInstructions = useWatch({ control, name: 'paymentInstructions' });
   const e = formState.errors;
   const num = { valueAsNumber: true } as const;
 
@@ -128,8 +129,9 @@ export function EventFields({ form, step }: { form: Form; step: number }) {
       {paid && (
         <Field data-invalid={e.paymentInstructions ? true : undefined}>
           <FieldLabel htmlFor="paymentInstructions">How to pay</FieldLabel>
-          <Textarea
+          <MarkdownTextarea
             id="paymentInstructions"
+            preview={paymentInstructions}
             rows={4}
             placeholder={
               'e.g. Bank: Canara Bank, A/c 1234567890, IFSC CNRB0001234\nor UPI: club@upi'
