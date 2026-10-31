@@ -1,3 +1,5 @@
+import { splitApiUrls } from '@/api/failover';
+
 export interface AppConfig {
   /** Base URL of the API, e.g. "/api" behind the same domain. */
   apiUrl: string;
@@ -23,4 +25,14 @@ export function loadAppConfig(
     apiUrl: runtime?.apiUrl || env.VITE_API_URL || '/api',
     platformApiKey: runtime?.platformApiKey || env.VITE_PLATFORM_API_KEY || '',
   };
+}
+
+/**
+ * The console's API addresses (primary first), made absolute for a portal on
+ * another domain: what goes in its VITE_EVENTKIT_API_URL.
+ */
+export function absoluteApiUrls(apiUrl: string, origin: string): string {
+  return splitApiUrls(apiUrl)
+    .map((u) => new URL(u, origin).href.replace(/\/+$/, ''))
+    .join(',');
 }

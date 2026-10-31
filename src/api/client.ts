@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from 'openapi-fetch';
 import type { AppConfig } from '@/lib/config';
+import { createFailoverFetch, splitApiUrls } from './failover';
 import type { components, paths } from './schema';
 
 export type Schemas = components['schemas'];
@@ -22,10 +23,17 @@ export class ApiError extends Error {
 
 /**
  * Typed client for the eventKit API. Adds the Bearer token (when logged in) and
- * the platform X-Api-Key to every request.
+ * the platform X-Api-Key to every request. With several API addresses
+ * (comma-separated, primary first), requests move to the next while the
+ * primary can't be reached.
  */
 export function createApiClient(config: AppConfig, getToken: () => string | null) {
-  const client = createClient<paths>({ baseUrl: config.apiUrl });
+  const urls = splitApiUrls(config.apiUrl);
+  const failover = urls.length > 1 ? createFailoverFetch(urls) : null;
+  const client = createClient<paths>({
+    baseUrl: urls[0] ?? config.apiUrl,
+    ...(failover ? { fetch: failover.fetch } : {}),
+  });
   const auth: Middleware = {
     onRequest({ request }) {
       const token = getToken();

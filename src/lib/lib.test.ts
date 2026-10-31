@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { loadAppConfig } from './config';
+import { absoluteApiUrls, loadAppConfig } from './config';
 import { formatDateIST, formatIST } from './datetime';
 import { cn } from './utils';
+
+describe('absoluteApiUrls', () => {
+  it('makes each address absolute and keeps the list order', () => {
+    expect(absoluteApiUrls('/api', 'https://console.test')).toBe('https://console.test/api');
+    expect(absoluteApiUrls('https://a.test/, https://b.test', 'https://console.test')).toBe(
+      'https://a.test,https://b.test',
+    );
+  });
+});
 
 describe('loadAppConfig', () => {
   it('prefers runtime config from the container', () => {

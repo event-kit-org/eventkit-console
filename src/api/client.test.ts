@@ -33,6 +33,22 @@ describe('createApiClient', () => {
   });
 });
 
+describe('createApiClient with two API addresses', () => {
+  it('moves to the second address while the first is unreachable', async () => {
+    const BACKUP = 'http://api-backup.test';
+    server.use(
+      http.get(`${API}/v1/events`, () => HttpResponse.error()),
+      http.get(`${BACKUP}/v1/events`, () => HttpResponse.json([{ id: 'e' }])),
+    );
+    const client = createApiClient({ ...TEST_CONFIG, apiUrl: `${API}, ${BACKUP}` }, () => null);
+    try {
+      expect(await unwrap(client.GET('/v1/events'))).toEqual([{ id: 'e' }]);
+    } finally {
+      localStorage.removeItem('eventkit:api-down');
+    }
+  });
+});
+
 describe('unwrap', () => {
   // Created per test: openapi-fetch captures fetch when the client is built,
   // which must happen after MSW has patched it.

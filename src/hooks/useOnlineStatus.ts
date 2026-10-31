@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { splitApiUrls } from '@/api/failover';
 
 /**
  * Whether the app can reach the API right now. navigator.onLine alone is not
  * reliable (it is true on Wi-Fi without internet), so this also pings /health.
+ * With several API addresses, online means any of them answers.
  */
 export function useOnlineStatus(
   apiUrl: string,
@@ -20,15 +22,20 @@ export function useOnlineStatus(
         if (!cancelled) setOnline(false);
         return;
       }
-      try {
-        const res = await fetch(`${apiUrl}/health`, {
-          cache: 'no-store',
-          signal: AbortSignal.timeout(3000),
-        });
-        if (!cancelled) setOnline(res.ok);
-      } catch {
-        if (!cancelled) setOnline(false);
+      let ok = false;
+      for (const url of splitApiUrls(apiUrl)) {
+        try {
+          const res = await fetch(`${url}/health`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(3000),
+          });
+          ok = res.ok;
+        } catch {
+          ok = false;
+        }
+        if (ok) break;
       }
+      if (!cancelled) setOnline(ok);
     };
     const goOffline = () => setOnline(false);
     void check();

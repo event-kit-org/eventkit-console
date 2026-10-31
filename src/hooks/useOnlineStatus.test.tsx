@@ -40,4 +40,14 @@ describe('useOnlineStatus', () => {
     await waitFor(() => expect(result.current.online).toBe(false));
     unmount();
   });
+
+  it('with several addresses, is online while any of them answers', async () => {
+    const BACKUP = 'http://api-backup.test';
+    server.use(
+      http.get(`${API}/health`, () => HttpResponse.error()),
+      http.get(`${BACKUP}/health`, () => HttpResponse.json({ status: 'ok' })),
+    );
+    const { result } = renderHook(() => useOnlineStatus(`${API},${BACKUP}`, 60_000));
+    await waitFor(() => expect(result.current.online).toBe(true));
+  });
 });

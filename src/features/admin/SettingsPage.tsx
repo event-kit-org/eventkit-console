@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi, useAuth } from '@/auth/context';
+import { absoluteApiUrls } from '@/lib/config';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { CopyButton } from '@/components/CopyButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -179,8 +180,9 @@ function PortalCard() {
     enabled: isOwner,
   });
   const [newKey, setNewKey] = useState<string | null>(null);
-  // The address the console reaches the API on, made absolute for a portal elsewhere.
-  const apiUrl = new URL(useAuth().config.apiUrl, window.location.origin).href.replace(/\/+$/, '');
+  // The addresses the console reaches the API on (primary first), made absolute
+  // for a portal elsewhere.
+  const apiUrl = absoluteApiUrls(useAuth().config.apiUrl, window.location.origin);
   const portalEnv = (key: string) =>
     `VITE_EVENTKIT_API_URL=${apiUrl}\nVITE_EVENTKIT_EVENT_ID=${event.id}\nVITE_EVENTKIT_API_KEY=${key}`;
   const createKey = useEventMutation(event.id, () =>
