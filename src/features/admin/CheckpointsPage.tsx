@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { ExitReasonsCard } from './ExitReasonsCard';
 import { formatIST, fromISTInput } from '@/lib/datetime';
 
 const schema = z.object({
@@ -270,6 +271,7 @@ export function CheckpointsPage() {
           </li>
         ))}
       </ul>
+      <ExitReasonsCard />
     </div>
   );
 }

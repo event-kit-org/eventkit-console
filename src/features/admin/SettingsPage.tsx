@@ -45,7 +45,7 @@ import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { EventFields } from './EventFields';
 import { ManageEventCard } from './ManageEventCard';
-import { ExitReasonsCard, StagedReleaseCard } from './ReleaseSettings';
+import { StagedReleaseCard } from './StagedReleaseCard';
 import {
   eventFormSchema,
   type EventFormValues,
@@ -88,7 +88,6 @@ export function SettingsPage() {
       <RsvpCard />
       <StagedReleaseCard />
       <FeaturesCard />
-      <ExitReasonsCard />
       <PaymentInstructionsFileCard />
       <PaymentQrCard />
       {/* Remounts when the deadline changes elsewhere (Manage event), so saving the

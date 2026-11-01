@@ -6,7 +6,7 @@ import {
   CreditCard,
   Gauge,
   Link2,
-  LogOut,
+  Contact,
   MapPin,
   Settings,
   Trophy,
@@ -43,7 +43,7 @@ export const SECTIONS: { group: string | null; links: Section[] }[] = [
     group: 'Event day',
     links: [
       { to: 'checkpoints', label: 'Checkpoints', icon: MapPin },
-      { to: 'outside', label: 'Outside now', icon: LogOut },
+      { to: 'attendees', label: 'People', icon: Contact },
       { to: 'polls', label: 'Polls', icon: BarChart3 },
       { to: 'notifications', label: 'Notifications', icon: Bell },
       { to: 'submissions', label: 'Submissions', icon: FileUp },

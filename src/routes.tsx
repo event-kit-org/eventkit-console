@@ -21,7 +21,7 @@ import { NotificationsPage } from '@/features/notifications/NotificationsPage';
 import { SubmissionPage } from '@/features/submissions/SubmissionPage';
 import { SubmissionsPage } from '@/features/submissions/SubmissionsPage';
 import { PollsPage } from '@/features/polls/PollsPage';
-import { OutsidePage } from '@/features/scanner/OutsidePage';
+import { EventPeoplePage } from '@/features/scanner/EventPeoplePage';
 import { ScannerPage } from '@/features/scanner/ScannerPage';
 import { AccountPage } from '@/features/account/AccountPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
@@ -54,7 +54,7 @@ export const routes: RouteObject[] = [
                 element: <RequireRole roles={['admin', 'volunteer']} />,
                 children: [
                   { path: 'scan', element: <ScannerPage /> },
-                  { path: 'outside', element: <OutsidePage /> },
+                  { path: 'attendees', element: <EventPeoplePage /> },
                 ],
               },
               {

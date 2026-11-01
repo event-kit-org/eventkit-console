@@ -70,9 +70,7 @@ describe('event layout', () => {
     expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments');
     expect(nav).toHaveTextContent('SetupPeoplePortal & settings');
     // Scanning happens on the portal; the page still opens by its address.
-    expect(nav).toHaveTextContent(
-      'Event dayCheckpointsOutside nowPollsNotificationsSubmissionsJudging',
-    );
+    expect(nav).toHaveTextContent('Event dayCheckpointsPeoplePollsNotificationsSubmissionsJudging');
   });
 
   it('names the open section in the breadcrumb, and collapses the sidebar', async () => {

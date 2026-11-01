@@ -102,11 +102,12 @@ describe('overview', () => {
   });
 });
 
-describe('exit reasons', () => {
+describe('exit reasons (on Checkpoints)', () => {
   it('edits the list and saves it', async () => {
     asRole('admin', { exitReasons: ['Bathroom', 'Emergency'] });
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([])));
     const save = capture('patch', E, { event, role: 'admin' });
-    go('/settings');
+    go('/checkpoints');
     await userEvent.type(await screen.findByLabelText('New reason'), 'Phone call{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Remove Emergency' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save reasons' }));
@@ -115,14 +116,15 @@ describe('exit reasons', () => {
 
   it('refuses duplicates', async () => {
     asRole('admin', { exitReasons: ['Bathroom'] });
-    go('/settings');
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([])));
+    go('/checkpoints');
     await userEvent.type(await screen.findByLabelText('New reason'), 'bathroom{Enter}');
     expect(screen.getByText('Each reason must be different.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save reasons' })).toBeDisabled();
   });
 });
 
-describe('outside now', () => {
+describe('People: outside now', () => {
   it('lists who is out, with a phone when there is one and how long ago they left', async () => {
     asRole('admin');
     const ago = (min: number) => new Date(Date.now() - min * 60_000 - 5_000).toISOString();
@@ -152,7 +154,7 @@ describe('outside now', () => {
         ]),
       ),
     );
-    go('/outside');
+    go('/attendees');
     const table = await screen.findByRole('table', { name: 'People outside' });
     const asha = within(table).getByRole('row', { name: /Asha/ });
     expect(asha).toHaveTextContent(
@@ -167,7 +169,7 @@ describe('outside now', () => {
   it('says when nobody is out', async () => {
     asRole('admin');
     server.use(http.get(`${E}/scans/outside`, () => HttpResponse.json([])));
-    go('/outside');
+    go('/attendees');
     expect(await screen.findByText('Everyone who left has come back.')).toBeInTheDocument();
   });
 });
