@@ -323,50 +323,67 @@ describe('scanner', () => {
   });
 });
 
-describe('exit checkpoints', () => {
-  const exitCp = {
-    id: 'c-out',
-    name: 'Gate out',
-    type: 'exit',
+describe('gate checkpoints', () => {
+  const gateCp = {
+    id: 'c-door',
+    name: 'Venue door',
+    type: 'gate',
     opensAt: null,
     closesAt: null,
     allowRepeat: false,
     poll: null,
-    linkedCheckpointId: 'c-gate',
     createdAt: event.createdAt,
   };
+  const door = { id: 'c-door', name: 'Venue door', type: 'gate' } as const;
+  /** The server: someone inside needs a reason; with one, they are out. */
+  function gateServer() {
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([...checkpoints, gateCp])));
+    answer(() => {
+      const body = bodies.at(-1) as { exitReason?: string };
+      if (!body.exitReason) {
+        return HttpResponse.json(
+          {
+            error: {
+              code: 'EXIT_REASON_REQUIRED',
+              message: 'Choose why they are leaving.',
+              details: {
+                participant: { name: 'Asha', participantCode: 'PX-0001', teamName: 'Byte Club' },
+              },
+            },
+          },
+          { status: 400 },
+        );
+      }
+      return HttpResponse.json(result({ checkpoint: door, exitReason: body.exitReason }));
+    });
+  }
 
-  it('asks why they are leaving before sending the scan', async () => {
-    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([...checkpoints, exitCp])));
-    answer(() =>
-      HttpResponse.json(
-        result({
-          checkpoint: { id: 'c-out', name: 'Gate out', type: 'exit' },
-          exitReason: 'Bathroom',
-        }),
-      ),
-    );
-    await userEvent.selectOptions(await open(), 'c-out');
+  it('after scanning someone inside, shows who it is and a reason to pick, then sends it', async () => {
+    gateServer();
+    await userEvent.selectOptions(await open(), 'c-door');
     show('qr-1');
-    const dialog = await screen.findByRole('dialog', { name: 'Why are they leaving?' });
-    expect(bodies).toHaveLength(0);
-    expect(within(dialog).getByRole('button', { name: 'Mark as left' })).toBeDisabled();
-    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Reason' }));
+    const panel = await screen.findByRole('region', { name: 'Going out' });
+    expect(panel).toHaveTextContent('Asha is going out');
+    expect(panel).toHaveTextContent('Team Byte Club · PX-0001');
+    expect(within(panel).getByRole('button', { name: 'Mark as left' })).toBeDisabled();
+    await userEvent.click(within(panel).getByRole('combobox', { name: 'Reason' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Bathroom' }));
     await userEvent.click(screen.getByRole('button', { name: 'Mark as left' }));
-    expect(await screen.findByText('✓ Left: Bathroom')).toBeInTheDocument();
-    expect(bodies[0]).toMatchObject({ qrToken: 'qr-1', exitReason: 'Bathroom' });
+    expect(await screen.findByText('✓ Out: Bathroom')).toBeInTheDocument();
+    expect(bodies.map((b) => (b as { exitReason?: string }).exitReason)).toEqual([
+      undefined,
+      'Bathroom',
+    ]);
+    expect(screen.queryByRole('region', { name: 'Going out' })).toBeNull();
   });
 
-  it('takes a typed reason, and cancelling sends nothing', async () => {
-    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([...checkpoints, exitCp])));
-    answer(() =>
-      HttpResponse.json(result({ checkpoint: { id: 'c-out', name: 'Gate out', type: 'exit' } })),
-    );
-    await userEvent.selectOptions(await open(), 'c-out');
+  it('takes a typed reason; cancelling sends nothing more', async () => {
+    gateServer();
+    await userEvent.selectOptions(await open(), 'c-door');
     show('qr-1');
     await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
-    expect(bodies).toHaveLength(0);
+    expect(screen.queryByRole('region', { name: 'Going out' })).toBeNull();
+    expect(bodies).toHaveLength(1);
 
     await userEvent.type(screen.getByLabelText('Code typed by hand'), 'PX-0001');
     await userEvent.click(screen.getByRole('button', { name: 'Check' }));
@@ -374,7 +391,16 @@ describe('exit checkpoints', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Something else…' }));
     await userEvent.type(screen.getByLabelText('Describe it'), 'Parent pickup');
     await userEvent.click(screen.getByRole('button', { name: 'Mark as left' }));
-    await waitFor(() => expect(bodies[0]).toMatchObject({ exitReason: 'Parent pickup' }));
+    await waitFor(() => expect(bodies.at(-1)).toMatchObject({ exitReason: 'Parent pickup' }));
+  });
+
+  it('lets someone outside straight back in', async () => {
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([...checkpoints, gateCp])));
+    answer(() => HttpResponse.json(result({ checkpoint: door, reentry: true })));
+    await userEvent.selectOptions(await open(), 'c-door');
+    show('qr-1');
+    expect(await screen.findByText('✓ Back in')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Going out' })).toBeNull();
   });
 });
 
@@ -426,7 +452,7 @@ describe('offline scanning', () => {
       http.get(`${E}/scans/roster`, () =>
         HttpResponse.json({
           generatedAt: event.createdAt,
-          checkpoint: { ...checkpoints[0], poll: null, linkedCheckpointId: null },
+          checkpoint: { ...checkpoints[0], poll: null },
           people: [
             {
               registrationId: 'r1',
@@ -440,7 +466,6 @@ describe('offline scanning', () => {
               lastAcceptedAt: null,
             },
           ],
-          exits: [],
         }),
       ),
     );

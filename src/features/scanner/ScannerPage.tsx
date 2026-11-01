@@ -1,4 +1,4 @@
-import { isEventKitError, type ScanResult } from '@eventkit/sdk';
+import { isEventKitError, type Leaving, leavingFrom, type ScanResult } from '@eventkit/sdk';
 import { useQuery } from '@tanstack/react-query';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { CameraOff, CloudUpload, Info, WifiOff } from 'lucide-react';
@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
 import { cn } from '@/lib/utils';
-import { ExitReasonDialog } from './ExitReasonDialog';
+import { ExitReasonPanel } from './ExitReasonPanel';
 import { describeScan } from './scan-messages';
 import { ScanLog } from './ScanLog';
 import { useCheckpointScanner } from './useCheckpointScanner';
@@ -50,7 +50,8 @@ function PauseBar({ until }: { until: number }) {
  * The scanner (the SDK's): each scan gets a UUID made on this phone and is
  * retried with the same id, so it never counts twice. Without a connection it
  * keeps going from the checkpoint's cached roster, queues the scans and sends
- * them once back online. Exit checkpoints ask why the person is leaving.
+ * them once back online. At a gate, scanning someone inside asks why they are
+ * leaving before the scan is sent; scanning someone outside lets them back in.
  */
 export function ScannerPage() {
   const { api } = useAuth();
@@ -64,8 +65,8 @@ export function ScannerPage() {
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
-  /** An exit scan waiting for its reason. */
-  const [leaving, setLeaving] = useState<{ code: string; force: boolean } | null>(null);
+  /** At a gate: someone inside was scanned; the scan waits for a reason. */
+  const [leaving, setLeaving] = useState<{ code: string; who: Leaving } | null>(null);
   const [pausedUntil, setPausedUntil] = useState(0);
 
   const checkpoints = useQuery({
@@ -73,11 +74,11 @@ export function ScannerPage() {
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/checkpoints', path)),
     enabled: features.scanning,
   });
-  const checkpoint = checkpoints.data?.find((c) => c.id === checkpointId);
 
   const choose = (id: string) => {
     setCheckpointId(id);
     setOutcome(null);
+    setLeaving(null);
     try {
       window.localStorage.setItem(storageKey(event.id), id);
     } catch {
@@ -91,6 +92,12 @@ export function ScannerPage() {
       const result = await action();
       if (result) setOutcome({ kind: 'result', result, code });
     } catch (e) {
+      const who = leavingFrom(e);
+      if (who) {
+        setOutcome(null);
+        setLeaving({ code, who });
+        return;
+      }
       setOutcome({
         kind: 'error',
         message: isEventKitError(e) || e instanceof Error ? e.message : 'Scan failed.',
@@ -103,10 +110,7 @@ export function ScannerPage() {
 
   const submit = (code: string, force = false, exitReason?: string) => {
     if (!scanner) return;
-    if (checkpoint?.type === 'exit' && !exitReason) {
-      setLeaving({ code, force });
-      return;
-    }
+    if (exitReason) setLeaving(null);
     void run(() => scanner.scan(code, { force, ...(exitReason ? { exitReason } : {}) }), code);
   };
 
@@ -201,6 +205,17 @@ export function ScannerPage() {
       </div>
       <PauseBar until={pausedUntil} />
 
+      {leaving && (
+        <ExitReasonPanel
+          key={leaving.code}
+          who={leaving.who}
+          reasons={event.exitReasons}
+          busy={busy}
+          onCancel={() => setLeaving(null)}
+          onSubmit={(reason) => submit(leaving.code, true, reason)}
+        />
+      )}
+
       {outcome && (
         <div
           role="status"
@@ -273,17 +288,6 @@ export function ScannerPage() {
       {checkpointId && (
         <ScanLog eventId={event.id} checkpointId={checkpointId} online={online} local={log} />
       )}
-
-      <ExitReasonDialog
-        code={leaving?.code ?? null}
-        reasons={event.exitReasons}
-        onCancel={() => setLeaving(null)}
-        onConfirm={(reason) => {
-          const pending = leaving!;
-          setLeaving(null);
-          submit(pending.code, true, reason);
-        }}
-      />
     </div>
   );
 }

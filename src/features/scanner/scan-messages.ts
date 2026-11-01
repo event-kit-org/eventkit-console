@@ -6,7 +6,7 @@ type Result = Schemas['ScanResult'];
 /** What the volunteer reads after a scan. */
 export function describeScan(r: Result): string {
   if (r.result === 'accepted') {
-    if (r.checkpoint.type === 'exit') return r.exitReason ? `Left: ${r.exitReason}` : 'Left';
+    if (r.exitReason) return `Out: ${r.exitReason}`;
     if (r.reentry) return 'Back in';
     return r.checkpoint.type === 'entry' ? 'Checked in' : 'OK — hand it over';
   }
@@ -23,8 +23,6 @@ export function describeScan(r: Result): string {
       return 'Has not confirmed attendance (RSVP) yet';
     case 'not_checked_in':
       return 'Not checked in at the entry yet';
-    case 'not_inside':
-      return 'Already marked outside — scan them back in at the entry';
     case 'cancelled':
       return 'Registration is cancelled';
     default:
@@ -45,8 +43,6 @@ export function reasonLabel(reason: Result['reason']): string {
       return "Not RSVP'd";
     case 'not_checked_in':
       return 'Not checked in';
-    case 'not_inside':
-      return 'Already out';
     case 'cancelled':
       return 'Cancelled';
     default:

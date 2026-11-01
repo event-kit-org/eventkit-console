@@ -31,7 +31,7 @@ function useNow(everyMs = 30_000) {
   return now;
 }
 
-/** People at the event: for now, who left through an exit and hasn't scanned back in. */
+/** People at the event: for now, who went out through an entry & exit checkpoint and hasn't scanned back in. */
 export function EventPeoplePage() {
   const api = useApi();
   const { event, path, features } = useEventContext();
@@ -67,8 +67,8 @@ export function EventPeoplePage() {
             )}
           </CardTitle>
           <CardDescription>
-            Scanned out at an exit and not back in yet, longest out first. Refreshes every 15
-            seconds.
+            Went out through an entry & exit checkpoint and not back in yet, longest out first.
+            Refreshes every 15 seconds.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">

@@ -566,7 +566,6 @@ describe('checkpoints', () => {
         closesAt: null,
         allowRepeat: true,
         pollId: 'p-food',
-        linkedCheckpointId: null,
       }),
     );
     await userEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);

@@ -10,7 +10,7 @@ async function call<T>(promise: Promise<{ data?: T; error?: unknown; response: R
   try {
     return await unwrap(promise);
   } catch (e) {
-    if (e instanceof ApiError) throw new EventKitError(e.status, e.code, e.message, e);
+    if (e instanceof ApiError) throw new EventKitError(e.status, e.code, e.message, e.details);
     throw e;
   }
 }

@@ -175,14 +175,13 @@ describe('People: outside now', () => {
 });
 
 describe('editing a checkpoint', () => {
-  it('changes its hours, repeat scans and pairing', async () => {
+  it('changes its hours and repeat scans', async () => {
     asRole('admin');
     const cp = (over: object) => ({
       opensAt: null,
       closesAt: null,
       allowRepeat: false,
       poll: null,
-      linkedCheckpointId: null,
       createdAt: event.createdAt,
       ...over,
     });
@@ -190,14 +189,14 @@ describe('editing a checkpoint', () => {
       http.get(`${E}/checkpoints`, () =>
         HttpResponse.json([
           cp({ id: 'c-gate', name: 'Entry', type: 'entry' }),
-          cp({ id: 'c-out', name: 'Exit', type: 'exit', linkedCheckpointId: 'c-gate' }),
+          cp({ id: 'c-out', name: 'Exit', type: 'gate' }),
         ]),
       ),
     );
     const save = capture(
       'patch',
       `${E}/checkpoints/c-out`,
-      cp({ id: 'c-out', name: 'Exit', type: 'exit' }),
+      cp({ id: 'c-out', name: 'Exit', type: 'gate' }),
     );
     go('/checkpoints');
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Exit' }));
@@ -225,7 +224,6 @@ describe('editing a checkpoint', () => {
         opensAt: '2026-11-07T02:30:00.000Z',
         closesAt: '2026-11-07T13:30:00.000Z',
         allowRepeat: true,
-        linkedCheckpointId: 'c-gate',
       }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());

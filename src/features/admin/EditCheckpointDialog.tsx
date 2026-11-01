@@ -14,30 +14,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { fromISTInput, toISTInput } from '@/lib/datetime';
 
 type Checkpoint = Schemas['Checkpoint'];
-const ANY_ENTRY = '__any__';
 
-/** Edits a checkpoint's name, opening hours, repeat scans and (exits) the entry it pairs with. */
-export function EditCheckpointDialog({
-  checkpoint,
-  entries,
-}: {
-  checkpoint: Checkpoint;
-  /** The event's entry checkpoints, for pairing an exit. */
-  entries: Checkpoint[];
-}) {
+/** Edits a checkpoint's name, opening hours and repeat scans. */
+export function EditCheckpointDialog({ checkpoint }: { checkpoint: Checkpoint }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -47,20 +32,12 @@ export function EditCheckpointDialog({
         </Button>
       </DialogTrigger>
       {/* A fresh form each time it opens, from the checkpoint as it is now. */}
-      {open && <EditForm checkpoint={checkpoint} entries={entries} onDone={() => setOpen(false)} />}
+      {open && <EditForm checkpoint={checkpoint} onDone={() => setOpen(false)} />}
     </Dialog>
   );
 }
 
-function EditForm({
-  checkpoint,
-  entries,
-  onDone,
-}: {
-  checkpoint: Checkpoint;
-  entries: Checkpoint[];
-  onDone: () => void;
-}) {
+function EditForm({ checkpoint, onDone }: { checkpoint: Checkpoint; onDone: () => void }) {
   const api = useApi();
   const { event } = useEventContext();
   const [name, setName] = useState(checkpoint.name);
@@ -69,8 +46,6 @@ function EditForm({
     checkpoint.closesAt ? toISTInput(checkpoint.closesAt) : '',
   );
   const [allowRepeat, setAllowRepeat] = useState(checkpoint.allowRepeat);
-  const [linked, setLinked] = useState(checkpoint.linkedCheckpointId ?? '');
-  const isExit = checkpoint.type === 'exit';
   const badWindow = opensAt !== '' && closesAt !== '' && closesAt <= opensAt;
 
   const save = useEventMutation(event.id, () =>
@@ -82,7 +57,6 @@ function EditForm({
           opensAt: opensAt ? fromISTInput(opensAt) : null,
           closesAt: closesAt ? fromISTInput(closesAt) : null,
           allowRepeat,
-          ...(isExit ? { linkedCheckpointId: linked || null } : {}),
         },
       }),
     ),
@@ -128,28 +102,6 @@ function EditForm({
             onChange={(e) => setClosesAt(e.target.value)}
           />
         </div>
-        {isExit && (
-          <Field>
-            <FieldLabel htmlFor="edit-pair">Pairs with entry checkpoint</FieldLabel>
-            <Select
-              value={linked || ANY_ENTRY}
-              onValueChange={(v) => setLinked(v === ANY_ENTRY ? '' : v)}
-            >
-              <SelectTrigger id="edit-pair" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY_ENTRY}>Any entry checkpoint</SelectItem>
-                {entries.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldDescription>Where people scan back in after leaving here.</FieldDescription>
-          </Field>
-        )}
         <Field orientation="horizontal">
           <Checkbox
             id="edit-repeat"

@@ -17,13 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { EditCheckpointDialog } from './EditCheckpointDialog';
@@ -32,23 +25,21 @@ import { formatIST, fromISTInput } from '@/lib/datetime';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name the checkpoint.').max(100),
-  type: z.enum(['entry', 'exit', 'meal', 'swag', 'session']),
+  type: z.enum(['entry', 'gate', 'meal', 'swag', 'session']),
   opensAt: z.string(),
   closesAt: z.string(),
   allowRepeat: z.boolean(),
   pollId: z.string(),
-  linkedCheckpointId: z.string(),
 });
 type Values = z.infer<typeof schema>;
 
 const TYPE_LABEL = {
-  entry: 'Entry',
-  exit: 'Exit',
+  entry: 'Check-in',
+  gate: 'Entry & exit',
   meal: 'Meal',
   swag: 'Swag',
   session: 'Session',
 };
-const NO_PAIR = '__none__';
 
 export function CheckpointsPage() {
   const api = useApi();
@@ -67,7 +58,6 @@ export function CheckpointsPage() {
       closesAt: '',
       allowRepeat: false,
       pollId: '',
-      linkedCheckpointId: '',
     },
   });
   const type = useWatch({ control: form.control, name: 'type' });
@@ -78,8 +68,6 @@ export function CheckpointsPage() {
     enabled: features.scanning && type === 'meal',
   });
   const foodPolls = (polls.data ?? []).filter((p) => p.defaultOptionId !== null);
-  const entries = (checkpoints.data ?? []).filter((c) => c.type === 'entry');
-  const nameOf = (id: string | null) => checkpoints.data?.find((c) => c.id === id)?.name;
   const create = useEventMutation(event.id, (v: Values) =>
     unwrap(
       api.POST('/v1/events/{eventId}/checkpoints', {
@@ -91,8 +79,6 @@ export function CheckpointsPage() {
           closesAt: v.closesAt ? fromISTInput(v.closesAt) : null,
           allowRepeat: v.allowRepeat,
           pollId: v.type === 'meal' && v.pollId ? v.pollId : null,
-          linkedCheckpointId:
-            v.type === 'exit' && v.linkedCheckpointId ? v.linkedCheckpointId : null,
         },
       }),
     ),
@@ -120,7 +106,7 @@ export function CheckpointsPage() {
     <div className="grid gap-4">
       <PageHeader
         title="Checkpoints"
-        description="Places where volunteers scan people's QR codes: the gate, exits, meals, swag, sessions."
+        description="Places where volunteers scan people's QR codes: check-in, the venue door (in and out), meals, swag, sessions."
       />
       <Card>
         <CardHeader>
@@ -175,36 +161,11 @@ export function CheckpointsPage() {
                 </FieldDescription>
               </Field>
             )}
-            {type === 'exit' && (
-              <Controller
-                control={form.control}
-                name="linkedCheckpointId"
-                render={({ field }) => (
-                  <Field className="sm:col-span-2">
-                    <FieldLabel htmlFor="cp-pair">Pairs with entry checkpoint</FieldLabel>
-                    <Select
-                      value={field.value || NO_PAIR}
-                      onValueChange={(v) => field.onChange(v === NO_PAIR ? '' : v)}
-                    >
-                      <SelectTrigger id="cp-pair" className="w-full">
-                        <SelectValue placeholder="Any entry checkpoint" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_PAIR}>Any entry checkpoint</SelectItem>
-                        {entries.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>
-                      People scanned out here pick a reason and show as outside until they scan back
-                      in at this entry.
-                    </FieldDescription>
-                  </Field>
-                )}
-              />
+            {type === 'gate' && (
+              <p className="text-sm text-muted-foreground sm:col-span-2">
+                The venue&apos;s door after check-in. Scanning someone inside lets them out (the
+                volunteer picks a reason); scanning them again lets them back in.
+              </p>
             )}
             <Controller
               control={form.control}
@@ -247,11 +208,6 @@ export function CheckpointsPage() {
                 <span className="font-medium">{c.name}</span>
                 <Badge variant="secondary">{TYPE_LABEL[c.type]}</Badge>
                 {c.allowRepeat && <Badge variant="outline">repeats allowed</Badge>}
-                {c.type === 'exit' && (
-                  <Badge variant="outline">
-                    back in at {nameOf(c.linkedCheckpointId) ?? 'any entry'}
-                  </Badge>
-                )}
               </div>
               <div className="text-xs text-muted-foreground">
                 {c.opensAt ? `From ${formatIST(c.opensAt)}` : 'Always open'}
@@ -259,7 +215,7 @@ export function CheckpointsPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <EditCheckpointDialog checkpoint={c} entries={entries.filter((e) => e.id !== c.id)} />
+              <EditCheckpointDialog checkpoint={c} />
               <ConfirmButton
                 size="sm"
                 variant="outline"

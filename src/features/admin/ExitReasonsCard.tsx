@@ -18,7 +18,7 @@ import { useEventMutation } from '@/hooks/useEventMutation';
 
 const DEFAULT_REASONS = ['Bathroom', 'Emergency', 'Medical', 'Food / outside break', 'Other'];
 
-/** The quick reasons volunteers pick from when someone leaves through an exit checkpoint. */
+/** The quick reasons volunteers pick from when someone goes out through an entry & exit checkpoint. */
 export function ExitReasonsCard() {
   const api = useApi();
   const { event, path } = useEventContext();
@@ -42,8 +42,8 @@ export function ExitReasonsCard() {
       <CardHeader>
         <CardTitle>Exit reasons</CardTitle>
         <CardDescription>
-          At an exit checkpoint, volunteers pick one of these (or type another) when someone leaves
-          the venue.
+          At an entry & exit checkpoint, volunteers pick one of these (or type another) when someone
+          leaves the venue.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-2">

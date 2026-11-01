@@ -5650,7 +5650,6 @@ export interface paths {
                         closesAt?: string | null;
                         allowRepeat?: boolean;
                         pollId?: string | null;
-                        linkedCheckpointId?: string | null;
                     };
                 };
             };
@@ -5807,7 +5806,6 @@ export interface paths {
                         closesAt?: string | null;
                         allowRepeat?: boolean;
                         pollId?: string | null;
-                        linkedCheckpointId?: string | null;
                     };
                 };
             };
@@ -5962,7 +5960,7 @@ export interface paths {
                         qrToken: string;
                         /** @description Entry checkpoints: check in a confirmed person who has not RSVPed. Default false (refused as not_attending). */
                         allowWithoutRsvp?: boolean;
-                        /** @description Exit checkpoints (required there): why they are leaving */
+                        /** @description Gate checkpoints, on the way out: why they are leaving. Without it the scan is refused with EXIT_REASON_REQUIRED (details.participant says who); send it again with the reason */
                         exitReason?: string;
                         /** @description Scanned without a connection */
                         offline?: boolean;
@@ -6068,7 +6066,7 @@ export interface paths {
                             qrToken: string;
                             /** @description Entry checkpoints: check in a confirmed person who has not RSVPed. Default false (refused as not_attending). */
                             allowWithoutRsvp?: boolean;
-                            /** @description Exit checkpoints (required there): why they are leaving */
+                            /** @description Gate checkpoints, on the way out: why they are leaving. Without it the scan is refused with EXIT_REASON_REQUIRED (details.participant says who); send it again with the reason */
                             exitReason?: string;
                             /** @description Scanned without a connection */
                             offline?: boolean;
@@ -6218,7 +6216,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Everyone who left through an exit and has not scanned back in, longest out first */
+        /** Everyone who went out through a gate and has not scanned back in, longest out first */
         get: {
             parameters: {
                 query?: never;
@@ -9790,7 +9788,7 @@ export interface components {
             updatedAt: string;
         };
         /** @enum {string} */
-        CheckpointTypeInput: "entry" | "meal" | "swag" | "session" | "exit";
+        CheckpointTypeInput: "entry" | "meal" | "swag" | "session" | "gate";
         CheckpointInput: {
             /** Format: uuid */
             id: string;
@@ -9805,8 +9803,6 @@ export interface components {
                 id: string;
                 question: string;
             } | null;
-            /** @description Exit checkpoints only: the entry checkpoint people scan at to come back in */
-            linkedCheckpointId: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -10371,7 +10367,7 @@ export interface components {
             id: string;
             /** @enum {string} */
             result: "accepted" | "rejected";
-            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled" | "not_inside") | null;
+            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled") | null;
             /** Format: date-time */
             scannedAt: string;
             /** @description True if this repeated an earlier request */
@@ -10396,9 +10392,9 @@ export interface components {
                 teamName: string;
                 status: components["schemas"]["RegistrationStatusInput"];
             };
-            /** @description Entry: back in after leaving through an exit */
+            /** @description Gate: they were outside and are back in */
             reentry: boolean;
-            /** @description Exit checkpoints: why they left */
+            /** @description Gate, on the way out: why they left */
             exitReason: string | null;
             /** @description Scanned offline and sent later */
             offline: boolean;
@@ -10410,7 +10406,7 @@ export interface components {
             scannedAt: string;
             /** @enum {string} */
             result: "accepted" | "rejected";
-            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled" | "not_inside") | null;
+            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled") | null;
             exitReason: string | null;
             offline: boolean;
             checkpoint: {
@@ -10443,12 +10439,6 @@ export interface components {
                 /** @description Their latest accepted scan at this checkpoint */
                 lastAcceptedAt: string | null;
             }[];
-            /** @description The event's exit checkpoints and the entry each pairs with */
-            exits: {
-                /** Format: uuid */
-                id: string;
-                linkedCheckpointId: string | null;
-            }[];
         };
         OutsidePersonInput: {
             /** Format: uuid */
@@ -10461,7 +10451,7 @@ export interface components {
             /** Format: date-time */
             outsideSince: string;
             reason: string | null;
-            /** @description The exit they left through */
+            /** @description The gate they went out through */
             checkpointName: string | null;
         };
         LinkPreviewInput: {
@@ -10692,7 +10682,7 @@ export interface components {
             updatedAt: string;
         };
         /** @enum {string} */
-        CheckpointType: "entry" | "meal" | "swag" | "session" | "exit";
+        CheckpointType: "entry" | "meal" | "swag" | "session" | "gate";
         Checkpoint: {
             /** Format: uuid */
             id: string;
@@ -10707,8 +10697,6 @@ export interface components {
                 id: string;
                 question: string;
             } | null;
-            /** @description Exit checkpoints only: the entry checkpoint people scan at to come back in */
-            linkedCheckpointId: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -11273,7 +11261,7 @@ export interface components {
             id: string;
             /** @enum {string} */
             result: "accepted" | "rejected";
-            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled" | "not_inside") | null;
+            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled") | null;
             /** Format: date-time */
             scannedAt: string;
             /** @description True if this repeated an earlier request */
@@ -11298,9 +11286,9 @@ export interface components {
                 teamName: string;
                 status: components["schemas"]["RegistrationStatus"];
             };
-            /** @description Entry: back in after leaving through an exit */
+            /** @description Gate: they were outside and are back in */
             reentry: boolean;
-            /** @description Exit checkpoints: why they left */
+            /** @description Gate, on the way out: why they left */
             exitReason: string | null;
             /** @description Scanned offline and sent later */
             offline: boolean;
@@ -11312,7 +11300,7 @@ export interface components {
             scannedAt: string;
             /** @enum {string} */
             result: "accepted" | "rejected";
-            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled" | "not_inside") | null;
+            reason: ("duplicate" | "not_open" | "closed" | "not_attending" | "not_checked_in" | "cancelled") | null;
             exitReason: string | null;
             offline: boolean;
             checkpoint: {
@@ -11345,12 +11333,6 @@ export interface components {
                 /** @description Their latest accepted scan at this checkpoint */
                 lastAcceptedAt: string | null;
             }[];
-            /** @description The event's exit checkpoints and the entry each pairs with */
-            exits: {
-                /** Format: uuid */
-                id: string;
-                linkedCheckpointId: string | null;
-            }[];
         };
         OutsidePerson: {
             /** Format: uuid */
@@ -11363,7 +11345,7 @@ export interface components {
             /** Format: date-time */
             outsideSince: string;
             reason: string | null;
-            /** @description The exit they left through */
+            /** @description The gate they went out through */
             checkpointName: string | null;
         };
         LinkPreview: {
