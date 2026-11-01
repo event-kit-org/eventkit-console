@@ -1,7 +1,14 @@
+import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import * as React from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
+function Input({ type, ...props }: React.ComponentProps<'input'>) {
+  if (type === 'password') return <PasswordInput {...props} />;
+  return <BaseInput type={type} {...props} />;
+}
+
+function BaseInput({ className, type, ...props }: React.ComponentProps<'input'>) {
   return (
     <input
       type={type}
@@ -14,6 +21,30 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
       )}
       {...props}
     />
+  );
+}
+
+/** A password field with an eye button that shows or hides what was typed. */
+function PasswordInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 'type'>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative w-full">
+      <BaseInput type={shown ? 'text' : 'password'} className={cn('pr-10', className)} {...props} />
+      <button
+        type="button"
+        onClick={() => setShown((s) => !s)}
+        aria-label={shown ? 'Hide password' : 'Show password'}
+        aria-pressed={shown}
+        disabled={props.disabled}
+        className="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-md text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+      >
+        {shown ? (
+          <EyeOffIcon className="size-4" aria-hidden />
+        ) : (
+          <EyeIcon className="size-4" aria-hidden />
+        )}
+      </button>
+    </div>
   );
 }
 
