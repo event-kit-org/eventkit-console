@@ -58,6 +58,7 @@ export function team(overrides: Partial<Schemas['Team']> = {}): Schemas['Team'] 
     createdAt: event.createdAt,
     status: 'registered',
     belowMinimum: false,
+    release: { status: 'registered', at: null, pending: false },
     answers: {},
     members: [member('r1', 'Asha', 'registered', true), member('r2', 'Ravi')],
     payment: {

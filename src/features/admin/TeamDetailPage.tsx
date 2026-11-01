@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CircleAlert, Link2, QrCode, Trash2 } from 'lucide-react';
+import { ArrowLeft, CircleAlert, Link2, QrCode, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
@@ -23,6 +23,8 @@ import { useFields } from '@/features/fields/queries';
 import { formatIST } from '@/lib/datetime';
 import { teamDisplayStatus } from '@/lib/status';
 import { formatMoney } from '@/lib/money';
+import { useReleaseTeams } from './release';
+import { PendingReleaseBadge } from './TeamRelease';
 
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
@@ -70,6 +72,7 @@ export function TeamDetailPage() {
   const rotateQr = useEventMutation(event.id, (id: string) =>
     unwrap(api.POST('/v1/events/{eventId}/registrations/{registrationId}/rotate-qr', reg(id))),
   );
+  const release = useReleaseTeams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   // Leaves the page first, so the deleted team isn't fetched again.
@@ -122,6 +125,7 @@ export function TeamDetailPage() {
               latestProofStatus: t.payment.proofs[0]?.status ?? null,
             })}
           />
+          {t.release?.pending && <PendingReleaseBadge />}
         </div>
         <div className="flex flex-wrap gap-2">
           {event.paymentMode === 'after_shortlist' && t.status === 'registered' && (
@@ -133,6 +137,17 @@ export function TeamDetailPage() {
             <Button onClick={() => move.mutate('confirm')} disabled={move.isPending}>
               Confirm team
             </Button>
+          )}
+          {t.release?.pending && (
+            <ConfirmButton
+              title={`Release ${t.name}'s result?`}
+              description={`The team's portal shows "${t.status}" straight away. This can't be taken back.`}
+              confirmLabel="Release"
+              disabled={release.isPending}
+              onConfirm={() => release.mutate({ stage: 'all', teamIds: [t.id] })}
+            >
+              <Send aria-hidden /> Release decision
+            </ConfirmButton>
           )}
           {admin && (
             <ConfirmButton
@@ -165,6 +180,7 @@ export function TeamDetailPage() {
       <ErrorAlert
         error={
           move.error ??
+          release.error ??
           regAction.error ??
           reissue.error ??
           rotateQr.error ??

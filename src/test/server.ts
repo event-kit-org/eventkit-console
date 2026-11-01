@@ -45,6 +45,8 @@ export const event: Schemas['Event'] = {
   discoverable: false,
   leaderboardVisible: false,
   rsvpEnabled: true,
+  stagedRelease: false,
+  exitReasons: ['Bathroom', 'Emergency', 'Medical', 'Food / outside break', 'Other'],
   createdAt: '2026-10-01T00:00:00.000Z',
 };
 

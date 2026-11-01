@@ -23,6 +23,9 @@ const summary = (over: object = {}) => ({
   leader: { registrationId: 'r1', name: 'Asha', email: 'asha@example.com', phone: '+91 1' },
   status: 'confirmed',
   memberCount: 2,
+  attendingCount: 0,
+  releasedStatus: 'confirmed',
+  pendingRelease: false,
   belowMinimum: false,
   latestProofStatus: 'approved',
   createdAt: event.createdAt,
@@ -563,6 +566,7 @@ describe('checkpoints', () => {
         closesAt: null,
         allowRepeat: true,
         pollId: 'p-food',
+        linkedCheckpointId: null,
       }),
     );
     await userEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);

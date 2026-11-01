@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -65,6 +65,9 @@ function result(over: Partial<Schemas['ScanResult']> = {}): Schemas['ScanResult'
       teamName: 'Byte Club',
       status: 'checked_in',
     },
+    reentry: false,
+    exitReason: null,
+    offline: false,
     ...over,
   };
 }
@@ -82,8 +85,21 @@ function answer(fn: (n: number) => Response | Promise<Response>) {
 beforeEach(() => {
   bodies = [];
   asRole('admin');
-  server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json(checkpoints)));
+  server.use(
+    http.get(`${E}/checkpoints`, () => HttpResponse.json(checkpoints)),
+    http.get(`${E}/scans`, () => HttpResponse.json([])),
+    // No offline list unless a test gives one.
+    http.get(`${E}/scans/roster`, () =>
+      HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'none' } }, { status: 404 }),
+    ),
+  );
 });
+
+/** Moves the clock past the pause between scans (and the same-code cooldown). */
+function later(ms = 4000) {
+  const now = Date.now();
+  vi.spyOn(Date, 'now').mockReturnValue(now + ms);
+}
 afterEach(() => vi.restoreAllMocks());
 
 async function open() {
@@ -132,6 +148,7 @@ describe('scanner', () => {
     await userEvent.selectOptions(await open(), 'c-lunch');
     show('qr-1');
     expect(await screen.findByText('Veg thali')).toBeInTheDocument();
+    later();
     show('qr-2');
     expect(await screen.findByText('Curd rice')).toBeInTheDocument();
     expect(screen.getByText('Default (did not vote)')).toBeInTheDocument();
@@ -183,8 +200,8 @@ describe('scanner', () => {
     await screen.findByText('✓ Checked in');
     show('qr-1');
     expect(bodies).toHaveLength(1);
-    const now = Date.now();
-    vi.spyOn(Date, 'now').mockReturnValue(now + 4000);
+    await waitFor(() => expect(camera.paused).toBe(false));
+    later();
     show('qr-1');
     await waitFor(() => expect(bodies).toHaveLength(2));
   });
@@ -245,9 +262,9 @@ describe('scanner', () => {
     await userEvent.selectOptions(await open(), 'c-gate');
     show('qr-1');
     expect(
-      await screen.findByText(/Not recorded — scan again when back online/),
+      await screen.findByText(/Not recorded: scan again when back online/),
     ).toBeInTheDocument();
-    expect(await screen.findByRole('alert')).toHaveTextContent('You are offline');
+    expect(await screen.findByRole('alert')).toHaveTextContent("You're offline");
     expect(camera.paused).toBe(true);
     expect(bodies).toHaveLength(3);
 
@@ -265,7 +282,7 @@ describe('scanner', () => {
     server.use(http.get(`${API}/health`, () => new HttpResponse(null, { status: 503 })));
     await userEvent.selectOptions(await open(), 'c-gate');
     expect(
-      await screen.findByText('You are offline. Scanning is paused until the connection is back.'),
+      await screen.findByText(/Scanning is paused: this checkpoint has no offline list/),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check' })).toBeDisabled();
   });
@@ -305,3 +322,143 @@ describe('scanner', () => {
     expect(await screen.findByText('Scanning is switched off for this event.')).toBeInTheDocument();
   });
 });
+
+describe('exit checkpoints', () => {
+  const exitCp = {
+    id: 'c-out',
+    name: 'Gate out',
+    type: 'exit',
+    opensAt: null,
+    closesAt: null,
+    allowRepeat: false,
+    poll: null,
+    linkedCheckpointId: 'c-gate',
+    createdAt: event.createdAt,
+  };
+
+  it('asks why they are leaving before sending the scan', async () => {
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([...checkpoints, exitCp])));
+    answer(() =>
+      HttpResponse.json(
+        result({
+          checkpoint: { id: 'c-out', name: 'Gate out', type: 'exit' },
+          exitReason: 'Bathroom',
+        }),
+      ),
+    );
+    await userEvent.selectOptions(await open(), 'c-out');
+    show('qr-1');
+    const dialog = await screen.findByRole('dialog', { name: 'Why are they leaving?' });
+    expect(bodies).toHaveLength(0);
+    expect(within(dialog).getByRole('button', { name: 'Mark as left' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Reason' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Bathroom' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as left' }));
+    expect(await screen.findByText('✓ Left: Bathroom')).toBeInTheDocument();
+    expect(bodies[0]).toMatchObject({ qrToken: 'qr-1', exitReason: 'Bathroom' });
+  });
+
+  it('takes a typed reason, and cancelling sends nothing', async () => {
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([...checkpoints, exitCp])));
+    answer(() =>
+      HttpResponse.json(result({ checkpoint: { id: 'c-out', name: 'Gate out', type: 'exit' } })),
+    );
+    await userEvent.selectOptions(await open(), 'c-out');
+    show('qr-1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(bodies).toHaveLength(0);
+
+    await userEvent.type(screen.getByLabelText('Code typed by hand'), 'PX-0001');
+    await userEvent.click(screen.getByRole('button', { name: 'Check' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Reason' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Something else…' }));
+    await userEvent.type(screen.getByLabelText('Describe it'), 'Parent pickup');
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as left' }));
+    await waitFor(() => expect(bodies[0]).toMatchObject({ exitReason: 'Parent pickup' }));
+  });
+});
+
+describe('scan log', () => {
+  it('lists recent scans under the banner', async () => {
+    server.use(
+      http.get(`${E}/scans`, () =>
+        HttpResponse.json([
+          {
+            id: 's2',
+            scannedAt: '2026-10-31T04:05:00.000Z',
+            result: 'rejected',
+            reason: 'duplicate',
+            exitReason: null,
+            offline: false,
+            checkpoint: { id: 'c-gate', name: 'Main gate', type: 'entry' },
+            participant: { name: 'Ravi', participantCode: 'PX-0002', teamName: 'Byte Club' },
+          },
+          {
+            id: 's1',
+            scannedAt: '2026-10-31T04:00:00.000Z',
+            result: 'accepted',
+            reason: null,
+            exitReason: null,
+            offline: true,
+            checkpoint: { id: 'c-gate', name: 'Main gate', type: 'entry' },
+            participant: { name: 'Asha', participantCode: 'PX-0001', teamName: 'Byte Club' },
+          },
+        ]),
+      ),
+    );
+    await userEvent.selectOptions(await open(), 'c-gate');
+    const log = await screen.findByRole('table', { name: 'Scan log' });
+    const rows = within(log).getAllByRole('row');
+    expect(rows[0]).toHaveTextContent('TimeParticipant IDNameStatus');
+    expect(rows[1]).toHaveTextContent('9:35:00 amPX-0002RaviDuplicate');
+    expect(rows[2]).toHaveTextContent('9:30:00 amPX-0001AshaAcceptedOffline');
+  });
+});
+
+describe('offline scanning', () => {
+  it('keeps scanning from the cached list and says offline mode is on', async () => {
+    const qrHash = await sha256('qr-asha');
+    let up = true;
+    server.use(
+      http.get(`${API}/health`, () =>
+        up ? HttpResponse.json({ ok: true }) : HttpResponse.error(),
+      ),
+      http.get(`${E}/scans/roster`, () =>
+        HttpResponse.json({
+          generatedAt: event.createdAt,
+          checkpoint: { ...checkpoints[0], poll: null, linkedCheckpointId: null },
+          people: [
+            {
+              registrationId: 'r1',
+              qrHash,
+              participantCode: 'PX-0001',
+              name: 'Asha',
+              teamName: 'Byte Club',
+              status: 'attending',
+              outsideSince: null,
+              outsideCheckpointId: null,
+              lastAcceptedAt: null,
+            },
+          ],
+          exits: [],
+        }),
+      ),
+    );
+    answer(() => HttpResponse.error());
+    await userEvent.selectOptions(await open(), 'c-gate');
+    await waitFor(() => expect(camera.paused).toBe(false));
+    up = false;
+    show('qr-asha');
+    expect(await screen.findByText('Checked offline · sent when back online')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('✓ Checked inAsha');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Offline scan mode is on');
+    expect(screen.getByLabelText('1 scans waiting to sync')).toBeInTheDocument();
+    const log = screen.getByRole('table', { name: 'Scan log' });
+    expect(log).toHaveTextContent('PX-0001AshaAcceptedOffline · not sent');
+  });
+});
+
+async function sha256(value: string) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('');
+}

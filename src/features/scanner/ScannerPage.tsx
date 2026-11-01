@@ -1,28 +1,28 @@
+import { isEventKitError, type ScanResult } from '@eventkit/sdk';
 import { useQuery } from '@tanstack/react-query';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { CameraOff, Info, WifiOff } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
-import { ApiError, type Schemas, unwrap } from '@/api/client';
+import { CameraOff, CloudUpload, Info, WifiOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { unwrap } from '@/api/client';
 import { useAuth } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
-import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils';
+import { ExitReasonDialog } from './ExitReasonDialog';
 import { describeScan } from './scan-messages';
+import { ScanLog } from './ScanLog';
+import { useCheckpointScanner } from './useCheckpointScanner';
 
 type Outcome =
-  | { kind: 'result'; result: Schemas['ScanResult']; code: string }
-  | { kind: 'error'; message: string };
-
-/** Ignore the same code for this long after a result (cameras re-detect constantly). */
-const SAME_CODE_COOLDOWN_MS = 3000;
-const RETRIES = 2;
+  { kind: 'result'; result: ScanResult; code: string } | { kind: 'error'; message: string };
 
 const storageKey = (eventId: string) => `eventkit.checkpoint.${eventId}`;
 function remembered(eventId: string): string {
@@ -33,29 +33,47 @@ function remembered(eventId: string): string {
   }
 }
 
+/** Shows the pause between scans running out, so volunteers know when to scan the next. */
+function PauseBar({ until }: { until: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (until <= Date.now()) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 100);
+    return () => window.clearInterval(timer);
+  }, [until]);
+  const left = Math.max(0, until - now);
+  if (left === 0) return null;
+  return <Progress aria-label="Ready for the next scan" value={100 - (left / 1200) * 100} />;
+}
+
 /**
- * Online-only scanner. Each scan gets a UUID made on this phone; a request that
- * fails mid-air is retried with the same id, so it can never count twice. With
- * no connection the scanner pauses and says so: nothing is queued.
+ * The scanner (the SDK's): each scan gets a UUID made on this phone and is
+ * retried with the same id, so it never counts twice. Without a connection it
+ * keeps going from the checkpoint's cached roster, queues the scans and sends
+ * them once back online. Exit checkpoints ask why the person is leaving.
  */
 export function ScannerPage() {
-  const { api, config } = useAuth();
+  const { api } = useAuth();
   const { event, path, features } = useEventContext();
-  const { online, markOffline } = useOnlineStatus(config.apiUrl);
   const [checkpointId, setCheckpointId] = useState(() => remembered(event.id));
+  const { scanner, online, offlineReady, pendingCount, log } = useCheckpointScanner(
+    event.id,
+    checkpointId,
+  );
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const last = useRef<{ code: string; at: number } | null>(null);
-  /** A scan whose request never got an answer: rescanning the same code reuses its id. */
-  const unanswered = useRef<{ code: string; checkpointId: string; id: string } | null>(null);
+  /** An exit scan waiting for its reason. */
+  const [leaving, setLeaving] = useState<{ code: string; force: boolean } | null>(null);
+  const [pausedUntil, setPausedUntil] = useState(0);
 
   const checkpoints = useQuery({
     queryKey: ['event', event.id, 'checkpoints'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/checkpoints', path)),
     enabled: features.scanning,
   });
+  const checkpoint = checkpoints.data?.find((c) => c.id === checkpointId);
 
   const choose = (id: string) => {
     setCheckpointId(id);
@@ -67,76 +85,34 @@ export function ScannerPage() {
     }
   };
 
-  const submit = useCallback(
-    async (code: string) => {
-      const now = Date.now();
-      if (
-        last.current &&
-        last.current.code === code &&
-        now - last.current.at < SAME_CODE_COOLDOWN_MS
-      )
-        return;
-      last.current = { code, at: now };
-
-      const pending = unanswered.current;
-      const id =
-        pending && pending.code === code && pending.checkpointId === checkpointId
-          ? pending.id
-          : crypto.randomUUID();
-      setBusy(true);
-      try {
-        for (let attempt = 0; ; attempt++) {
-          try {
-            const result = await unwrap(
-              api.POST('/v1/events/{eventId}/scans', {
-                ...path,
-                body: { id, checkpointId, qrToken: code },
-              }),
-            );
-            unanswered.current = null;
-            setOutcome({ kind: 'result', result, code });
-            return;
-          } catch (e) {
-            if (e instanceof ApiError) {
-              unanswered.current = null;
-              setOutcome({ kind: 'error', message: e.message });
-              return;
-            }
-            if (attempt >= RETRIES) throw e;
-          }
-        }
-      } catch {
-        unanswered.current = { code, checkpointId, id };
-        markOffline();
-        setOutcome({
-          kind: 'error',
-          message: 'No answer from the server. Not recorded — scan again when back online.',
-        });
-      } finally {
-        setBusy(false);
-      }
-    },
-    [api, path, checkpointId, markOffline],
-  );
-
-  /** At the gate: someone confirmed who never RSVPed is marked attending, then scanned again. */
-  const markAttending = async (code: string) => {
+  async function run(action: () => Promise<ScanResult | null>, code: string) {
     setBusy(true);
     try {
-      await unwrap(
-        api.POST('/v1/events/{eventId}/attendance', {
-          ...path,
-          body: { qrToken: code, attending: true },
-        }),
-      );
+      const result = await action();
+      if (result) setOutcome({ kind: 'result', result, code });
     } catch (e) {
-      setOutcome({ kind: 'error', message: (e as Error).message });
-      return;
+      setOutcome({
+        kind: 'error',
+        message: isEventKitError(e) || e instanceof Error ? e.message : 'Scan failed.',
+      });
     } finally {
       setBusy(false);
+      if (scanner) setPausedUntil(scanner.pausedUntil);
     }
-    last.current = null;
-    await submit(code);
+  }
+
+  const submit = (code: string, force = false, exitReason?: string) => {
+    if (!scanner) return;
+    if (checkpoint?.type === 'exit' && !exitReason) {
+      setLeaving({ code, force });
+      return;
+    }
+    void run(() => scanner.scan(code, { force, ...(exitReason ? { exitReason } : {}) }), code);
+  };
+
+  /** At the gate: someone confirmed who never RSVPed is marked attending, then scanned again. */
+  const markAttending = (code: string) => {
+    if (scanner) void run(() => scanner.markAttendingAndScan(code), code);
   };
 
   if (!features.scanning) {
@@ -148,18 +124,31 @@ export function ScannerPage() {
     );
   }
 
-  const ready = online && checkpointId !== '' && !busy;
+  const canScan = (online || offlineReady) && checkpointId !== '' && !busy && !leaving;
   const result = outcome?.kind === 'result' ? outcome.result : null;
 
   return (
     <div className="mx-auto grid max-w-md gap-3">
       {!online && (
-        <div
-          role="alert"
-          className="flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-3 text-center font-semibold text-white"
-        >
-          <WifiOff className="size-5 shrink-0" aria-hidden />
-          You are offline. Scanning is paused until the connection is back.
+        <Alert variant={offlineReady ? 'default' : 'destructive'} role="alert">
+          <WifiOff aria-hidden />
+          <AlertTitle>You&apos;re offline</AlertTitle>
+          <AlertDescription>
+            {offlineReady
+              ? 'Offline scan mode is on: scans are checked on this phone and sent when the connection is back.'
+              : 'Scanning is paused: this checkpoint has no offline list yet. Open it once while online.'}
+          </AlertDescription>
+        </Alert>
+      )}
+      {pendingCount > 0 && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+          <span className="flex items-center gap-2">
+            <CloudUpload className="size-4" aria-hidden />
+            Waiting to sync
+          </span>
+          <Badge variant="secondary" aria-label={`${pendingCount} scans waiting to sync`}>
+            {pendingCount}
+          </Badge>
         </div>
       )}
       <Field>
@@ -194,15 +183,15 @@ export function ScannerPage() {
       <div
         className={cn(
           'aspect-square overflow-hidden rounded-xl border bg-black transition-opacity',
-          !ready && 'opacity-60',
+          !canScan && 'opacity-60',
         )}
       >
         <Scanner
           onScan={(codes) => {
             const code = codes[0]?.rawValue;
-            if (code && ready) void submit(code);
+            if (code && canScan) submit(code);
           }}
-          paused={!ready}
+          paused={!canScan}
           formats={['qr_code']}
           components={{ finder: true, torch: true }}
           allowMultiple
@@ -210,6 +199,7 @@ export function ScannerPage() {
           onError={(e) => setCameraError(e.message)}
         />
       </div>
+      <PauseBar until={pausedUntil} />
 
       {outcome && (
         <div
@@ -235,12 +225,17 @@ export function ScannerPage() {
               )}
               <div className="mt-1 text-lg">{result.participant.name}</div>
               <div className="text-sm opacity-90">Team {result.participant.teamName}</div>
+              {result.offline && (
+                <div className="mt-1 text-xs opacity-90">
+                  Checked offline · sent when back online
+                </div>
+              )}
               {result.reason === 'not_attending' && outcome.kind === 'result' && (
                 <Button
                   variant="secondary"
                   className="mt-3"
                   disabled={!online || busy}
-                  onClick={() => void markAttending(outcome.code)}
+                  onClick={() => markAttending(outcome.code)}
                 >
                   Mark attending and check in
                 </Button>
@@ -258,9 +253,9 @@ export function ScannerPage() {
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (manual.trim() && ready) {
-            last.current = null;
-            void submit(manual.trim()).then(() => setManual(''));
+          if (manual.trim() && canScan) {
+            submit(manual.trim(), true);
+            setManual('');
           }
         }}
       >
@@ -270,10 +265,25 @@ export function ScannerPage() {
           value={manual}
           onChange={(e) => setManual(e.target.value)}
         />
-        <Button type="submit" variant="outline" disabled={!ready || !manual.trim()}>
+        <Button type="submit" variant="outline" disabled={!canScan || !manual.trim()}>
           Check
         </Button>
       </form>
+
+      {checkpointId && (
+        <ScanLog eventId={event.id} checkpointId={checkpointId} online={online} local={log} />
+      )}
+
+      <ExitReasonDialog
+        code={leaving?.code ?? null}
+        reasons={event.exitReasons}
+        onCancel={() => setLeaving(null)}
+        onConfirm={(reason) => {
+          const pending = leaving!;
+          setLeaving(null);
+          submit(pending.code, true, reason);
+        }}
+      />
     </div>
   );
 }

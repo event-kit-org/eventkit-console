@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import {
@@ -18,7 +19,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { teamDisplayStatus } from '@/lib/status';
+import { useEventContext } from '@/features/events/event-context';
 import { useTeams } from './queries';
+import { PendingReleaseBadge, ReleaseControls } from './TeamRelease';
 
 const FILTERS = [
   ['all', 'All teams'],
@@ -28,18 +31,34 @@ const FILTERS = [
   ['confirmed', 'Confirmed'],
   ['cancelled', 'Cancelled'],
   ['flagged', 'Below minimum'],
+  ['pending_release', 'Not released yet'],
 ] as const;
 
 export function TeamsPage() {
+  const { event } = useEventContext();
   const teams = useTeams();
   const [filter, setFilter] = useState('all');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const list = (teams.data ?? []).filter(
     (t) =>
       filter === 'all' ||
       t.status === filter ||
       teamDisplayStatus(t) === filter ||
-      (filter === 'flagged' && t.belowMinimum),
+      (filter === 'flagged' && t.belowMinimum) ||
+      (filter === 'pending_release' && t.pendingRelease),
   );
+  const pending = (teams.data ?? []).filter((t) => t.pendingRelease);
+  // Release controls show while staged release is on, or decisions still wait.
+  const staged = event.stagedRelease || pending.length > 0;
+  const selectable = list.filter((t) => t.pendingRelease);
+  const allSelected = selectable.length > 0 && selectable.every((t) => selected.has(t.id));
+  const toggle = (id: string, on: boolean) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   return (
     <div className="grid gap-4">
@@ -60,6 +79,20 @@ export function TeamsPage() {
           ))}
         </NativeSelect>
       </PageHeader>
+      {staged && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
+          <p className="text-sm text-muted-foreground">
+            {pending.length === 0
+              ? 'Staged release is on: every decision so far has been released.'
+              : `${pending.length} team${pending.length === 1 ? ' hasn’t' : 's haven’t'} been shown their result yet.`}
+          </p>
+          <ReleaseControls
+            selected={[...selected].filter((id) => pending.some((t) => t.id === id))}
+            pendingCount={pending.length}
+            onReleased={() => setSelected(new Set())}
+          />
+        </div>
+      )}
       <ErrorAlert error={teams.error} />
       {teams.isPending && <TableSkeleton cols={6} />}
       {teams.data && list.length === 0 ? (
@@ -70,6 +103,18 @@ export function TeamsPage() {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
+                  {staged && (
+                    <TableHead className="w-8">
+                      <Checkbox
+                        aria-label="Select every team waiting for release"
+                        checked={allSelected}
+                        disabled={selectable.length === 0}
+                        onCheckedChange={(c) =>
+                          setSelected(c === true ? new Set(selectable.map((t) => t.id)) : new Set())
+                        }
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>Team</TableHead>
                   <TableHead>Leader</TableHead>
                   <TableHead>Status</TableHead>
@@ -84,6 +129,17 @@ export function TeamsPage() {
               <TableBody>
                 {list.map((t) => (
                   <TableRow key={t.id}>
+                    {staged && (
+                      <TableCell>
+                        {t.pendingRelease && (
+                          <Checkbox
+                            aria-label={`Select ${t.name} for release`}
+                            checked={selected.has(t.id)}
+                            onCheckedChange={(c) => toggle(t.id, c === true)}
+                          />
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Link className="font-medium hover:underline" to={t.id}>
                         {t.name}
@@ -99,7 +155,10 @@ export function TeamsPage() {
                       <div className="text-xs text-muted-foreground">{t.leader.email}</div>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={teamDisplayStatus(t)} />
+                      <div className="flex flex-wrap items-center gap-1">
+                        <StatusBadge status={teamDisplayStatus(t)} />
+                        {t.pendingRelease && <PendingReleaseBadge />}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{t.memberCount}</TableCell>
                     <TableCell className="capitalize">{t.latestProofStatus ?? '—'}</TableCell>

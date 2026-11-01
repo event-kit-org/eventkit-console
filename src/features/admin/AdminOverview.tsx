@@ -1,4 +1,4 @@
-import { CircleAlert, Info, Receipt, Users, UsersRound } from 'lucide-react';
+import { CalendarCheck, CircleAlert, Info, Receipt, Users, UsersRound } from 'lucide-react';
 import { Link } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TilesSkeleton } from '@/components/PageState';
@@ -21,6 +21,9 @@ export function AdminOverview() {
     .reduce((n, t) => n + t.memberCount, 0);
   const flagged = list.filter((t) => t.belowMinimum);
   const full = event.maxParticipants > 0 ? confirmedPeople / event.maxParticipants : 0;
+  // RSVP: people who said they're coming (attending or already checked in).
+  const attending = registered.reduce((n, t) => n + t.attendingCount, 0);
+  const rsvpShare = confirmedPeople > 0 ? attending / confirmedPeople : 0;
 
   const tiles = [
     { label: 'Teams registered', value: registered.length, icon: UsersRound, to: 'teams' },
@@ -30,6 +33,17 @@ export function AdminOverview() {
       icon: Users,
       to: 'teams',
       foot: `${Math.round(full * 100)}% of capacity`,
+      share: full,
+    },
+    {
+      label: event.rsvpEnabled ? "Attending (RSVP'd)" : 'Attending',
+      value: `${attending} / ${confirmedPeople}`,
+      icon: CalendarCheck,
+      to: 'teams',
+      foot: event.rsvpEnabled
+        ? `${Math.round(rsvpShare * 100)}% of confirmed people have RSVP'd`
+        : 'Confirmed people count as attending',
+      share: rsvpShare,
     },
     {
       label: 'Receipts to review',
@@ -64,8 +78,8 @@ export function AdminOverview() {
       {teams.isPending || pending.isPending ? (
         <TilesSkeleton />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-3">
-          {tiles.map(({ label, value, icon: Icon, to, foot }) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {tiles.map(({ label, value, icon: Icon, to, foot, share }) => (
             <Link
               key={label}
               to={to}
@@ -86,7 +100,7 @@ export function AdminOverview() {
                       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.min(100, full * 100)}%` }}
+                          style={{ width: `${Math.min(100, (share ?? 0) * 100)}%` }}
                         />
                       </div>
                       {foot}
