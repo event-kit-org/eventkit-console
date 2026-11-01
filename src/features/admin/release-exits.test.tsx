@@ -173,3 +173,61 @@ describe('People: outside now', () => {
     expect(await screen.findByText('Everyone who left has come back.')).toBeInTheDocument();
   });
 });
+
+describe('editing a checkpoint', () => {
+  it('changes its hours, repeat scans and pairing', async () => {
+    asRole('admin');
+    const cp = (over: object) => ({
+      opensAt: null,
+      closesAt: null,
+      allowRepeat: false,
+      poll: null,
+      linkedCheckpointId: null,
+      createdAt: event.createdAt,
+      ...over,
+    });
+    server.use(
+      http.get(`${E}/checkpoints`, () =>
+        HttpResponse.json([
+          cp({ id: 'c-gate', name: 'Entry', type: 'entry' }),
+          cp({ id: 'c-out', name: 'Exit', type: 'exit', linkedCheckpointId: 'c-gate' }),
+        ]),
+      ),
+    );
+    const save = capture(
+      'patch',
+      `${E}/checkpoints/c-out`,
+      cp({ id: 'c-out', name: 'Exit', type: 'exit' }),
+    );
+    go('/checkpoints');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Exit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Exit' });
+    await userEvent.type(
+      within(dialog).getByLabelText('Opens (IST, optional)'),
+      '2026-11-07T08:00',
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText('Closes (IST, optional)'),
+      '2026-11-07T07:00',
+    );
+    expect(within(dialog).getByText('Must close after it opens.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
+    await userEvent.clear(within(dialog).getByLabelText('Closes (IST, optional)'));
+    await userEvent.type(
+      within(dialog).getByLabelText('Closes (IST, optional)'),
+      '2026-11-07T19:00',
+    );
+    await userEvent.click(within(dialog).getByLabelText('Allow repeat scans'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(save[0]?.body).toEqual({
+        name: 'Exit',
+        opensAt: '2026-11-07T02:30:00.000Z',
+        closesAt: '2026-11-07T13:30:00.000Z',
+        allowRepeat: true,
+        linkedCheckpointId: 'c-gate',
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+});

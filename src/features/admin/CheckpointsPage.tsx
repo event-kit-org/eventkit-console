@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { EditCheckpointDialog } from './EditCheckpointDialog';
 import { ExitReasonsCard } from './ExitReasonsCard';
 import { formatIST, fromISTInput } from '@/lib/datetime';
 
@@ -257,17 +258,20 @@ export function CheckpointsPage() {
                 {c.closesAt && ` until ${formatIST(c.closesAt)}`}
               </div>
             </div>
-            <ConfirmButton
-              size="sm"
-              variant="outline"
-              title={`Delete ${c.name}?`}
-              description="This can't be undone."
-              confirmLabel="Delete"
-              destructive
-              onConfirm={() => remove.mutate(c.id)}
-            >
-              Delete
-            </ConfirmButton>
+            <div className="flex gap-2">
+              <EditCheckpointDialog checkpoint={c} entries={entries.filter((e) => e.id !== c.id)} />
+              <ConfirmButton
+                size="sm"
+                variant="outline"
+                title={`Delete ${c.name}?`}
+                description="This can't be undone."
+                confirmLabel="Delete"
+                destructive
+                onConfirm={() => remove.mutate(c.id)}
+              >
+                Delete
+              </ConfirmButton>
+            </div>
           </li>
         ))}
       </ul>
