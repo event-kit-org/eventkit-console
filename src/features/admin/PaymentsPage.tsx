@@ -2,6 +2,7 @@ import { FileText, Receipt } from 'lucide-react';
 import { useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { CardsSkeleton, EmptyState } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
@@ -126,9 +127,15 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
       </CardContent>
       {proof.status === 'pending' && (
         <CardFooter className="gap-2">
-          <Button onClick={() => approve.mutate(undefined)} disabled={approve.isPending}>
+          <ConfirmButton
+            title="Approve this receipt?"
+            description={`${proof.team.name} will be confirmed and take up a place. This cannot be undone.`}
+            confirmLabel="Approve"
+            onConfirm={() => approve.mutate(undefined)}
+            disabled={approve.isPending}
+          >
             Approve
-          </Button>
+          </ConfirmButton>
           {rejecting ? (
             <>
               <Button

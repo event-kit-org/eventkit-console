@@ -210,6 +210,10 @@ describe('payments', () => {
     );
     expect(screen.getByText(/₹1,000 for 2 people/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(approve).toHaveLength(0);
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Approve' }),
+    );
     await waitFor(() => expect(approve).toHaveLength(1));
   });
 
