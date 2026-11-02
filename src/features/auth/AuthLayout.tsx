@@ -1,5 +1,5 @@
-import { CalendarDays } from 'lucide-react';
 import type { ReactNode } from 'react';
+import logo from '@/assets/logo.png';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function AuthLayout({
@@ -14,9 +14,7 @@ export function AuthLayout({
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-muted p-4 md:p-10">
       <div className="flex items-center gap-2 font-semibold">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <CalendarDays className="size-4" aria-hidden />
-        </span>
+        <img src={logo} alt="" className="size-7 rounded-md" />
         eventKit
       </div>
       <Card className="w-full max-w-sm">
