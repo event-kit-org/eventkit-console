@@ -299,38 +299,6 @@ describe('notifications', () => {
     expect(await screen.findByText('Lunch is served')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add channel' })).not.toBeInTheDocument();
   });
-
-  it('offers urgent push on this device when it is configured', async () => {
-    asRole('admin');
-    use([], [], true);
-    const subscribe = vi.fn().mockResolvedValue({
-      toJSON: () => ({ endpoint: 'https://push.test/1', keys: { p256dh: 'p', auth: 'a' } }),
-    });
-    vi.stubGlobal('Notification', { requestPermission: vi.fn().mockResolvedValue('granted') });
-    vi.stubGlobal('PushManager', function PushManager() {});
-    Object.defineProperty(navigator, 'serviceWorker', {
-      configurable: true,
-      value: {
-        ready: Promise.resolve({ pushManager: { getSubscription: async () => null, subscribe } }),
-      },
-    });
-    const saved = capture('put', `${API}/v1/push/subscriptions`);
-    go();
-    await userEvent.click(await screen.findByRole('button', { name: 'Turn on' }));
-    await waitFor(() =>
-      expect(saved[0]?.body).toEqual({
-        endpoint: 'https://push.test/1',
-        keys: { p256dh: 'p', auth: 'a' },
-      }),
-    );
-    expect(
-      await screen.findByText('Urgent notifications will reach this device.'),
-    ).toBeInTheDocument();
-    expect(subscribe).toHaveBeenCalledWith({
-      userVisibleOnly: true,
-      applicationServerKey: new Uint8Array([1, 0, 1]),
-    });
-  });
 });
 
 describe('enablePush', () => {

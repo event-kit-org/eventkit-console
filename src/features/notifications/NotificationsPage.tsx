@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { BellOff, BellRing, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { BellOff, Plus } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
@@ -8,7 +8,6 @@ import { FormField } from '@/components/FormField';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { RolePicker } from '@/components/RolePicker';
-import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,7 +27,6 @@ import { useEventMutation } from '@/hooks/useEventMutation';
 import { audienceText, ROLES } from '@/lib/audience';
 import { formatIST } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import { enablePush, pushSupported } from './push';
 
 type Channel = Schemas['Channel'];
 type LastSeen = Record<string, string>;
@@ -115,7 +113,6 @@ export function NotificationsPage() {
         title="Notifications"
         description="Announcements to participants and staff, by channel. Urgent ones also push to devices."
       />
-      <PushCard />
       <ErrorAlert error={feed.error ?? channels.error} />
       <div className="grid overflow-hidden rounded-xl border bg-card md:grid-cols-[16rem_minmax(0,1fr)]">
         <aside
@@ -223,37 +220,6 @@ function Messages({ channel }: { channel: Channel }) {
       </div>
       {channel.canSend && <Composer channel={channel} />}
     </>
-  );
-}
-
-function PushCard() {
-  const api = useApi();
-  const config = useQuery({
-    queryKey: ['push-config'],
-    queryFn: () => unwrap(api.GET('/v1/push/config')),
-  });
-  const enable = useMutation({ mutationFn: (key: string) => enablePush(api, key) });
-  if (!config.data?.enabled || !config.data.publicKey || !pushSupported()) return null;
-  const key = config.data.publicKey;
-  return (
-    <div className="grid gap-2">
-      <Alert>
-        <BellRing aria-hidden />
-        <AlertDescription className="text-foreground">
-          {enable.isSuccess
-            ? 'Urgent notifications will reach this device.'
-            : 'Get urgent notifications on this device, even when the app is closed.'}
-        </AlertDescription>
-        {!enable.isSuccess && (
-          <AlertAction>
-            <Button size="xs" disabled={enable.isPending} onClick={() => enable.mutate(key)}>
-              Turn on
-            </Button>
-          </AlertAction>
-        )}
-      </Alert>
-      <ErrorAlert error={enable.error} />
-    </div>
   );
 }
 
