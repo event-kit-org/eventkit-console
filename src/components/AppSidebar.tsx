@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import logo from '@/assets/logo.png';
 import {
   CalendarDays,
   Check,
@@ -63,11 +64,7 @@ export function AppSidebar() {
 }
 
 function Logo() {
-  return (
-    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-      <CalendarDays className="size-4" aria-hidden />
-    </div>
-  );
+  return <img src={logo} alt="" className="aspect-square size-8 rounded-lg" />;
 }
 
 function Brand() {
