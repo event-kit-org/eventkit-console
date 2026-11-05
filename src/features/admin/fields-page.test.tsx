@@ -262,6 +262,8 @@ describe('answers on admin team pages', () => {
       payment: {
         mode: 'at_registration',
         amountDue: 100000,
+        paidAmount: null,
+        balance: null,
         currency: 'INR',
         deadline: null,
         proofs: [

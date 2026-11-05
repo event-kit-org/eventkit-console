@@ -1,11 +1,31 @@
-import { CalendarCheck, CircleAlert, Info, Receipt, Users, UsersRound } from 'lucide-react';
+import {
+  CalendarCheck,
+  CircleAlert,
+  HandCoins,
+  Info,
+  Receipt,
+  Undo2,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { Link } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TilesSkeleton } from '@/components/PageState';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEventContext } from '@/features/events/event-context';
 import { formatIST } from '@/lib/datetime';
+import { formatMoney, sumBalances } from '@/lib/money';
 import { useProofs, useTeams } from './queries';
+
+type Tile = {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  to: string;
+  foot?: string;
+  share?: number;
+};
 
 const PLACE_HOLDING = ['confirmed', 'attending', 'checked_in'];
 
@@ -25,7 +45,28 @@ export function AdminOverview() {
   const attending = registered.reduce((n, t) => n + t.attendingCount, 0);
   const rsvpShare = confirmedPeople > 0 ? attending / confirmedPeople : 0;
 
-  const tiles = [
+  const owed = sumBalances(registered);
+  const balanceTiles: Tile[] =
+    owed.extra.teams + owed.refund.teams > 0
+      ? [
+          {
+            label: 'Extra to collect',
+            value: formatMoney(owed.extra.total, event.currency),
+            icon: HandCoins,
+            to: 'teams',
+            foot: `from ${owed.extra.teams} team${owed.extra.teams === 1 ? '' : 's'} after the fee change`,
+          },
+          {
+            label: 'To refund',
+            value: formatMoney(owed.refund.total, event.currency),
+            icon: Undo2,
+            to: 'teams',
+            foot: `to ${owed.refund.teams} team${owed.refund.teams === 1 ? '' : 's'} after the fee change`,
+          },
+        ]
+      : [];
+
+  const tiles: Tile[] = [
     { label: 'Teams registered', value: registered.length, icon: UsersRound, to: 'teams' },
     {
       label: 'Confirmed people',
@@ -51,6 +92,7 @@ export function AdminOverview() {
       icon: Receipt,
       to: 'payments',
     },
+    ...balanceTiles,
   ];
 
   return (
@@ -97,12 +139,14 @@ export function AdminOverview() {
                 {foot && (
                   <CardFooter className="text-xs text-muted-foreground">
                     <div className="grid w-full gap-1.5">
-                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.min(100, (share ?? 0) * 100)}%` }}
-                        />
-                      </div>
+                      {share !== undefined && (
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${Math.min(100, share * 100)}%` }}
+                          />
+                        </div>
+                      )}
                       {foot}
                     </div>
                   </CardFooter>

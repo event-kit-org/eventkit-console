@@ -22,7 +22,7 @@ import { memberFields, teamFields } from '@/features/fields/fields';
 import { useFields } from '@/features/fields/queries';
 import { formatIST } from '@/lib/datetime';
 import { teamDisplayStatus } from '@/lib/status';
-import { formatMoney } from '@/lib/money';
+import { describeBalance, formatMoney } from '@/lib/money';
 import { useReleaseTeams } from './release';
 import { PendingReleaseBadge } from './TeamRelease';
 
@@ -325,6 +325,12 @@ export function TeamDetailPage() {
             <CardTitle>Payment</CardTitle>
           </CardHeader>
           <CardContent>
+            {t.payment.balance !== null && t.payment.balance !== 0 && (
+              <p className="mb-3 text-sm font-medium">
+                Paid {formatMoney(t.payment.paidAmount ?? 0, t.payment.currency)}; at the current
+                fee that is {describeBalance(t.payment.balance, t.payment.currency)}.
+              </p>
+            )}
             <ul className="grid gap-2 text-sm">
               {t.payment.proofs.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center gap-2">

@@ -8,6 +8,7 @@ import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi, useAuth } from '@/auth/context';
 import { absoluteApiUrls } from '@/lib/config';
+import { balancesAtFee, formatMoney, sumBalances } from '@/lib/money';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { CopyButton } from '@/components/CopyButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -53,6 +54,7 @@ import {
   STEPS,
   toEventPayload,
 } from './event-form';
+import { useTeams } from './queries';
 
 const FEATURE_TEXT: Record<Schemas['Feature'], string> = {
   registration: 'Team registration on your portal, payments and registration links',
@@ -563,18 +565,31 @@ function EditEventCard() {
   const save = useEventMutation(event.id, (v: EventFormValues) =>
     unwrap(api.PATCH('/v1/events/{eventId}', { ...path, body: toEventPayload(v) })),
   );
+  const teams = useTeams();
+  // A fee change that leaves paid teams owing or owed money waits for a confirmation.
+  const [feeChange, setFeeChange] = useState<{ values: EventFormValues; fee: number } | null>(null);
+  const submit = (v: EventFormValues) => {
+    const fee = toEventPayload(v).registrationFee;
+    if (fee !== null && fee !== event.registrationFee) {
+      const after = sumBalances(balancesAtFee(teams.data ?? [], fee, event.feeBasis));
+      if (after.extra.teams + after.refund.teams > 0) return setFeeChange({ values: v, fee });
+    }
+    save.mutate(v);
+  };
+  const impact = feeChange
+    ? sumBalances(balancesAtFee(teams.data ?? [], feeChange.fee, event.feeBasis))
+    : null;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Event details</CardTitle>
-        <CardDescription>Payment settings lock once anyone has registered.</CardDescription>
+        <CardDescription>
+          Payment mode, fee basis and currency lock once anyone has registered. The fee can still
+          change; teams that already paid then owe the difference or get a refund.
+        </CardDescription>
       </CardHeader>
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={form.handleSubmit((v) => save.mutate(v))}
-        noValidate
-      >
+      <form className="flex flex-col gap-4" onSubmit={form.handleSubmit(submit)} noValidate>
         <CardContent className="grid gap-8">
           {STEPS.map((s, i) => (
             <FieldSet key={s.title}>
@@ -591,6 +606,50 @@ function EditEventCard() {
           {save.isSuccess && <Saved />}
         </CardFooter>
       </form>
+      <AlertDialog open={feeChange !== null} onOpenChange={(open) => !open && setFeeChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Change the fee to {feeChange && formatMoney(feeChange.fee, event.currency)}?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="grid gap-2">
+                <p>Teams that already paid will no longer match the new fee:</p>
+                <ul className="list-disc pl-5">
+                  {impact && impact.extra.teams > 0 && (
+                    <li>
+                      {impact.extra.teams} team{impact.extra.teams > 1 ? 's' : ''} owe{' '}
+                      {impact.extra.teams > 1 ? '' : 's '}
+                      {formatMoney(impact.extra.total, event.currency)} extra in total
+                    </li>
+                  )}
+                  {impact && impact.refund.teams > 0 && (
+                    <li>
+                      {impact.refund.teams} team{impact.refund.teams > 1 ? 's' : ''} should be
+                      refunded {formatMoney(impact.refund.total, event.currency)} in total
+                    </li>
+                  )}
+                </ul>
+                <p>
+                  Nothing is collected or refunded automatically. The Teams page shows each team's
+                  balance.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep the current fee</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (feeChange) save.mutate(feeChange.values);
+                setFeeChange(null);
+              }}
+            >
+              Change the fee
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

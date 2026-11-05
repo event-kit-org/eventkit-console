@@ -28,6 +28,9 @@ const summary = (over: object = {}) => ({
   pendingRelease: false,
   belowMinimum: false,
   latestProofStatus: 'approved',
+  paidAmount: null,
+  paidMembers: null,
+  balance: null,
   createdAt: event.createdAt,
   ...over,
 });
@@ -61,6 +64,75 @@ describe('admin overview', () => {
     asRole('volunteer');
     go('/teams');
     expect(await screen.findByText(/sign in on the event's own portal/)).toBeInTheDocument();
+  });
+});
+
+describe('fee balances', () => {
+  const teams = () =>
+    HttpResponse.json([
+      summary({ paidAmount: 100000, paidMembers: 2, balance: 20000 }),
+      summary({ id: 't2', name: 'Small Fry', paidAmount: 50000, paidMembers: 1, balance: -25000 }),
+      summary({ id: 't3', name: 'Not Yet', latestProofStatus: 'pending' }),
+    ]);
+
+  it('shows each team what it owes or is owed, and totals them on the overview', async () => {
+    asRole('admin');
+    server.use(
+      http.get(`${E}/teams`, teams),
+      http.get(`${E}/payment-proofs`, () => HttpResponse.json([])),
+    );
+    go('');
+    const extra = (await screen.findByText('Extra to collect')).closest('a')!;
+    expect(extra).toHaveTextContent('₹200');
+    expect(extra).toHaveTextContent('from 1 team');
+    const refund = screen.getByText('To refund').closest('a')!;
+    expect(refund).toHaveTextContent('₹250');
+    expect(refund).toHaveTextContent('to 1 team');
+  });
+
+  it('adds a balance column to the teams list', async () => {
+    asRole('admin');
+    server.use(http.get(`${E}/teams`, teams));
+    go('/teams');
+    const rows = await screen.findAllByRole('row');
+    expect(rows[1]).toHaveTextContent('+₹200 to collect');
+    expect(rows[2]).toHaveTextContent('−₹250 to refund');
+    expect(rows[3]).toHaveTextContent('—');
+  });
+
+  it('shows no balance tiles when nobody owes anything', async () => {
+    asRole('admin');
+    server.use(
+      http.get(`${E}/teams`, () => HttpResponse.json([summary()])),
+      http.get(`${E}/payment-proofs`, () => HttpResponse.json([])),
+    );
+    go('');
+    await screen.findByText('Receipts to review');
+    expect(screen.queryByText('Extra to collect')).not.toBeInTheDocument();
+  });
+
+  it('puts the balance on the team page', async () => {
+    asRole('admin');
+    const t = registeredTeam('confirmed');
+    t.payment = { ...t.payment, paidAmount: 100000, balance: -50000 };
+    t.payment.proofs = [
+      {
+        id: 'p1',
+        teamId: t.id,
+        status: 'approved',
+        amount: 100000,
+        currency: 'INR',
+        memberCount: 2,
+        uploadedAt: event.createdAt,
+        verifiedAt: event.createdAt,
+        rejectionNote: null,
+      },
+    ];
+    server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
+    go(`/teams/${t.id}`);
+    expect(await screen.findByText(/Paid ₹1,000; at the current fee that is/)).toHaveTextContent(
+      '−₹500 to refund',
+    );
   });
 });
 
@@ -118,6 +190,8 @@ describe('teams', () => {
       payment: {
         mode: 'after_shortlist',
         amountDue: 100000,
+        paidAmount: null,
+        balance: null,
         currency: 'INR',
         deadline: null,
         proofs: [proof('rejected', 'Blurry')],

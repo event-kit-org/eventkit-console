@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/table';
 import { teamDisplayStatus } from '@/lib/status';
 import { useEventContext } from '@/features/events/event-context';
+import { describeBalance } from '@/lib/money';
+import { cn } from '@/lib/utils';
 import { useTeams } from './queries';
 import { PendingReleaseBadge, ReleaseControls } from './TeamRelease';
 
@@ -120,6 +122,7 @@ export function TeamsPage() {
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Members</TableHead>
                   <TableHead>Payment</TableHead>
+                  <TableHead>Balance</TableHead>
                   <TableHead>Decided by</TableHead>
                   <TableHead>
                     <span className="sr-only">Review</span>
@@ -162,6 +165,15 @@ export function TeamsPage() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{t.memberCount}</TableCell>
                     <TableCell className="capitalize">{t.latestProofStatus ?? '—'}</TableCell>
+                    <TableCell
+                      className={cn(
+                        'tabular-nums',
+                        (t.balance ?? 0) > 0 && 'text-amber-700 dark:text-amber-400',
+                        (t.balance ?? 0) < 0 && 'text-sky-700 dark:text-sky-400',
+                      )}
+                    >
+                      {describeBalance(t.balance, event.currency)}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {t.confirmedBy ?? t.shortlistedBy ?? '—'}
                     </TableCell>
