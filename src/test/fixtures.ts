@@ -65,7 +65,6 @@ export function team(overrides: Partial<Schemas['Team']> = {}): Schemas['Team'] 
       mode: 'at_registration',
       amountDue: 100000,
       paidAmount: null,
-      balance: null,
       currency: 'INR',
       deadline: null,
       proofs: [],

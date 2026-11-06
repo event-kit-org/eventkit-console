@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST } from '@/lib/datetime';
-import { describeShortfall, feeFor, formatMoney, paiseToRupees, rupeesToPaise } from '@/lib/money';
+import { formatMoney, rupeesToPaise } from '@/lib/money';
 import { useProofs } from './queries';
 
 type Status = Schemas['PaymentProofStatus'];
@@ -68,12 +68,8 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
   const { event } = useEventContext();
   const [note, setNote] = useState('');
   const [rejecting, setRejecting] = useState(false);
-  // The fee may have changed since upload; the API asks the current one on approval.
-  const due =
-    event.registrationFee === null
-      ? proof.amount
-      : feeFor(event.registrationFee, event.feeBasis, proof.memberCount);
-  const [received, setReceived] = useState(String(paiseToRupees(due)));
+  // Typed from the receipt: what teams are charged can differ from the event's fee.
+  const [received, setReceived] = useState('');
   const paidAmount = received.trim() === '' ? NaN : rupeesToPaise(Number(received));
   const validAmount = Number.isFinite(paidAmount) && paidAmount >= 0;
   const p = { params: { path: { eventId: event.id, proofId: proof.id } } };
@@ -162,11 +158,6 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
                   value={received}
                   onChange={(e) => setReceived(e.target.value)}
                 />
-                {validAmount && paidAmount !== due && (
-                  <p className="text-sm text-muted-foreground">
-                    {describeShortfall(paidAmount, due, proof.currency)}
-                  </p>
-                )}
               </div>
             }
             confirmDisabled={!validAmount}

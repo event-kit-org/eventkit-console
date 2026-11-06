@@ -4,7 +4,6 @@ import {
   HandCoins,
   Info,
   Receipt,
-  Undo2,
   Users,
   UsersRound,
   type LucideIcon,
@@ -15,7 +14,7 @@ import { TilesSkeleton } from '@/components/PageState';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEventContext } from '@/features/events/event-context';
 import { formatIST } from '@/lib/datetime';
-import { formatMoney, sumBalances } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { useProofs, useTeams } from './queries';
 
 type Tile = {
@@ -45,23 +44,17 @@ export function AdminOverview() {
   const attending = registered.reduce((n, t) => n + t.attendingCount, 0);
   const rsvpShare = confirmedPeople > 0 ? attending / confirmedPeople : 0;
 
-  const owed = sumBalances(registered);
-  const balanceTiles: Tile[] =
-    owed.extra.teams + owed.refund.teams > 0
+  const paidTeams = registered.filter((t) => t.paidAmount !== null);
+  const collected = paidTeams.reduce((n, t) => n + (t.paidAmount ?? 0), 0);
+  const paymentTiles: Tile[] =
+    paidTeams.length > 0
       ? [
           {
-            label: 'Extra to collect',
-            value: formatMoney(owed.extra.total, event.currency),
+            label: 'Collected',
+            value: formatMoney(collected, event.currency),
             icon: HandCoins,
             to: 'teams',
-            foot: `from ${owed.extra.teams} team${owed.extra.teams === 1 ? '' : 's'} after the fee change`,
-          },
-          {
-            label: 'To refund',
-            value: formatMoney(owed.refund.total, event.currency),
-            icon: Undo2,
-            to: 'teams',
-            foot: `to ${owed.refund.teams} team${owed.refund.teams === 1 ? '' : 's'} after the fee change`,
+            foot: `from ${paidTeams.length} approved team${paidTeams.length === 1 ? '' : 's'}`,
           },
         ]
       : [];
@@ -92,7 +85,7 @@ export function AdminOverview() {
       icon: Receipt,
       to: 'payments',
     },
-    ...balanceTiles,
+    ...paymentTiles,
   ];
 
   return (

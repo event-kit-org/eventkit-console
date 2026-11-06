@@ -30,7 +30,6 @@ const summary = (over: object = {}) => ({
   latestProofStatus: 'approved',
   paidAmount: null,
   paidMembers: null,
-  balance: null,
   createdAt: event.createdAt,
   ...over,
 });
@@ -67,40 +66,38 @@ describe('admin overview', () => {
   });
 });
 
-describe('fee balances', () => {
+describe('paid amounts', () => {
   const teams = () =>
     HttpResponse.json([
-      summary({ paidAmount: 100000, paidMembers: 2, balance: 20000 }),
-      summary({ id: 't2', name: 'Small Fry', paidAmount: 50000, paidMembers: 1, balance: -25000 }),
+      summary({ paidAmount: 60000, paidMembers: 2 }),
+      summary({ id: 't2', name: 'Small Fry', paidAmount: 60000, paidMembers: 1 }),
       summary({ id: 't3', name: 'Not Yet', latestProofStatus: 'pending' }),
     ]);
 
-  it('shows each team what it owes or is owed, and totals them on the overview', async () => {
+  it('totals what approved teams paid on the overview', async () => {
     asRole('admin');
     server.use(
       http.get(`${E}/teams`, teams),
       http.get(`${E}/payment-proofs`, () => HttpResponse.json([])),
     );
     go('');
-    const extra = (await screen.findByText('Extra to collect')).closest('a')!;
-    expect(extra).toHaveTextContent('₹200');
-    expect(extra).toHaveTextContent('from 1 team');
-    const refund = screen.getByText('To refund').closest('a')!;
-    expect(refund).toHaveTextContent('₹250');
-    expect(refund).toHaveTextContent('to 1 team');
+    const collected = (await screen.findByText('Collected')).closest('a')!;
+    expect(collected).toHaveTextContent('₹1,200');
+    expect(collected).toHaveTextContent('from 2 approved teams');
+    expect(screen.queryByText(/refund/i)).not.toBeInTheDocument();
   });
 
-  it('adds a balance column to the teams list', async () => {
+  it('adds a paid column to the teams list', async () => {
     asRole('admin');
     server.use(http.get(`${E}/teams`, teams));
     go('/teams');
     const rows = await screen.findAllByRole('row');
-    expect(rows[1]).toHaveTextContent('+₹200 to collect');
-    expect(rows[2]).toHaveTextContent('−₹250 to refund');
+    expect(rows[0]).toHaveTextContent('Paid');
+    expect(rows[1]).toHaveTextContent('₹600');
     expect(rows[3]).toHaveTextContent('—');
   });
 
-  it('shows no balance tiles when nobody owes anything', async () => {
+  it('shows no collected tile before anyone has paid', async () => {
     asRole('admin');
     server.use(
       http.get(`${E}/teams`, () => HttpResponse.json([summary()])),
@@ -108,22 +105,22 @@ describe('fee balances', () => {
     );
     go('');
     await screen.findByText('Receipts to review');
-    expect(screen.queryByText('Extra to collect')).not.toBeInTheDocument();
+    expect(screen.queryByText('Collected')).not.toBeInTheDocument();
   });
 
-  it('puts the balance on the team page', async () => {
+  it('shows what the team paid on the team page', async () => {
     asRole('admin');
     const t = registeredTeam('confirmed');
-    t.payment = { ...t.payment, paidAmount: 100000, balance: -50000 };
+    t.payment = { ...t.payment, paidAmount: 60000 };
     t.payment.proofs = [
       {
         id: 'p1',
         teamId: t.id,
         status: 'approved',
-        amount: 100000,
+        amount: 25000,
         currency: 'INR',
         memberCount: 2,
-        paidAmount: 100000,
+        paidAmount: 60000,
         uploadedAt: event.createdAt,
         verifiedAt: event.createdAt,
         rejectionNote: null,
@@ -131,9 +128,8 @@ describe('fee balances', () => {
     ];
     server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
     go(`/teams/${t.id}`);
-    expect(await screen.findByText(/Paid ₹1,000; at the current fee that is/)).toHaveTextContent(
-      '−₹500 to refund',
-    );
+    expect(await screen.findByText('Paid ₹600')).toBeInTheDocument();
+    expect(screen.getByText('(received ₹600)')).toBeInTheDocument();
   });
 });
 
@@ -192,7 +188,6 @@ describe('teams', () => {
         mode: 'after_shortlist',
         amountDue: 100000,
         paidAmount: null,
-        balance: null,
         currency: 'INR',
         deadline: null,
         proofs: [proof('rejected', 'Blurry')],
@@ -288,11 +283,9 @@ describe('payments', () => {
     expect(approve).toHaveLength(0);
     const dialog = within(await screen.findByRole('alertdialog'));
     const received = dialog.getByLabelText('Amount received (₹)');
-    expect(received).toHaveValue(1000);
-    await userEvent.clear(received);
+    expect(received).toHaveValue(null);
     expect(dialog.getByRole('button', { name: 'Approve' })).toBeDisabled();
     await userEvent.type(received, '800');
-    expect(dialog.getByText('₹200 short of the ₹1,000 due')).toBeInTheDocument();
     await userEvent.click(dialog.getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(approve).toHaveLength(1));
     expect(approve[0]!.body).toEqual({ paidAmount: 80000 });

@@ -263,71 +263,14 @@ describe('settings', () => {
     await waitFor(() => expect(removed).toHaveLength(1));
   });
 
-  it('warns who owes extra or is owed a refund before changing the fee', async () => {
+  it('saves a fee change straight away, even after teams have paid', async () => {
     asRole('admin');
     const save = capture('patch', E, { event, role: 'admin' });
-    const paid = (over: object) => ({
-      id: 't',
-      name: 'Team',
-      leader: { registrationId: 'r', name: 'A', email: 'a@example.com', phone: null },
-      status: 'confirmed',
-      shortlistedBy: null,
-      confirmedBy: null,
-      memberCount: 2,
-      attendingCount: 0,
-      releasedStatus: 'confirmed',
-      pendingRelease: false,
-      belowMinimum: false,
-      latestProofStatus: 'approved',
-      paidAmount: 100000,
-      paidMembers: 2,
-      balance: 0,
-      createdAt: event.createdAt,
-      ...over,
-    });
-    server.use(
-      http.get(`${E}/teams`, () =>
-        HttpResponse.json([
-          paid({ id: 't1' }),
-          paid({ id: 't2', paidAmount: 50000, paidMembers: 1 }),
-          paid({ id: 't3', latestProofStatus: 'pending', paidAmount: null, paidMembers: null }),
-        ]),
-      ),
-    );
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
-    const fee = await screen.findByLabelText('Fee');
-    await screen.findByText(/Payment mode, fee basis and currency lock/);
-
-    // 500 → 250: both paid teams are owed a refund (₹500 + ₹250).
-    fireEvent.change(fee, { target: { value: '250' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Change the fee to ₹250?');
-    expect(dialog).toHaveTextContent('2 teams should be refunded ₹750 in total');
-    expect(save).toHaveLength(0);
-    await userEvent.click(screen.getByRole('button', { name: 'Keep the current fee' }));
-    expect(save).toHaveLength(0);
-
-    // 500 → 600: they owe extra instead (₹200 + ₹100), and confirming saves it.
-    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Keep the current fee' }));
-    fireEvent.change(fee, { target: { value: '600' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
-      '2 teams owe ₹300 extra in total',
-    );
-    await confirmDialog('Change the fee');
-    await waitFor(() => expect(save[0]?.body).toMatchObject({ registrationFee: 60000 }));
-  });
-
-  it('saves a fee change straight away when no paid team is affected', async () => {
-    asRole('admin');
-    const save = capture('patch', E, { event, role: 'admin' });
-    server.use(http.get(`${E}/teams`, () => HttpResponse.json([])));
     renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
     fireEvent.change(await screen.findByLabelText('Fee'), { target: { value: '250' } });
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(save[0]?.body).toMatchObject({ registrationFee: 25000 }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
