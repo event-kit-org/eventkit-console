@@ -296,6 +296,43 @@ export function TeamDetailPage() {
           </ul>
         </CardContent>
       </Card>
+      {t.assignments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Assignments</CardTitle>
+            <CardDescription>
+              Participants see a list once it is released. Change them on{' '}
+              <Link to="../../assignments" relative="path" className="underline underline-offset-4">
+                Assignments
+              </Link>
+              .
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-3 text-sm">
+              {t.assignments.map((a) => (
+                <div key={a.listId} className="grid gap-0.5">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    {a.listName}
+                    <Badge variant={a.released ? 'default' : 'secondary'}>
+                      {a.released ? 'Released' : 'Hidden'}
+                    </Badge>
+                  </dt>
+                  <dd className="font-medium">{a.option?.title ?? a.text}</dd>
+                  {a.option?.description && (
+                    <dd className="text-muted-foreground">{a.option.description}</dd>
+                  )}
+                  {a.assignedBy && (
+                    <dd className="text-xs text-muted-foreground">
+                      by {a.assignedBy.name}, {formatIST(a.assignedAt)}
+                    </dd>
+                  )}
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
       {admin && event.paymentMode !== 'none' && t.status !== 'cancelled' && (
         <Card>
           <CardHeader>

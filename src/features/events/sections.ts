@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bell,
   ClipboardList,
+  ListChecks,
   FileUp,
   CreditCard,
   Gauge,
@@ -35,6 +36,7 @@ export const SECTIONS: { group: string | null; links: Section[] }[] = [
     links: [
       { to: 'teams', label: 'Teams', icon: Users, roles: REVIEW },
       { to: 'payments', label: 'Payments', icon: CreditCard, roles: REVIEW },
+      { to: 'assignments', label: 'Assignments', icon: ListChecks },
       { to: 'form', label: 'Registration form', icon: ClipboardList },
       { to: 'links', label: 'Links', icon: Link2 },
     ],

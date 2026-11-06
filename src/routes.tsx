@@ -4,6 +4,7 @@ import { AppShell } from '@/components/AppShell';
 import { CheckpointsPage } from '@/features/admin/CheckpointsPage';
 import { CreateEventPage } from '@/features/admin/CreateEventPage';
 import { FieldsPage } from '@/features/admin/FieldsPage';
+import { AssignmentsPage } from '@/features/admin/AssignmentsPage';
 import { LinksPage } from '@/features/admin/LinksPage';
 import { PaymentsPage } from '@/features/admin/PaymentsPage';
 import { PeoplePage } from '@/features/admin/PeoplePage';
@@ -71,6 +72,7 @@ export const routes: RouteObject[] = [
                   { path: 'people', element: <PeoplePage /> },
                   { path: 'links', element: <LinksPage /> },
                   { path: 'form', element: <FieldsPage /> },
+                  { path: 'assignments', element: <AssignmentsPage /> },
                   { path: 'submissions', element: <SubmissionsPage /> },
                   { path: 'submissions/:submissionId', element: <SubmissionPage /> },
                   { path: 'checkpoints', element: <CheckpointsPage /> },

@@ -62,3 +62,18 @@ export function download(filename: string, csv: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** One row per active team: its leader and each assignment list's value. */
+export function assignmentsCsv(
+  teams: Schemas['TeamSummary'][],
+  lists: Schemas['AssignmentList'][],
+): string {
+  const header = ['Team', 'Leader', 'Leader email', ...lists.map((l) => l.name)];
+  const rows = teams.map((t) => [
+    t.name,
+    t.leader.name,
+    t.leader.email,
+    ...lists.map((l) => t.assignments[l.id]?.label ?? ''),
+  ]);
+  return [header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+}

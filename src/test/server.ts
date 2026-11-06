@@ -64,6 +64,10 @@ export const handlers = [
   http.get(`${API}/health`, () => HttpResponse.json({ status: 'ok' })),
   http.get(`${API}/v1/events/:eventId/fields`, () => HttpResponse.json([])),
   http.get(`${API}/v1/events/:eventId/team-rules`, () => HttpResponse.json([])),
+  // Overview charts: empty until a test says otherwise.
+  http.get(`${API}/v1/events/:eventId/insights/registrations`, () => HttpResponse.json([])),
+  http.get(`${API}/v1/events/:eventId/insights/attendance`, () => HttpResponse.json([])),
+  http.get(`${API}/v1/events/:eventId/insights/dashboard`, () => HttpResponse.json([])),
   // Uploads: a presigned link, then the browser's PUT straight to the bucket.
   http.post(`${API}/v1/events/:eventId/uploads`, async ({ request, params }) => {
     const { purpose, contentType } = (await request.json()) as {

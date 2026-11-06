@@ -8,13 +8,15 @@ import {
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TilesSkeleton } from '@/components/PageState';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEventContext } from '@/features/events/event-context';
-import { formatIST } from '@/lib/datetime';
+import { formatIST, toISTInput } from '@/lib/datetime';
 import { formatMoney } from '@/lib/money';
+import { AttendanceCard, Dashboard, RegistrationsCard } from './insights/OverviewCharts';
 import { useProofs, useTeams } from './queries';
 
 type Tile = {
@@ -43,6 +45,10 @@ export function AdminOverview() {
   // RSVP: people who said they're coming (attending or already checked in).
   const attending = registered.reduce((n, t) => n + t.attendingCount, 0);
   const rsvpShare = confirmedPeople > 0 ? attending / confirmedPeople : 0;
+  // Attendance only means something from the event's first day (IST).
+  const [openedAt] = useState(Date.now);
+  const eventDayStarted =
+    openedAt >= new Date(`${toISTInput(event.startAt).slice(0, 10)}T00:00:00+05:30`).getTime();
 
   const paidTeams = registered.filter((t) => t.paidAmount !== null);
   const collected = paidTeams.reduce((n, t) => n + (t.paidAmount ?? 0), 0);
@@ -153,6 +159,11 @@ export function AdminOverview() {
         Registration closes {formatIST(event.registrationDeadline)}. The event starts{' '}
         {formatIST(event.startAt)}.
       </p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {features.registration && <RegistrationsCard />}
+        {features.scanning && eventDayStarted && <AttendanceCard />}
+      </div>
+      {features.registration && <Dashboard />}
     </div>
   );
 }
