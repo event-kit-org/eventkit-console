@@ -18,6 +18,17 @@ export function describeBalance(balance: number | null, currency: string | null)
   return balance > 0 ? `+${amount} to collect` : `−${amount} to refund`;
 }
 
+/** What `members` people owe at `fee` (paise). */
+export const feeFor = (fee: number, feeBasis: 'per_person' | 'per_team', members: number) =>
+  feeBasis === 'per_team' ? fee : fee * members;
+
+/** A short or over amount against what was due, e.g. "₹200 short of ₹1,000 due". */
+export function describeShortfall(paid: number, due: number, currency: string | null): string {
+  if (paid === due) return '';
+  const gap = formatMoney(Math.abs(due - paid), currency);
+  return `${gap} ${paid < due ? 'short of' : 'over'} the ${formatMoney(due, currency)} due`;
+}
+
 type Payer = { paidAmount: number | null; paidMembers: number | null; balance: number | null };
 
 /** Teams owing extra and teams owed a refund, with their totals, from each team's balance. */
@@ -43,6 +54,6 @@ export function balancesAtFee(
   return teams.map((t) =>
     t.paidAmount === null || t.paidMembers === null
       ? t
-      : { ...t, balance: (feeBasis === 'per_team' ? fee : fee * t.paidMembers) - t.paidAmount },
+      : { ...t, balance: feeFor(fee, feeBasis, t.paidMembers) - t.paidAmount },
   );
 }

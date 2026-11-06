@@ -273,6 +273,7 @@ describe('answers on admin team pages', () => {
             status: 'pending',
             amount: 100000,
             currency: 'INR',
+            paidAmount: null,
             memberCount: 2,
             uploadedAt: event.createdAt,
             verifiedAt: null,

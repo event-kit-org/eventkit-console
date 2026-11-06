@@ -18,6 +18,8 @@ export function ConfirmButton({
   description,
   confirmLabel,
   destructive = false,
+  body,
+  confirmDisabled = false,
   onConfirm,
   children,
   ...buttonProps
@@ -26,6 +28,9 @@ export function ConfirmButton({
   description?: ReactNode;
   confirmLabel: string;
   destructive?: boolean;
+  /** Inputs the confirmation needs, shown under the description. */
+  body?: ReactNode;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
 }) {
   return (
@@ -38,9 +43,14 @@ export function ConfirmButton({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
         </AlertDialogHeader>
+        {body}
         <AlertDialogFooter>
           <AlertDialogCancel>Keep</AlertDialogCancel>
-          <AlertDialogAction variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
+          <AlertDialogAction
+            variant={destructive ? 'destructive' : 'default'}
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -17,12 +17,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST } from '@/lib/datetime';
-import { formatMoney } from '@/lib/money';
+import { describeShortfall, feeFor, formatMoney, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { useProofs } from './queries';
 
 type Status = Schemas['PaymentProofStatus'];
@@ -66,9 +68,22 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
   const { event } = useEventContext();
   const [note, setNote] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  // The fee may have changed since upload; the API asks the current one on approval.
+  const due =
+    event.registrationFee === null
+      ? proof.amount
+      : feeFor(event.registrationFee, event.feeBasis, proof.memberCount);
+  const [received, setReceived] = useState(String(paiseToRupees(due)));
+  const paidAmount = received.trim() === '' ? NaN : rupeesToPaise(Number(received));
+  const validAmount = Number.isFinite(paidAmount) && paidAmount >= 0;
   const p = { params: { path: { eventId: event.id, proofId: proof.id } } };
   const approve = useEventMutation(event.id, () =>
-    unwrap(api.POST('/v1/events/{eventId}/payment-proofs/{proofId}/approve', p)),
+    unwrap(
+      api.POST('/v1/events/{eventId}/payment-proofs/{proofId}/approve', {
+        ...p,
+        body: { paidAmount },
+      }),
+    ),
   );
   const reject = useEventMutation(event.id, () =>
     unwrap(
@@ -86,6 +101,9 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
           {formatMoney(proof.amount, proof.currency)} for {proof.memberCount}{' '}
           {proof.memberCount === 1 ? 'person' : 'people'} · uploaded by {proof.uploadedBy.name},{' '}
           {formatIST(proof.uploadedAt)}
+          {proof.paidAmount !== null && (
+            <> · received {formatMoney(proof.paidAmount, proof.currency)}</>
+          )}
         </CardDescription>
         {proof.status !== 'pending' && (
           <CardAction>
@@ -129,8 +147,29 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
         <CardFooter className="gap-2">
           <ConfirmButton
             title="Approve this receipt?"
-            description={`${proof.team.name} will be confirmed and take up a place. This cannot be undone.`}
+            description={`Enter what the receipt shows was paid. ${proof.team.name} will be confirmed and take up a place. This cannot be undone.`}
             confirmLabel="Approve"
+            body={
+              <div className="grid gap-2">
+                <Label htmlFor={`received-${proof.id}`}>Amount received (₹)</Label>
+                <Input
+                  id={`received-${proof.id}`}
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  className="max-w-40"
+                  value={received}
+                  onChange={(e) => setReceived(e.target.value)}
+                />
+                {validAmount && paidAmount !== due && (
+                  <p className="text-sm text-muted-foreground">
+                    {describeShortfall(paidAmount, due, proof.currency)}
+                  </p>
+                )}
+              </div>
+            }
+            confirmDisabled={!validAmount}
             onConfirm={() => approve.mutate(undefined)}
             disabled={approve.isPending}
           >

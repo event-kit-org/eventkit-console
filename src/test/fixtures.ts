@@ -98,6 +98,7 @@ export function proof(
     amount: 100000,
     currency: 'INR',
     memberCount: 2,
+    paidAmount: status === 'approved' ? 100000 : null,
     uploadedAt: event.createdAt,
     verifiedAt: null,
     rejectionNote: note,

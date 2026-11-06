@@ -5417,7 +5417,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve a receipt: the team is confirmed (refused if places run out) */
+        /** Approve a receipt with the amount received: the team is confirmed (refused if places run out) */
         post: {
             parameters: {
                 query?: never;
@@ -5428,7 +5428,14 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description In paise: what the receipt shows the team paid */
+                        paidAmount: number;
+                    };
+                };
+            };
             responses: {
                 /** @description Default Response */
                 200: {
@@ -5437,6 +5444,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["PaymentProof"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
                 /** @description Default Response */
@@ -9890,10 +9906,12 @@ export interface components {
             /** Format: uuid */
             teamId: string;
             status: components["schemas"]["PaymentProofStatusInput"];
-            /** @description In paise: registration fee × memberCount */
+            /** @description In paise: what the team was asked (registration fee × memberCount) */
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description In paise: what the approver entered as received; null until approved */
+            paidAmount: number | null;
             /** Format: date-time */
             uploadedAt: string;
             verifiedAt: string | null;
@@ -9946,7 +9964,7 @@ export interface components {
                 mode: components["schemas"]["PaymentModeInput"];
                 /** @description In paise; null for unpaid events */
                 amountDue: number | null;
-                /** @description In paise: the approved receipt's amount; null until one is approved */
+                /** @description In paise: what the approver entered as received; null until one is approved */
                 paidAmount: number | null;
                 /** @description In paise: what the event's current fee asks minus paidAmount. Positive: the team owes extra; negative: it is owed a refund. Null until a receipt is approved */
                 balance: number | null;
@@ -9967,10 +9985,12 @@ export interface components {
             /** Format: uuid */
             teamId: string;
             status: components["schemas"]["PaymentProofStatusInput"];
-            /** @description In paise: registration fee × memberCount */
+            /** @description In paise: what the team was asked (registration fee × memberCount) */
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description In paise: what the approver entered as received; null until approved */
+            paidAmount: number | null;
             /** Format: date-time */
             uploadedAt: string;
             verifiedAt: string | null;
@@ -10016,7 +10036,7 @@ export interface components {
             pendingRelease: boolean;
             belowMinimum: boolean;
             latestProofStatus: ("pending" | "approved" | "rejected") | null;
-            /** @description In paise: the approved receipt's amount */
+            /** @description In paise: what the approver entered as received */
             paidAmount: number | null;
             /** @description Members the approved receipt covered; null until one is approved */
             paidMembers: number | null;
@@ -10794,10 +10814,12 @@ export interface components {
             /** Format: uuid */
             teamId: string;
             status: components["schemas"]["PaymentProofStatus"];
-            /** @description In paise: registration fee × memberCount */
+            /** @description In paise: what the team was asked (registration fee × memberCount) */
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description In paise: what the approver entered as received; null until approved */
+            paidAmount: number | null;
             /** Format: date-time */
             uploadedAt: string;
             verifiedAt: string | null;
@@ -10850,7 +10872,7 @@ export interface components {
                 mode: components["schemas"]["PaymentMode"];
                 /** @description In paise; null for unpaid events */
                 amountDue: number | null;
-                /** @description In paise: the approved receipt's amount; null until one is approved */
+                /** @description In paise: what the approver entered as received; null until one is approved */
                 paidAmount: number | null;
                 /** @description In paise: what the event's current fee asks minus paidAmount. Positive: the team owes extra; negative: it is owed a refund. Null until a receipt is approved */
                 balance: number | null;
@@ -10871,10 +10893,12 @@ export interface components {
             /** Format: uuid */
             teamId: string;
             status: components["schemas"]["PaymentProofStatus"];
-            /** @description In paise: registration fee × memberCount */
+            /** @description In paise: what the team was asked (registration fee × memberCount) */
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description In paise: what the approver entered as received; null until approved */
+            paidAmount: number | null;
             /** Format: date-time */
             uploadedAt: string;
             verifiedAt: string | null;
@@ -10920,7 +10944,7 @@ export interface components {
             pendingRelease: boolean;
             belowMinimum: boolean;
             latestProofStatus: ("pending" | "approved" | "rejected") | null;
-            /** @description In paise: the approved receipt's amount */
+            /** @description In paise: what the approver entered as received */
             paidAmount: number | null;
             /** @description Members the approved receipt covered; null until one is approved */
             paidMembers: number | null;

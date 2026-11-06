@@ -123,6 +123,7 @@ describe('fee balances', () => {
         amount: 100000,
         currency: 'INR',
         memberCount: 2,
+        paidAmount: 100000,
         uploadedAt: event.createdAt,
         verifiedAt: event.createdAt,
         rejectionNote: null,
@@ -285,10 +286,16 @@ describe('payments', () => {
     expect(screen.getByText(/₹1,000 for 2 people/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
     expect(approve).toHaveLength(0);
-    await userEvent.click(
-      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Approve' }),
-    );
+    const dialog = within(await screen.findByRole('alertdialog'));
+    const received = dialog.getByLabelText('Amount received (₹)');
+    expect(received).toHaveValue(1000);
+    await userEvent.clear(received);
+    expect(dialog.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    await userEvent.type(received, '800');
+    expect(dialog.getByText('₹200 short of the ₹1,000 due')).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(approve).toHaveLength(1));
+    expect(approve[0]!.body).toEqual({ paidAmount: 80000 });
   });
 
   it('rejects with a note', async () => {

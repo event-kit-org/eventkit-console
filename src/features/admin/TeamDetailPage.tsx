@@ -335,6 +335,11 @@ export function TeamDetailPage() {
               {t.payment.proofs.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center gap-2">
                   <span className="tabular-nums">{formatMoney(p.amount, p.currency)}</span>
+                  {p.paidAmount !== null && p.paidAmount !== p.amount && (
+                    <span className="tabular-nums">
+                      (received {formatMoney(p.paidAmount, p.currency)})
+                    </span>
+                  )}
                   <span className="text-muted-foreground">uploaded {formatIST(p.uploadedAt)}</span>
                   <Badge
                     variant={p.status === 'rejected' ? 'destructive' : 'secondary'}
