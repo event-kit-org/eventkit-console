@@ -238,6 +238,8 @@ describe('teams', () => {
     await confirmDialog('New link');
     expect(await screen.findByText('https://portal.test/me/ek_new')).toBeInTheDocument();
     expect(reissue).toHaveLength(1);
+    // Without mailing, nothing can be emailed.
+    expect(reissue[0]!.body).toEqual({ emailLeader: false });
     await userEvent.click(screen.getAllByRole('button', { name: 'New QR' })[0]!);
     await confirmDialog('New QR');
     await waitFor(() => expect(rotate).toHaveLength(1));
@@ -254,6 +256,29 @@ describe('teams', () => {
     );
     go(`/teams/${t.id}`);
     expect(await screen.findByRole('alert')).toHaveTextContent('Team not found.');
+  });
+});
+
+describe('new personal links', () => {
+  it('can email the new link to the team leader, and says so', async () => {
+    asRole('admin', {}, { registration: true, mailing: true });
+    const t = registeredTeam('confirmed');
+    server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
+    const reissue = capture('post', `${E}/registrations/r2/reissue-link`, {
+      registrationId: 'r2',
+      token: 'ek_new',
+      url: 'https://portal.test/me/ek_new',
+      emailedTo: 'asha@example.com',
+    });
+    go(`/teams/${t.id}`);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'New link' }))[1]!);
+    const dialog = within(await screen.findByRole('alertdialog'));
+    expect(dialog.getByLabelText('Email it to the team leader to pass on')).toBeChecked();
+    await userEvent.click(dialog.getByRole('button', { name: 'New link' }));
+    await waitFor(() => expect(reissue[0]?.body).toEqual({ emailLeader: true }));
+    expect(
+      await screen.findByText(/Emailed to the team leader \(asha@example.com\) to pass on/),
+    ).toBeInTheDocument();
   });
 });
 

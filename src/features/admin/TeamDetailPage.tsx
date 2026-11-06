@@ -14,6 +14,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -29,7 +31,7 @@ import { PendingReleaseBadge } from './TeamRelease';
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
   const api = useApi();
-  const { event, role } = useEventContext();
+  const { event, role, features } = useEventContext();
   // Reviewers shortlist, confirm and cancel; links, QR codes, receipts and deleting are for admins.
   const admin = role === 'admin';
   const params = { params: { path: { eventId: event.id, teamId } } };
@@ -38,7 +40,10 @@ export function TeamDetailPage() {
     name: string;
     token: string;
     url: string | null;
+    emailedTo: string | null;
   } | null>(null);
+  // A new link can go to the team leader by email (eventKit mails only leaders).
+  const [emailLeader, setEmailLeader] = useState(true);
   const team = useQuery({
     queryKey: ['event', event.id, 'team', teamId],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/teams/{teamId}', params)),
@@ -66,8 +71,13 @@ export function TeamDetailPage() {
   const reg = (registrationId: string) => ({
     params: { path: { eventId: event.id, registrationId } },
   });
-  const reissue = useEventMutation(event.id, (id: string) =>
-    unwrap(api.POST('/v1/events/{eventId}/registrations/{registrationId}/reissue-link', reg(id))),
+  const reissue = useEventMutation(event.id, (v: { id: string; emailLeader: boolean }) =>
+    unwrap(
+      api.POST('/v1/events/{eventId}/registrations/{registrationId}/reissue-link', {
+        ...reg(v.id),
+        body: { emailLeader: v.emailLeader },
+      }),
+    ),
   );
   const rotateQr = useEventMutation(event.id, (id: string) =>
     unwrap(api.POST('/v1/events/{eventId}/registrations/{registrationId}/rotate-qr', reg(id))),
@@ -201,7 +211,9 @@ export function TeamDetailPage() {
               <Link2 aria-hidden />
               <AlertTitle>New personal link for {newLink.name}</AlertTitle>
               <AlertDescription>
-                Shown once; send it to them.{' '}
+                {newLink.emailedTo
+                  ? `Emailed to the team leader (${newLink.emailedTo}) to pass on. Also shown here once:`
+                  : 'Shown once; send it to them.'}{' '}
                 <code className="font-mono text-xs break-all text-foreground">
                   {newLink.url ?? newLink.token}
                 </code>
@@ -244,11 +256,29 @@ export function TeamDetailPage() {
                         variant="outline"
                         title={`Give ${m.name} a new personal link?`}
                         description="Their current link stops working."
+                        body={
+                          features.mailing && (
+                            <Field orientation="horizontal">
+                              <Checkbox
+                                id={`email-leader-${m.registrationId}`}
+                                checked={emailLeader}
+                                onCheckedChange={(c) => setEmailLeader(c === true)}
+                              />
+                              <FieldLabel
+                                htmlFor={`email-leader-${m.registrationId}`}
+                                className="font-normal"
+                              >
+                                Email it to the team leader to pass on
+                              </FieldLabel>
+                            </Field>
+                          )
+                        }
                         confirmLabel="New link"
                         onConfirm={() =>
-                          reissue.mutate(m.registrationId, {
-                            onSuccess: (link) => setNewLink({ name: m.name, ...link }),
-                          })
+                          reissue.mutate(
+                            { id: m.registrationId, emailLeader: features.mailing && emailLeader },
+                            { onSuccess: (link) => setNewLink({ name: m.name, ...link }) },
+                          )
                         }
                       >
                         <Link2 aria-hidden /> New link
