@@ -184,7 +184,7 @@ export function CountsChart({ buckets, chart }: { buckets: Bucket[]; chart: 'bar
     ) satisfies ChartConfig;
     const data = slices.map((b, i) => ({ ...b, key: `s${i}` }));
     return (
-      <ChartContainer config={config} className="mx-auto aspect-square max-h-64">
+      <ChartContainer config={config} className="mx-auto aspect-square w-full max-w-64">
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent nameKey="key" hideLabel />} />
           <Pie data={data} dataKey="count" nameKey="key" stroke="var(--card)" strokeWidth={2}>
