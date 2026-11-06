@@ -120,6 +120,7 @@ describe('paid amounts', () => {
         amount: 25000,
         currency: 'INR',
         memberCount: 2,
+        registrationIds: ['r1', 'r2'],
         paidAmount: 60000,
         uploadedAt: event.createdAt,
         verifiedAt: event.createdAt,
@@ -191,6 +192,7 @@ describe('teams', () => {
         currency: 'INR',
         deadline: null,
         proofs: [proof('rejected', 'Blurry')],
+        unpaid: [],
       },
     });
     server.use(
@@ -286,6 +288,7 @@ describe('payments', () => {
   const item = (status: 'pending' | 'approved' | 'rejected', ext = 'png') => ({
     ...proof(status, status === 'rejected' ? 'Wrong amount' : null),
     team: { id: 't', name: 'Byte Club' },
+    members: [],
     uploadedBy: { id: 'u', name: 'Asha' },
     receiptUrl: `https://storage.test/events/e/receipts/t/r.${ext}?signed=1`,
   });

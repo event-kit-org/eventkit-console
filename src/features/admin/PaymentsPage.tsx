@@ -94,9 +94,11 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
       <CardHeader>
         <CardTitle>{proof.team.name}</CardTitle>
         <CardDescription>
-          {formatMoney(proof.amount, proof.currency)} for {proof.memberCount}{' '}
-          {proof.memberCount === 1 ? 'person' : 'people'} · uploaded by {proof.uploadedBy.name},{' '}
-          {formatIST(proof.uploadedAt)}
+          {formatMoney(proof.amount, proof.currency)} for{' '}
+          {proof.members.length > 0
+            ? proof.members.map((m) => m.name).join(', ')
+            : `${proof.memberCount} ${proof.memberCount === 1 ? 'person' : 'people'}`}{' '}
+          · uploaded by {proof.uploadedBy.name}, {formatIST(proof.uploadedAt)}
           {proof.paidAmount !== null && (
             <> · received {formatMoney(proof.paidAmount, proof.currency)}</>
           )}

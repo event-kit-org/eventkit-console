@@ -273,12 +273,14 @@ describe('answers on admin team pages', () => {
             amount: 100000,
             currency: 'INR',
             paidAmount: null,
+            registrationIds: ['r1'],
             memberCount: 2,
             uploadedAt: event.createdAt,
             verifiedAt: null,
             rejectionNote: null,
           },
         ],
+        unpaid: [],
       },
     });
     t.members = t.members.map((m, i) => ({ ...m, answers: { dept: i === 0 ? 'CSE' : 'ECE' } }));

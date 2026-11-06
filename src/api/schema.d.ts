@@ -1324,6 +1324,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/portal/me/team/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leader: add a member to your team, up to the maximum size, until registration closes. Their link is emailed to you to pass on. With a per-person fee after you've paid, upload another receipt for them */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NewMemberInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AddedMember"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/portal/me/team/members/{registrationId}/reissue-link": {
         parameters: {
             query?: never;
@@ -4684,6 +4760,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/events/{eventId}/teams/{teamId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a member to a registered team, up to the maximum size (admins, any time). With a per-person fee after the team paid, they wait for their own receipt. Their link is returned, and emailed to the leader when mailing is on */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NewMemberInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            registrationId: string;
+                            name: string;
+                            participantCode: string;
+                            status: string;
+                            /** @description The leader their link was emailed to; null when mail is off or failed */
+                            emailedTo: string | null;
+                            link: components["schemas"]["SecretLink"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/events/{eventId}/teams/{teamId}/shortlist": {
         parameters: {
             query?: never;
@@ -5073,6 +5246,99 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{eventId}/registrations/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Correct a member's name or email (admins). With resendToLeader, every member of the team gets a new link, and the leader is emailed the registration email with all of them (sent first: MAILING_OFF or MAIL_FAILED change nothing) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    registrationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        email?: string;
+                        /** @description Replace the team's links and email them all to the leader */
+                        resendToLeader?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MemberDetails"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/v1/events/{eventId}/registrations/{registrationId}/reissue-link": {
@@ -11299,6 +11565,21 @@ export interface components {
         AnswersInput: {
             [key: string]: string | number | string[];
         };
+        NewMemberInput: {
+            name: string;
+            email: string;
+            /** @description Member fields */
+            answers?: components["schemas"]["AnswersBodyInput"];
+        };
+        AddedMemberInput: {
+            /** Format: uuid */
+            registrationId: string;
+            name: string;
+            participantCode: string;
+            status: string;
+            /** @description The leader their link was emailed to; null when mail is off or failed */
+            emailedTo: string | null;
+        };
         /** @enum {string} */
         RegistrationStatusInput: "registered" | "shortlisted" | "confirmed" | "attending" | "checked_in" | "cancelled";
         /** @enum {string} */
@@ -11313,6 +11594,8 @@ export interface components {
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description Who this receipt pays for (a later one can pay for members added after) */
+            registrationIds: string[];
             /** @description In paise: what the approver entered as received; null until approved */
             paidAmount: number | null;
             /** Format: date-time */
@@ -11374,6 +11657,12 @@ export interface components {
                 deadline: string | null;
                 /** @description Newest first */
                 proofs: components["schemas"]["PaymentProofInput"][];
+                /** @description Members still to be paid for (per-person fee): everyone before the first receipt is approved, then anyone added after */
+                unpaid: {
+                    /** Format: uuid */
+                    registrationId: string;
+                    name: string;
+                }[];
             };
             /** @description The organiser who shortlisted the team, and when (organisers only) */
             shortlistedBy: components["schemas"]["TeamDecisionInput"];
@@ -11392,6 +11681,8 @@ export interface components {
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description Who this receipt pays for (a later one can pay for members added after) */
+            registrationIds: string[];
             /** @description In paise: what the approver entered as received; null until approved */
             paidAmount: number | null;
             /** Format: date-time */
@@ -11403,6 +11694,12 @@ export interface components {
                 id: string;
                 name: string;
             };
+            /** @description Who it pays for */
+            members: {
+                /** Format: uuid */
+                registrationId: string;
+                name: string;
+            }[];
             uploadedBy: {
                 name: string;
                 /** @enum {string} */
@@ -11982,6 +12279,14 @@ export interface components {
         ReleaseResultInput: {
             released: number;
         };
+        MemberDetailsInput: {
+            /** Format: uuid */
+            registrationId: string;
+            name: string;
+            email: string;
+            /** @description The leader the links were emailed to, if resent */
+            emailedTo: string | null;
+        };
         ScanBatchResultInput: {
             results: {
                 /** Format: uuid */
@@ -12322,6 +12627,22 @@ export interface components {
         Answers: {
             [key: string]: string | number | string[];
         };
+        NewMember: {
+            name: string;
+            /** Format: email */
+            email: string;
+            /** @description Member fields */
+            answers?: components["schemas"]["AnswersBody"];
+        };
+        AddedMember: {
+            /** Format: uuid */
+            registrationId: string;
+            name: string;
+            participantCode: string;
+            status: string;
+            /** @description The leader their link was emailed to; null when mail is off or failed */
+            emailedTo: string | null;
+        };
         /** @enum {string} */
         RegistrationStatus: "registered" | "shortlisted" | "confirmed" | "attending" | "checked_in" | "cancelled";
         /** @enum {string} */
@@ -12336,6 +12657,8 @@ export interface components {
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description Who this receipt pays for (a later one can pay for members added after) */
+            registrationIds: string[];
             /** @description In paise: what the approver entered as received; null until approved */
             paidAmount: number | null;
             /** Format: date-time */
@@ -12397,6 +12720,12 @@ export interface components {
                 deadline: string | null;
                 /** @description Newest first */
                 proofs: components["schemas"]["PaymentProof"][];
+                /** @description Members still to be paid for (per-person fee): everyone before the first receipt is approved, then anyone added after */
+                unpaid: {
+                    /** Format: uuid */
+                    registrationId: string;
+                    name: string;
+                }[];
             };
             /** @description The organiser who shortlisted the team, and when (organisers only) */
             shortlistedBy: components["schemas"]["TeamDecision"];
@@ -12415,6 +12744,8 @@ export interface components {
             amount: number;
             currency: string;
             memberCount: number;
+            /** @description Who this receipt pays for (a later one can pay for members added after) */
+            registrationIds: string[];
             /** @description In paise: what the approver entered as received; null until approved */
             paidAmount: number | null;
             /** Format: date-time */
@@ -12426,6 +12757,12 @@ export interface components {
                 id: string;
                 name: string;
             };
+            /** @description Who it pays for */
+            members: {
+                /** Format: uuid */
+                registrationId: string;
+                name: string;
+            }[];
             uploadedBy: {
                 name: string;
                 /** @enum {string} */
@@ -13004,6 +13341,14 @@ export interface components {
         };
         ReleaseResult: {
             released: number;
+        };
+        MemberDetails: {
+            /** Format: uuid */
+            registrationId: string;
+            name: string;
+            email: string;
+            /** @description The leader the links were emailed to, if resent */
+            emailedTo: string | null;
         };
         ScanBatchResult: {
             results: {

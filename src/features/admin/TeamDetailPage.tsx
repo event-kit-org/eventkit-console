@@ -13,7 +13,14 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -27,6 +34,7 @@ import { teamDisplayStatus } from '@/lib/status';
 import { formatMoney } from '@/lib/money';
 import { useReleaseTeams } from './release';
 import { PendingReleaseBadge } from './TeamRelease';
+import { AddMemberDialog, EditMemberDialog } from './TeamMemberDialogs';
 
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
@@ -204,6 +212,13 @@ export function TeamDetailPage() {
           <CardDescription>
             {t.members.length} {t.members.length === 1 ? 'person' : 'people'}
           </CardDescription>
+          {admin &&
+            t.status !== 'cancelled' &&
+            t.members.filter((m) => m.status !== 'cancelled').length < event.maxTeamSize && (
+              <CardAction>
+                <AddMemberDialog team={t} questions={memberFields(fields)} />
+              </CardAction>
+            )}
         </CardHeader>
         <CardContent className="grid gap-3">
           {newLink && (
@@ -249,6 +264,7 @@ export function TeamDetailPage() {
                   <AnswerList fields={memberFields(fields)} answers={m.answers} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {admin && m.status !== 'cancelled' && <EditMemberDialog member={m} />}
                   {admin && (
                     <>
                       <ConfirmButton
@@ -395,6 +411,12 @@ export function TeamDetailPage() {
             {t.payment.paidAmount !== null && (
               <p className="mb-3 text-sm font-medium">
                 Paid {formatMoney(t.payment.paidAmount, t.payment.currency)}
+              </p>
+            )}
+            {t.payment.paidAmount !== null && t.payment.unpaid.length > 0 && (
+              <p className="mb-3 text-sm">
+                Still to pay for {t.payment.unpaid.map((u) => u.name).join(', ')}:{' '}
+                {formatMoney(t.payment.amountDue ?? 0, t.payment.currency)}, with another receipt.
               </p>
             )}
             <ul className="grid gap-2 text-sm">
