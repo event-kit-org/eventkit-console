@@ -78,3 +78,14 @@ describe('MarkdownTextarea', () => {
     expect(screen.getByRole('status')).toHaveTextContent('- a - b');
   });
 });
+
+it('counts characters against maxLength', () => {
+  render(
+    <MarkdownTextarea aria-label="Body" maxLength={2000} value="hello" onChange={() => {}} />,
+    {
+      wrapper: TooltipProvider,
+    },
+  );
+  expect(screen.getByRole('textbox', { name: 'Body' })).toHaveAttribute('maxLength', '2000');
+  expect(screen.getByText('5/2000')).toBeInTheDocument();
+});

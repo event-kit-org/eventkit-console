@@ -254,12 +254,18 @@ function Composer({ channel }: { channel: Channel }) {
         });
       }}
     >
-      <FormField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <FormField
+        label="Title"
+        maxLength={120}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
       <Field>
         <FieldLabel htmlFor="send-body">Message</FieldLabel>
         <MarkdownTextarea
           id="send-body"
           rows={3}
+          maxLength={2000}
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />

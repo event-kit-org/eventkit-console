@@ -118,8 +118,13 @@ export function MarkdownTextarea({
           <span className="text-muted-foreground">Nothing to preview.</span>
         )}
       </TabsContent>
-      <p className="text-xs text-muted-foreground">
-        Supports Markdown: **bold**, _italic_, [link](https://…), - lists.
+      <p className="flex justify-between gap-2 text-xs text-muted-foreground">
+        <span>Supports Markdown: **bold**, _italic_, [link](https://…), - lists.</span>
+        {props.maxLength !== undefined && (
+          <span className="shrink-0 tabular-nums">
+            {text.length}/{props.maxLength}
+          </span>
+        )}
       </p>
     </Tabs>
   );
