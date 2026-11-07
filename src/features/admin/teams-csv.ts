@@ -40,7 +40,7 @@ export function teamsCsv(teams: Team[], fields: Field[]): string {
 }
 
 /** Quotes a CSV cell, and defuses spreadsheet formulas (=, +, -, @). */
-function cell(value: string): string {
+export function cell(value: string): string {
   // Phone numbers like +91 98450 12345 are left as they are.
   const formula = /^[=+\-@\t\r]/.test(value) && !/^\+?[\d\s()-]+$/.test(value);
   const safe = formula ? `'${value}` : value;

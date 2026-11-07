@@ -48,6 +48,7 @@ export const member = (
   isLeader,
   answers: {},
   linkLastUsedAt: null,
+  linkStored: true,
 });
 
 export function team(overrides: Partial<Schemas['Team']> = {}): Schemas['Team'] {

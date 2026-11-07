@@ -157,9 +157,12 @@ describe('People: outside now', () => {
     go('/attendees');
     const table = await screen.findByRole('table', { name: 'People outside' });
     const asha = within(table).getByRole('row', { name: /Asha/ });
-    expect(asha).toHaveTextContent(
-      'PX-a1AshaByte Club+91 98450 00000Bathroomvia Gate out12 min ago',
-    );
+    // Small screens fold the ID, team, phone and reason under the name; wide ones have columns.
+    for (const text of ['PX-a1', 'Asha', 'Byte Club', '+91 98450 00000', 'Bathroom']) {
+      expect(asha).toHaveTextContent(text);
+    }
+    expect(asha).toHaveTextContent('via Gate out');
+    expect(asha).toHaveTextContent(/12 min ago$/);
     const ravi = within(table).getByRole('row', { name: /Ravi/ });
     expect(ravi).toHaveTextContent('—');
     expect(ravi).toHaveTextContent('1 h 30 min ago');

@@ -5,6 +5,7 @@ import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { SearchInput } from '@/components/SearchInput';
 import { PageHeader } from '@/components/PageHeader';
 import { CardsSkeleton } from '@/components/PageState';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -73,6 +74,7 @@ import {
 } from '@/components/ui/table';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { useListFilter } from '@/hooks/useListFilter';
 import { teamDisplayStatus } from '@/lib/status';
 import { fillLabel, randomFill } from './assignments';
 import { useTeams } from './queries';
@@ -384,7 +386,7 @@ function OptionsTable({ list }: { list: List }) {
           <TableBody>
             {list.options.map((o) => (
               <TableRow key={o.id}>
-                <TableCell className="min-w-56">
+                <TableCell className="min-w-40 sm:min-w-56">
                   <div className="grid gap-1">
                     <Input
                       aria-label="Option title"
@@ -456,7 +458,7 @@ function OptionsTable({ list }: { list: List }) {
           });
         }}
       >
-        <Field className="min-w-48 flex-1">
+        <Field className="min-w-0 flex-1 basis-40">
           <FieldLabel htmlFor={`new-option-${list.id}`}>New option</FieldLabel>
           <Input
             id={`new-option-${list.id}`}
@@ -485,9 +487,16 @@ function OptionsTable({ list }: { list: List }) {
   );
 }
 
+const teamText = (t: Team) => [
+  t.name,
+  ...t.members.flatMap((m) => [m.name, m.email, m.participantCode]),
+  ...Object.values(t.assignments).map((a) => a.label),
+];
+
 function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
   const [filter, setFilter] = useState('');
-  const shown = filter ? teams.filter((t) => !t.assignments[filter]) : teams;
+  const search = useListFilter(teams, teamText);
+  const shown = filter ? search.filtered.filter((t) => !t.assignments[filter]) : search.filtered;
   return (
     <Card>
       <CardHeader>
@@ -514,12 +523,24 @@ function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
           </Field>
         </CardAction>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-3">
+        {teams.length > 0 && (
+          <SearchInput
+            label="Search teams"
+            placeholder="Team, member or value"
+            value={search.query}
+            onChange={search.setQuery}
+          />
+        )}
         {shown.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyDescription>
-                {teams.length === 0 ? 'No teams have registered yet.' : 'Every team has one.'}
+                {teams.length === 0
+                  ? 'No teams have registered yet.'
+                  : search.active
+                    ? 'No team matches.'
+                    : 'Every team has one.'}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -527,8 +548,8 @@ function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Team</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="sticky left-0 z-10 bg-card">Team</TableHead>
+                <TableHead className="hidden md:table-cell">Status</TableHead>
                 {lists.map((l) => (
                   <TableHead key={l.id} className="min-w-44">
                     {l.name}
@@ -539,8 +560,10 @@ function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
             <TableBody>
               {shown.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.name}</TableCell>
-                  <TableCell>
+                  <TableCell className="sticky left-0 z-10 max-w-36 bg-card font-medium whitespace-normal wrap-anywhere sm:max-w-56">
+                    {t.name}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <StatusBadge status={teamDisplayStatus(t)} />
                   </TableCell>
                   {lists.map((l) => (

@@ -32,8 +32,8 @@ export function EventLayout() {
     return (
       <div className="grid gap-3" aria-busy="true">
         <span className="sr-only">Loading…</span>
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-80" />
+        <Skeleton className="h-8 w-64 max-w-full" />
+        <Skeleton className="h-4 w-80 max-w-full" />
       </div>
     );
   }

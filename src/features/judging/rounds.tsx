@@ -35,6 +35,22 @@ export function useRounds() {
   });
 }
 
+/** The teams allowed in a round; null when every team is. */
+export function useRoundTeams(roundId: string | undefined) {
+  const api = useApi();
+  const { event } = useEventContext();
+  return useQuery({
+    queryKey: ['event', event.id, 'rounds', roundId, 'teams'],
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/events/{eventId}/rounds/{roundId}/teams', {
+          params: { path: { eventId: event.id, roundId: roundId! } },
+        }),
+      ),
+    enabled: Boolean(roundId),
+  });
+}
+
 const TONE: Record<Phase, string> = {
   draft: '',
   released: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',

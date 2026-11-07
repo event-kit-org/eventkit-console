@@ -1,4 +1,4 @@
-import { Copy, FileUp, Plus, Trash2 } from 'lucide-react';
+import { Copy, Download, FileUp, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { unwrap } from '@/api/client';
@@ -26,6 +26,7 @@ import { PhaseBadge, useRounds } from '@/features/judging/rounds';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST, fromISTInput } from '@/lib/datetime';
 import { useSubmissions } from './queries';
+import { useRoundExport } from './round-export';
 
 /** Admin: what teams submit in each round (a project link, a deck...), grouped by round. */
 export function SubmissionsPage() {
@@ -42,6 +43,7 @@ export function SubmissionsPage() {
   const remove = useEventMutation(event.id, (id: string) =>
     unwrap(api.DELETE('/v1/events/{eventId}/submissions/{submissionId}', params(id))),
   );
+  const exportRound = useRoundExport();
   const loading = rounds.isPending || submissions.isPending;
 
   return (
@@ -52,7 +54,11 @@ export function SubmissionsPage() {
       >
         {rounds.data && rounds.data.length > 0 && <CreateDialog />}
       </PageHeader>
-      <ErrorAlert error={rounds.error ?? submissions.error ?? duplicate.error ?? remove.error} />
+      <ErrorAlert
+        error={
+          rounds.error ?? submissions.error ?? duplicate.error ?? remove.error ?? exportRound.error
+        }
+      />
       {loading && <CardsSkeleton />}
       {rounds.data?.length === 0 && (
         <EmptyState icon={FileUp} title="No rounds yet">
@@ -63,9 +69,21 @@ export function SubmissionsPage() {
         const items = (submissions.data ?? []).filter((s) => s.round.id === round.id);
         return (
           <section key={round.id} aria-label={round.name} className="grid gap-2">
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium">{round.name}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="min-w-0 font-medium wrap-anywhere">{round.name}</h3>
               <PhaseBadge phase={round.phase} />
+              {items.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  disabled={exportRound.isPending}
+                  onClick={() => exportRound.mutate(round)}
+                >
+                  <Download aria-hidden /> CSV
+                  <span className="sr-only"> of every submission in {round.name}</span>
+                </Button>
+              )}
             </div>
             {items.length === 0 && !loading && (
               <p className="text-sm text-muted-foreground">No submissions in this round yet.</p>
@@ -73,8 +91,8 @@ export function SubmissionsPage() {
             <ul className="grid divide-y rounded-lg border text-sm empty:hidden">
               {items.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-2 p-3">
-                  <Link to={s.id} className="grid gap-0.5 hover:underline">
-                    <span className="font-medium">{s.title}</span>
+                  <Link to={s.id} className="grid min-w-0 gap-0.5 hover:underline">
+                    <span className="font-medium wrap-anywhere">{s.title}</span>
                     <span className="text-muted-foreground">
                       {s.fields.length} {s.fields.length === 1 ? 'question' : 'questions'} ·{' '}
                       {s.entryCount} submitted

@@ -66,6 +66,41 @@ describe('notifications', () => {
     expect(screen.queryByRole('form', { name: 'Send a notification' })).not.toBeInTheDocument();
   });
 
+  it('admins delete a notification for everyone, warning that pushes stay', async () => {
+    asRole('admin');
+    use([channel({ canSend: false })], [note]);
+    const removed = capture('delete', `${E}/channels/ch1/notifications/n1`);
+    go();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete "Lunch is served"' }));
+    const dialog = within(await screen.findByRole('alertdialog'));
+    expect(dialog.getByText(/push already sent to phones can’t be taken back/)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(removed).toHaveLength(1));
+  });
+
+  it('reviewers can’t delete notifications', async () => {
+    asRole('reviewer');
+    use([channel({ canSend: false })], [note]);
+    go();
+    expect(await screen.findByText('Lunch is served')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+  });
+
+  it('searches the open channel', async () => {
+    asRole('admin');
+    const other = { ...note, id: 'n5', title: 'Dinner at 8', body: 'Terrace' };
+    use([channel({ canSend: false })], [note, other]);
+    go();
+    await userEvent.type(
+      await screen.findByRole('searchbox', { name: 'Search Announcements' }),
+      'terrace',
+    );
+    expect(screen.getByText('Dinner at 8')).toBeInTheDocument();
+    expect(screen.queryByText('Lunch is served')).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole('searchbox'), 'zzz');
+    expect(screen.getByText('No notification matches.')).toBeInTheDocument();
+  });
+
   it('makes links in a notification clickable', async () => {
     asRole('admin');
     use([channel({ canSend: false })], [{ ...note, body: 'Repos: https://drive.example/file/1' }]);

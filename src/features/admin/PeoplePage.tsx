@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserCog } from 'lucide-react';
+import { UserCog, UserMinus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
@@ -8,6 +8,7 @@ import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { EmptyState, TableSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +25,7 @@ import {
 import { useEventContext } from '@/features/events/event-context';
 import { roleLabel } from '@/features/events/roles';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { useListFilter } from '@/hooks/useListFilter';
 
 type Member = Schemas['Member'];
 type StaffRole = 'volunteer' | 'judge';
@@ -112,9 +114,9 @@ function Organisers(props: {
             <TableBody>
               {props.organisers.map((m) => (
                 <TableRow key={m.userId}>
-                  <TableCell>
-                    <div className="font-medium">{m.name}</div>
-                    <div className="text-xs text-muted-foreground">{m.email}</div>
+                  <TableCell className="whitespace-normal">
+                    <div className="font-medium wrap-anywhere">{m.name}</div>
+                    <div className="text-xs break-all text-muted-foreground">{m.email}</div>
                   </TableCell>
                   <TableCell>
                     {m.isOwner || !isOwner ? (
@@ -125,7 +127,7 @@ function Organisers(props: {
                       <NativeSelect
                         size="sm"
                         aria-label={`Role of ${m.name}`}
-                        className="w-36"
+                        className="w-28 sm:w-36"
                         value={m.role}
                         onChange={(e) => props.onRole(m.userId, e.target.value as OrganiserRole)}
                       >
@@ -148,7 +150,8 @@ function Organisers(props: {
                         destructive
                         onConfirm={() => props.onRemove(m.userId)}
                       >
-                        Remove
+                        <UserMinus aria-hidden />
+                        <span className="sr-only sm:not-sr-only">Remove</span>
                       </ConfirmButton>
                     )}
                     {!m.isOwner && m.userId === user?.id && <LeaveEvent />}
@@ -184,7 +187,7 @@ function AddOrganiser() {
           required
           aria-label="Their eventKit email"
           placeholder="Their eventKit email"
-          className="min-w-56 flex-1"
+          className="min-w-0 flex-1 basis-56"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -212,12 +215,15 @@ function AddOrganiser() {
   );
 }
 
+const memberText = (m: Member) => [m.name, m.email, m.phone, roleLabel[m.role]];
+
 /** Volunteers and judges: portal accounts made through staff links. */
 function Staff(props: {
   staff: Member[];
   onRole: (userId: string, role: StaffRole) => void;
   onRemove: (userId: string) => void;
 }) {
+  const search = useListFilter(props.staff, memberText);
   return (
     <Card>
       <CardHeader>
@@ -227,9 +233,19 @@ function Staff(props: {
           Removing someone ends their access.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-3">
+        {props.staff.length > 0 && (
+          <SearchInput
+            label="Search staff"
+            placeholder="Name, email or role"
+            value={search.query}
+            onChange={search.setQuery}
+          />
+        )}
         {props.staff.length === 0 ? (
           <EmptyState icon={UserCog} title="No staff yet." />
+        ) : search.filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nobody matches.</p>
         ) : (
           <div className="overflow-hidden rounded-lg border">
             <Table>
@@ -243,11 +259,11 @@ function Staff(props: {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {props.staff.map((m) => (
+                {search.filtered.map((m) => (
                   <TableRow key={m.userId}>
-                    <TableCell>
-                      <div className="font-medium">{m.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                    <TableCell className="whitespace-normal">
+                      <div className="font-medium wrap-anywhere">{m.name}</div>
+                      <div className="text-xs break-all text-muted-foreground">
                         {m.email}
                         {m.phone && ` · ${m.phone}`}
                       </div>
@@ -256,7 +272,7 @@ function Staff(props: {
                       <NativeSelect
                         size="sm"
                         aria-label={`Role of ${m.name}`}
-                        className="w-36"
+                        className="w-28 sm:w-36"
                         value={m.role}
                         onChange={(e) => props.onRole(m.userId, e.target.value as StaffRole)}
                       >
@@ -277,7 +293,8 @@ function Staff(props: {
                         destructive
                         onConfirm={() => props.onRemove(m.userId)}
                       >
-                        Remove
+                        <UserMinus aria-hidden />
+                        <span className="sr-only sm:not-sr-only">Remove</span>
                       </ConfirmButton>
                     </TableCell>
                   </TableRow>

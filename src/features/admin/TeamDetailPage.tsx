@@ -34,7 +34,12 @@ import { teamDisplayStatus } from '@/lib/status';
 import { formatMoney } from '@/lib/money';
 import { useReleaseTeams } from './release';
 import { PendingReleaseBadge } from './TeamRelease';
-import { AddMemberDialog, EditMemberDialog } from './TeamMemberDialogs';
+import {
+  AddMemberDialog,
+  EditMemberDialog,
+  EditTeamDialog,
+  SendLinkMenu,
+} from './TeamMemberDialogs';
 
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
@@ -50,8 +55,9 @@ export function TeamDetailPage() {
     url: string | null;
     emailedTo: string | null;
   } | null>(null);
-  // A new link can go to the team leader by email (eventKit mails only leaders).
+  // A new link can go to the team leader by email.
   const [emailLeader, setEmailLeader] = useState(true);
+  const [sentNote, setSentNote] = useState<string | null>(null);
   const team = useQuery({
     queryKey: ['event', event.id, 'team', teamId],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/teams/{teamId}', params)),
@@ -117,7 +123,7 @@ export function TeamDetailPage() {
       <div className="grid gap-4">
         <Skeleton className="h-8 w-28" />
         <div className="flex items-center gap-3">
-          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-7 w-56 max-w-full" />
           <Skeleton className="h-6 w-20 rounded-full" />
         </div>
         <CardsSkeleton count={2} />
@@ -136,7 +142,7 @@ export function TeamDetailPage() {
       </Button>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">{t.name}</h2>
+          <h2 className="min-w-0 text-xl font-semibold tracking-tight wrap-anywhere">{t.name}</h2>
           <StatusBadge
             status={teamDisplayStatus({
               status: t.status,
@@ -167,6 +173,7 @@ export function TeamDetailPage() {
               <Send aria-hidden /> Release decision
             </ConfirmButton>
           )}
+          {admin && <EditTeamDialog team={t} questions={teamFields(fields)} />}
           {admin && (
             <ConfirmButton
               variant="outline"
@@ -221,6 +228,12 @@ export function TeamDetailPage() {
             )}
         </CardHeader>
         <CardContent className="grid gap-3">
+          {sentNote && (
+            <Alert>
+              <Send aria-hidden />
+              <AlertDescription>{sentNote}</AlertDescription>
+            </Alert>
+          )}
           {newLink && (
             <Alert>
               <Link2 aria-hidden />
@@ -241,16 +254,16 @@ export function TeamDetailPage() {
                 key={m.registrationId}
                 className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
               >
-                <div className="grid gap-1">
+                <div className="grid min-w-0 gap-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{m.name}</span>
+                    <span className="font-medium wrap-anywhere">{m.name}</span>
                     <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                       {m.participantCode}
                     </code>
                     {m.isLeader && <Badge variant="outline">leader</Badge>}
                     <StatusBadge status={m.status} />
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs break-all text-muted-foreground">
                     {[
                       m.email,
                       m.phone,
@@ -265,6 +278,9 @@ export function TeamDetailPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {admin && m.status !== 'cancelled' && <EditMemberDialog member={m} />}
+                  {admin && m.status !== 'cancelled' && (
+                    <SendLinkMenu member={m} onSent={setSentNote} />
+                  )}
                   {admin && (
                     <>
                       <ConfirmButton

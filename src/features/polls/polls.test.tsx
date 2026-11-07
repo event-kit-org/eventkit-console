@@ -11,6 +11,8 @@ function poll(over: Partial<Schemas['Poll']> = {}): Schemas['Poll'] {
   return {
     id: 'p1',
     question: 'Lunch?',
+    type: 'choice',
+    scaleMax: null,
     audience: ['participant', 'volunteer', 'judge', 'admin'],
     closesAt: '2026-10-31T06:30:00.000Z',
     closed: false,
@@ -23,7 +25,9 @@ function poll(over: Partial<Schemas['Poll']> = {}): Schemas['Poll'] {
       { id: 'o2', label: 'Curd rice', position: 1, votes: null },
     ],
     totalVotes: null,
+    stats: null,
     myVote: null,
+    myAnswer: null,
     canVote: true,
     canManage: false,
     optionsLocked: false,
@@ -101,6 +105,7 @@ describe('polls', () => {
     await waitFor(() =>
       expect(created[0]?.body).toEqual({
         question: 'Dinner?',
+        type: 'choice',
         options: ['Biryani', 'Dosa'],
         audience: ['participant', 'volunteer'],
         closesAt: '2026-10-31T14:30:00.000Z',
@@ -124,5 +129,114 @@ describe('polls', () => {
     expect(await screen.findByText('Bad poll.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('button', { name: 'New poll' })).toBeInTheDocument();
+  });
+
+  it('multi-select polls take several options', async () => {
+    asRole('admin');
+    usePolls([
+      poll({
+        type: 'multi_choice',
+        defaultOptionId: null,
+        mealCheckpoints: [],
+        options: [
+          { id: 'o1', label: 'AI', position: 0, votes: null },
+          { id: 'o2', label: 'Web', position: 1, votes: null },
+          { id: 'o3', label: 'Chips', position: 2, votes: null },
+        ],
+      }),
+    ]);
+    const voted = capture('put', `${E}/polls/p1/vote`, poll());
+    go();
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'AI' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chips' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vote' }));
+    await waitFor(() => expect(voted[0]?.body).toEqual({ optionIds: ['o1', 'o3'] }));
+  });
+
+  it('rating polls answer on a scale and show the spread', async () => {
+    asRole('admin');
+    usePolls([
+      poll({
+        type: 'rating',
+        scaleMax: 4,
+        options: [],
+        defaultOptionId: null,
+        mealCheckpoints: [],
+        totalVotes: 3,
+        stats: {
+          count: 3,
+          average: 3.33,
+          min: 2,
+          max: 4,
+          distribution: [1, 2, 3, 4].map((value) => ({ value, count: value === 1 ? 0 : 1 })),
+        },
+      }),
+    ]);
+    const voted = capture('put', `${E}/polls/p1/vote`, poll());
+    go();
+    await userEvent.click(await screen.findByRole('radio', { name: '3' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Answer' }));
+    await waitFor(() => expect(voted[0]?.body).toEqual({ value: 3 }));
+    expect(screen.getByText('3.33')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'How many gave each rating' })).toBeInTheDocument();
+  });
+
+  it('text polls take an answer and list the answers on request, with search', async () => {
+    asRole('admin');
+    usePolls([
+      poll({
+        type: 'short_text',
+        options: [],
+        defaultOptionId: null,
+        mealCheckpoints: [],
+        totalVotes: 2,
+        myAnswer: { optionId: null, optionIds: [], value: 'Loved it' },
+      }),
+    ]);
+    server.use(
+      http.get(`${E}/polls/p1/answers`, () =>
+        HttpResponse.json([
+          { value: 'More coffee', respondedAt: event.createdAt, by: 'Ravi' },
+          { value: 'Loved it', respondedAt: event.createdAt, by: 'Asha' },
+        ]),
+      ),
+    );
+    const voted = capture('put', `${E}/polls/p1/vote`, poll());
+    go();
+    const box = await screen.findByRole('textbox', { name: 'Lunch?' });
+    expect(box).toHaveValue('Loved it');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'Great');
+    await userEvent.click(screen.getByRole('button', { name: 'Change answer' }));
+    await waitFor(() => expect(voted[0]?.body).toEqual({ value: 'Great' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Show answers (2)' }));
+    expect(await screen.findByText('More coffee')).toBeInTheDocument();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search answers' }), 'coffee');
+    expect(screen.getByText('More coffee')).toBeInTheDocument();
+    expect(screen.queryByText('Loved it')).not.toBeInTheDocument();
+  });
+
+  it('creates a rating poll without options', async () => {
+    asRole('admin');
+    usePolls([]);
+    const created = capture('post', `${E}/polls`, poll(), 201);
+    go();
+    await userEvent.click(await screen.findByRole('button', { name: 'New poll' }));
+    await userEvent.type(screen.getByLabelText('Question'), 'Rate the food');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Answer type' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Rating' }));
+    expect(screen.queryByLabelText('Options, one per line')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Default option')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('combobox', { name: 'Scale' }));
+    await userEvent.click(await screen.findByRole('option', { name: '1 to 10' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create poll' }));
+    await waitFor(() =>
+      expect(created[0]?.body).toMatchObject({
+        question: 'Rate the food',
+        type: 'rating',
+        scaleMax: 10,
+      }),
+    );
+    expect(created[0]?.body).not.toHaveProperty('options');
   });
 });

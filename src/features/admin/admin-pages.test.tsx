@@ -23,6 +23,10 @@ const summary = (over: object = {}) => ({
   leader: { registrationId: 'r1', name: 'Asha', email: 'asha@example.com', phone: '+91 1' },
   status: 'confirmed',
   memberCount: 2,
+  members: [
+    { registrationId: 'r1', name: 'Asha', email: 'asha@example.com', participantCode: 'PX-0001' },
+    { registrationId: 'r2', name: 'Ravi', email: 'ravi@example.com', participantCode: 'PX-0002' },
+  ],
   attendingCount: 0,
   releasedStatus: 'confirmed',
   pendingRelease: false,
@@ -258,6 +262,109 @@ describe('teams', () => {
     );
     go(`/teams/${t.id}`);
     expect(await screen.findByRole('alert')).toHaveTextContent('Team not found.');
+  });
+});
+
+describe('searching teams', () => {
+  it('finds a team by its name or any member’s name, email or ID', async () => {
+    asRole('admin');
+    server.use(
+      http.get(`${E}/teams`, () =>
+        HttpResponse.json([
+          summary(),
+          summary({
+            id: 't2',
+            name: 'Quantum Quokkas',
+            members: [
+              {
+                registrationId: 'r9',
+                name: 'Zoë',
+                email: 'zoe@x.test',
+                participantCode: 'PX-0099',
+              },
+            ],
+          }),
+        ]),
+      ),
+    );
+    go('/teams');
+    const box = await screen.findByRole('searchbox', { name: 'Search teams and members' });
+    await userEvent.type(box, 'zoe');
+    expect(screen.getByRole('link', { name: 'Quantum Quokkas' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Byte Club' })).not.toBeInTheDocument();
+    await userEvent.clear(box);
+    await userEvent.type(box, 'px-0002');
+    expect(screen.getByRole('link', { name: 'Byte Club' })).toBeInTheDocument();
+    await userEvent.type(box, 'nobody');
+    expect(screen.getByText('No team or member matches.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(screen.getAllByRole('link', { name: /^(Byte Club|Quantum Quokkas)$/ })).toHaveLength(2);
+  });
+});
+
+describe('editing a team', () => {
+  it('changes the name and the leader', async () => {
+    asRole('admin');
+    const t = registeredTeam('confirmed');
+    server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
+    const saved = capture('patch', `${E}/teams/${t.id}`, t);
+    go(`/teams/${t.id}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit team' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await userEvent.clear(dialog.getByLabelText('Team name'));
+    await userEvent.type(dialog.getByLabelText('Team name'), 'Byte Club 2');
+    await userEvent.click(dialog.getByRole('combobox', { name: 'Leader' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Ravi' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(saved[0]?.body).toEqual({ name: 'Byte Club 2', leaderRegistrationId: 'r2' }),
+    );
+  });
+
+  it('shows a name another team uses', async () => {
+    asRole('admin');
+    const t = registeredTeam('confirmed');
+    server.use(
+      http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)),
+      http.patch(`${E}/teams/${t.id}`, () =>
+        apiError(409, 'TEAM_NAME_TAKEN', 'Another team already uses that name.'),
+      ),
+    );
+    go(`/teams/${t.id}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit team' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await userEvent.type(dialog.getByLabelText('Team name'), 'x');
+    await userEvent.click(dialog.getByRole('button', { name: 'Save' }));
+    expect(await dialog.findByText('Another team already uses that name.')).toBeInTheDocument();
+  });
+});
+
+describe('sending a link again', () => {
+  it('emails a member their current link, or the leader, and says where it went', async () => {
+    asRole('admin', {}, { registration: true, mailing: true });
+    const t = registeredTeam('confirmed');
+    server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
+    const sent = capture('post', `${E}/registrations/r2/send-link`, {
+      emailedTo: 'ravi@example.com',
+    });
+    go(`/teams/${t.id}`);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Send link' }))[1]!);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Email to Ravi' }));
+    await waitFor(() => expect(sent[0]?.body).toEqual({ to: 'member' }));
+    expect(
+      await screen.findByText('Ravi’s link was emailed to ravi@example.com.'),
+    ).toBeInTheDocument();
+  });
+
+  it('explains when a link is too old to send, or mail is off', async () => {
+    asRole('admin', {}, { registration: true, mailing: true });
+    const old = registeredTeam('confirmed');
+    old.members[1] = { ...old.members[1]!, linkStored: false };
+    server.use(http.get(`${E}/teams/${old.id}`, () => HttpResponse.json(old)));
+    go(`/teams/${old.id}`);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Send link' }))[1]!);
+    expect(await screen.findByText(/made before links were kept/)).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 });
 

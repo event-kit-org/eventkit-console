@@ -6,6 +6,7 @@ import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { CardsSkeleton, EmptyState } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { useListFilter } from '@/hooks/useListFilter';
 import { formatIST } from '@/lib/datetime';
 import { formatMoney, rupeesToPaise } from '@/lib/money';
 import { useProofs } from './queries';
@@ -35,27 +37,48 @@ const TABS: [Status, string][] = [
   ['rejected', 'Rejected'],
 ];
 
+type Proof = Schemas['PaymentProofForReview'];
+const proofText = (p: Proof) => [p.team.name, p.uploadedBy.name, ...p.members.map((m) => m.name)];
+
 export function PaymentsPage() {
   const [status, setStatus] = useState<Status>('pending');
   const proofs = useProofs(status);
+  const search = useListFilter(proofs.data ?? [], proofText);
 
   return (
     <div className="grid gap-4">
       <PageHeader title="Payments" description="Receipts teams uploaded. You approve each one." />
-      <Tabs value={status} onValueChange={(v) => setStatus(v as Status)}>
-        <TabsList aria-label="Show">
-          {TABS.map(([value, label]) => (
-            <TabsTrigger key={value} value={value}>
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          value={status}
+          onValueChange={(v) => setStatus(v as Status)}
+          className="w-full sm:w-auto"
+        >
+          <TabsList aria-label="Show" className="w-full sm:w-fit">
+            {TABS.map(([value, label]) => (
+              <TabsTrigger key={value} value={value} className="min-w-0 flex-1 sm:flex-none">
+                <span className="truncate">{label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <SearchInput
+          label="Search receipts"
+          placeholder="Team or member"
+          value={search.query}
+          onChange={search.setQuery}
+        />
+      </div>
       <ErrorAlert error={proofs.error} />
       {proofs.isPending && <CardsSkeleton />}
-      {proofs.data?.length === 0 && <EmptyState icon={Receipt} title="Nothing here." />}
+      {proofs.data && search.filtered.length === 0 && (
+        <EmptyState
+          icon={Receipt}
+          title={search.active ? 'No receipt matches.' : 'Nothing here.'}
+        />
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
-        {proofs.data?.map((p) => (
+        {search.filtered.map((p) => (
           <ProofCard key={p.id} proof={p} />
         ))}
       </div>

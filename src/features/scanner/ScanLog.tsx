@@ -16,6 +16,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatTimeIST } from '@/lib/datetime';
 import { reasonLabel } from './scan-messages';
+import { SearchInput } from '@/components/SearchInput';
+import { useListFilter } from '@/hooks/useListFilter';
 
 interface Row {
   id: string;
@@ -37,6 +39,8 @@ const LIMIT = 25;
  * Recent scans at the checkpoint: the server's (refreshed every 5 s while
  * online, so every volunteer's show) with this device's unsent offline scans on top.
  */
+const rowText = (r: { name: string; participantCode: string }) => [r.name, r.participantCode];
+
 export function ScanLog({
   eventId,
   checkpointId,
@@ -82,14 +86,24 @@ export function ScanLog({
   const unsent: Row[] = local
     .filter((e) => !seen.has(e.id))
     .map((e) => ({ ...e, offline: e.sync !== 'synced' }));
-  const rows = [...unsent, ...server]
+  const all = [...unsent, ...server]
     .sort((a, b) => b.scannedAt.localeCompare(a.scannedAt))
     .slice(0, Math.max(LIMIT, unsent.length));
+  const search = useListFilter(all, rowText);
+  const rows = search.filtered;
 
   return (
     <Card size="sm">
-      <CardHeader>
+      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle as="h2">Scan log</CardTitle>
+        {all.length > 0 && (
+          <SearchInput
+            label="Search the scan log"
+            placeholder="Name or ID"
+            value={search.query}
+            onChange={search.setQuery}
+          />
+        )}
       </CardHeader>
       <CardContent className="px-0">
         {scans.isPending && online && rows.length === 0 ? (
@@ -98,13 +112,15 @@ export function ScanLog({
             <Skeleton className="h-6 w-full" />
           </div>
         ) : rows.length === 0 ? (
-          <p className="px-4 text-sm text-muted-foreground">No scans here yet.</p>
+          <p className="px-4 text-sm text-muted-foreground">
+            {search.active ? 'No scan matches.' : 'No scans here yet.'}
+          </p>
         ) : (
           <Table aria-label="Scan log">
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4">Time</TableHead>
-                <TableHead>Participant ID</TableHead>
+                <TableHead className="hidden sm:table-cell">Participant ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead className="pr-4">Status</TableHead>
               </TableRow>
@@ -113,8 +129,15 @@ export function ScanLog({
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="pl-4 tabular-nums">{formatTimeIST(r.scannedAt)}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.participantCode}</TableCell>
-                  <TableCell className="max-w-32 truncate">{r.name}</TableCell>
+                  <TableCell className="hidden font-mono text-xs sm:table-cell">
+                    {r.participantCode}
+                  </TableCell>
+                  <TableCell className="max-w-40 whitespace-normal wrap-anywhere">
+                    {r.name}
+                    <div className="font-mono text-xs text-muted-foreground sm:hidden">
+                      {r.participantCode}
+                    </div>
+                  </TableCell>
                   <TableCell className="pr-4">
                     <ScanStatus row={r} />
                   </TableCell>

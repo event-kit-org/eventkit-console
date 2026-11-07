@@ -10,6 +10,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import { useEventMutation } from '@/hooks/useEventMutation';
 import { EditCheckpointDialog } from './EditCheckpointDialog';
 import { ExitReasonsCard } from './ExitReasonsCard';
 import { formatIST, fromISTInput } from '@/lib/datetime';
+import { useListFilter } from '@/hooks/useListFilter';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name the checkpoint.').max(100),
@@ -41,6 +43,8 @@ const TYPE_LABEL = {
   session: 'Session',
 };
 
+const checkpointText = (c: { name: string; type: string }) => [c.name, c.type];
+
 export function CheckpointsPage() {
   const api = useApi();
   const { event, path, features } = useEventContext();
@@ -49,6 +53,7 @@ export function CheckpointsPage() {
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/checkpoints', path)),
     enabled: features.scanning,
   });
+  const search = useListFilter(checkpoints.data ?? [], checkpointText);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -196,9 +201,17 @@ export function CheckpointsPage() {
       </Card>
       <ErrorAlert error={checkpoints.error ?? remove.error} />
       {checkpoints.isPending && <RowsSkeleton />}
-      {checkpoints.data?.length === 0 && <EmptyState icon={MapPin} title="No checkpoints yet." />}
+      {checkpoints.data && checkpoints.data.length > 0 && (
+        <SearchInput label="Search checkpoints" value={search.query} onChange={search.setQuery} />
+      )}
+      {checkpoints.data && search.filtered.length === 0 && (
+        <EmptyState
+          icon={MapPin}
+          title={search.active ? 'No checkpoint matches.' : 'No checkpoints yet.'}
+        />
+      )}
       <ul className="grid gap-2">
-        {checkpoints.data?.map((c) => (
+        {search.filtered.map((c) => (
           <li
             key={c.id}
             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4 text-sm"

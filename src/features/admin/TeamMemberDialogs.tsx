@@ -1,4 +1,4 @@
-import { Pencil, UserPlus } from 'lucide-react';
+import { Mail, Pencil, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
@@ -16,15 +16,32 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useEventContext } from '@/features/events/event-context';
 import { FieldInputs } from '@/features/fields/FieldInputs';
 import {
   type Draft,
+  fieldErrors,
   type Field as Question,
   missingRequired,
   toAnswers,
+  toDraft,
 } from '@/features/fields/fields';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatMoney } from '@/lib/money';
@@ -109,7 +126,7 @@ export function EditMemberDialog({ member }: { member: Member }) {
                     Send the registration email to the leader again
                   </FieldLabel>
                   <FieldDescription>
-                    Everyone in the team gets a new link; their old links stop working.
+                    With everyone’s current link. Links too old to send again are replaced.
                   </FieldDescription>
                 </div>
               </Field>
@@ -118,6 +135,178 @@ export function EditMemberDialog({ member }: { member: Member }) {
           <ErrorAlert error={save.error} />
           <DialogFooter>
             <Button type="submit" disabled={!name.trim() || !email.trim() || save.isPending}>
+              Save
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Email a member's current link again, unchanged: to them, or to the leader to
+ * pass on. Links made before links were kept need one new link first.
+ */
+export function SendLinkMenu({
+  member,
+  onSent,
+}: {
+  member: Member;
+  onSent: (message: string) => void;
+}) {
+  const api = useApi();
+  const { event, features } = useEventContext();
+  const send = useEventMutation(event.id, (to: 'member' | 'leader') =>
+    unwrap(
+      api.POST('/v1/events/{eventId}/registrations/{registrationId}/send-link', {
+        params: { path: { eventId: event.id, registrationId: member.registrationId } },
+        body: { to },
+      }),
+    ),
+  );
+  const go = (to: 'member' | 'leader') =>
+    send.mutate(to, {
+      onSuccess: ({ emailedTo }) => onSent(`${member.name}’s link was emailed to ${emailedTo}.`),
+      onError: (err) => onSent(err instanceof Error ? err.message : 'The email could not be sent.'),
+    });
+  const ready = features.mailing && member.linkStored === true;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" disabled={send.isPending}>
+          <Mail aria-hidden /> Send link
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-w-72">
+        {!features.mailing ? (
+          <DropdownMenuLabel className="font-normal text-muted-foreground">
+            Turn on mailing for this event to send links.
+          </DropdownMenuLabel>
+        ) : !ready ? (
+          <DropdownMenuLabel className="font-normal text-muted-foreground">
+            This link was made before links were kept, so it can’t be sent again. Give them a new
+            link once.
+          </DropdownMenuLabel>
+        ) : (
+          <>
+            <DropdownMenuLabel className="font-normal text-muted-foreground">
+              Their current link, unchanged
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => go('member')}>
+              Email to {member.isLeader ? 'them (leader)' : member.name}
+            </DropdownMenuItem>
+            {!member.isLeader && (
+              <DropdownMenuItem onSelect={() => go('leader')}>
+                Email to the team leader
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Admin: correct a team's name, its team answers, or who leads it. */
+export function EditTeamDialog({
+  team,
+  questions,
+}: {
+  team: Schemas['Team'];
+  questions: Question[];
+}) {
+  const api = useApi();
+  const { event } = useEventContext();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(team.name);
+  const [draft, setDraft] = useState<Draft>({});
+  const leaderNow = team.members.find((m) => m.isLeader)?.registrationId ?? '';
+  const [leader, setLeader] = useState(leaderNow);
+  const active = team.members.filter((m) => m.status !== 'cancelled');
+  const save = useEventMutation(event.id, () =>
+    unwrap(
+      api.PATCH('/v1/events/{eventId}/teams/{teamId}', {
+        params: { path: { eventId: event.id, teamId: team.id } },
+        body: {
+          ...(name.trim() !== team.name ? { name } : {}),
+          ...(questions.length > 0 ? { answers: toAnswers(questions, draft) } : {}),
+          ...(leader !== leaderNow ? { leaderRegistrationId: leader } : {}),
+        },
+      }),
+    ),
+  );
+  const missing = missingRequired(questions, draft);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setName(team.name);
+          setDraft(toDraft(team.answers, questions));
+          setLeader(leaderNow);
+          save.reset();
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Pencil aria-hidden /> Edit team
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate(undefined, { onSuccess: () => setOpen(false) });
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Edit {team.name}</DialogTitle>
+            <DialogDescription>
+              Change the team’s name, its answers or its leader. Members’ own details are edited on
+              each member.
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor={`team-${team.id}-name`}>Team name</FieldLabel>
+              <Input
+                id={`team-${team.id}-name`}
+                value={name}
+                maxLength={80}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`team-${team.id}-leader`}>Leader</FieldLabel>
+              <Select value={leader} onValueChange={setLeader}>
+                <SelectTrigger id={`team-${team.id}-leader`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {active.map((m) => (
+                    <SelectItem key={m.registrationId} value={m.registrationId}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+          <FieldInputs
+            fields={questions}
+            draft={draft}
+            onChange={setDraft}
+            errors={fieldErrors(save.error, '/answers')}
+            idPrefix={`team-${team.id}`}
+          />
+          <ErrorAlert error={save.error} />
+          <DialogFooter>
+            <Button type="submit" disabled={!name.trim() || missing.length > 0 || save.isPending}>
               Save
             </Button>
           </DialogFooter>

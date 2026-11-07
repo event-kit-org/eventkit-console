@@ -1400,6 +1400,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/portal/me/team/members/{registrationId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leader: remove a teammate (cancels their registration) until registration closes. Not yourself, not someone checked in, never below the minimum team size. Nothing is refunded automatically; an organiser can restore them */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    registrationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/portal/me/team/members/{registrationId}/reissue-link": {
         parameters: {
             query?: never;
@@ -1503,7 +1580,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Vote, or change your vote, until the poll closes (NOT_CONFIRMED until your team is confirmed) */
+        /** Answer, or change your answer, until the poll closes (NOT_CONFIRMED until your team is confirmed) */
         put: {
             parameters: {
                 query?: never;
@@ -1517,7 +1594,9 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** Format: uuid */
-                        optionId: string;
+                        optionId?: string;
+                        optionIds?: string[];
+                        value?: string | number;
                     };
                 };
             };
@@ -4757,7 +4836,86 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /** Correct a team (admins): its name, its team answers, or its leader (any active member) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        answers?: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: uuid */
+                        leaderRegistrationId?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Team"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/v1/events/{eventId}/teams/{teamId}/members": {
@@ -5261,7 +5419,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Correct a member's name or email (admins). With resendToLeader, every member of the team gets a new link, and the leader is emailed the registration email with all of them (sent first: MAILING_OFF or MAIL_FAILED change nothing) */
+        /** Correct a member's name or email (admins). With resendToLeader, the leader is emailed the registration email with every member's link: links stored encrypted are sent as they are, older ones are replaced (sent first: MAILING_OFF or MAIL_FAILED change nothing) */
         patch: {
             parameters: {
                 query?: never;
@@ -5277,7 +5435,7 @@ export interface paths {
                     "application/json": {
                         name?: string;
                         email?: string;
-                        /** @description Replace the team's links and email them all to the leader */
+                        /** @description Email the team's links to the leader (older links are replaced) */
                         resendToLeader?: boolean;
                     };
                 };
@@ -5386,6 +5544,99 @@ export interface paths {
                             /** @description The leader it was emailed to, if it was */
                             emailedTo: string | null;
                         };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{eventId}/registrations/{registrationId}/send-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Email a member's current personal link again, unchanged (admins): to the member (their own link only) or to the team leader. LINK_NOT_STORED for links made before links were kept encrypted: issue a new link once instead. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    registrationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        to: "member" | "leader";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            emailedTo: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
                     };
                 };
                 /** @description Default Response */
@@ -6837,7 +7088,11 @@ export interface paths {
                 content: {
                     "application/json": {
                         question: string;
-                        options: string[];
+                        type?: components["schemas"]["PollTypeInput"];
+                        /** @description Rating polls (default 5) */
+                        scaleMax?: number;
+                        /** @description Choice polls: at least two. Other types: none. */
+                        options?: string[];
                         audience: components["schemas"]["RoleInput"][];
                         closesAt?: string | null;
                         resultsVisible?: boolean;
@@ -7341,7 +7596,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Vote, or change your vote, until the poll closes */
+        /** Answer, or change your answer, until the poll closes */
         put: {
             parameters: {
                 query?: never;
@@ -7356,7 +7611,9 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** Format: uuid */
-                        optionId: string;
+                        optionId?: string;
+                        optionIds?: string[];
+                        value?: string | number;
                     };
                 };
             };
@@ -7417,6 +7674,93 @@ export interface paths {
                 };
             };
         };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{eventId}/polls/{pollId}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The answers to a text, number, date-time or rating poll, newest first (page with ?before=<respondedAt>). Admins and volunteers see who answered; the audience sees answers only when results are shown, without names. */
+        get: {
+            parameters: {
+                query?: {
+                    before?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    eventId: string;
+                    pollId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PollValueAnswer"][];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -7788,6 +8132,74 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{eventId}/channels/{channelId}/notifications/{notificationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a sent notification for everyone (admins, or the volunteer who sent it)
+         * @description Urgent pushes already delivered to devices are not withdrawn.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    channelId: string;
+                    notificationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -8323,6 +8735,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/events/{eventId}/judging/teams/{teamId}/breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who scored a team in a round, criterion by criterion, with comments (admins only; judges see only their own scores) */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The round. Default: the latest released or closed round (for admins and judges, the first round until one is released). */
+                    roundId?: string;
+                };
+                header?: never;
+                path: {
+                    eventId: string;
+                    teamId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScoreBreakdown"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/events/{eventId}/leaderboard": {
         parameters: {
             query?: never;
@@ -8465,6 +8946,7 @@ export interface paths {
                         name: string;
                         position?: number;
                         phase?: components["schemas"]["RoundPhaseInput"];
+                        kind?: components["schemas"]["RoundKindInput"];
                     };
                 };
             };
@@ -8592,7 +9074,7 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Rename, reorder, or release or close a round */
+        /** Rename, reorder, change the kind of, or release or close a round */
         patch: {
             parameters: {
                 query?: never;
@@ -8609,6 +9091,7 @@ export interface paths {
                         name?: string;
                         position?: number;
                         phase?: components["schemas"]["RoundPhaseInput"];
+                        kind?: components["schemas"]["RoundKindInput"];
                     };
                 };
             };
@@ -8660,6 +9143,135 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/events/{eventId}/rounds/{roundId}/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which teams take part in a round (null: every team) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    roundId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoundTeams"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        /** Set the teams that go on to this round, e.g. after an elimination round (admins). Only they submit, are judged and are ranked here; null or [] admits every team. Participants see it once the round is released. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    roundId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RoundTeamsInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoundTeams"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/events/{eventId}/rounds/{roundId}/criteria/duplicate": {
@@ -10113,7 +10725,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A poll's votes per option, whoever it was for */
+        /** A poll's answers counted: per option for choice polls, per value for the rest (the 20 most given), whoever it was for */
         get: {
             parameters: {
                 query?: never;
@@ -11645,6 +12257,8 @@ export interface components {
                 answers: components["schemas"]["AnswersInput"];
                 /** @description When their personal link was last opened (admins and the leader) */
                 linkLastUsedAt: string | null;
+                /** @description Organisers: whether their current link can be sent again unchanged (send-link). False for links made before 0.22.0: issue a new link once. */
+                linkStored: boolean | null;
             }[];
             payment: {
                 mode: components["schemas"]["PaymentModeInput"];
@@ -11728,6 +12342,14 @@ export interface components {
             /** @description Who confirmed it */
             confirmedBy: string | null;
             memberCount: number;
+            /** @description Active members, the leader included, so lists can be searched */
+            members: {
+                /** Format: uuid */
+                registrationId: string;
+                name: string;
+                email: string;
+                participantCode: string;
+            }[];
             /** @description Members who RSVPed (attending or checked in) */
             attendingCount: number;
             /** @description Staged release: what participants are shown (registered, shortlisted or confirmed) */
@@ -11795,10 +12417,23 @@ export interface components {
             /** Format: date-time */
             sentAt: string;
         };
+        /**
+         * @description choice, dropdown and multi_choice are answered with options; short_text, long_text, number, datetime and rating (1 to scaleMax) with a value.
+         * @enum {string}
+         */
+        PollTypeInput: "choice" | "dropdown" | "multi_choice" | "short_text" | "long_text" | "number" | "datetime" | "rating";
+        PollAnswerInput: {
+            optionId: string | null;
+            optionIds: string[];
+            value: string | number | null;
+        };
         PollInput: {
             /** Format: uuid */
             id: string;
             question: string;
+            type: components["schemas"]["PollTypeInput"];
+            /** @description Rating polls: the top of the scale */
+            scaleMax: number | null;
             audience: components["schemas"]["RoleInput"][];
             closesAt: string | null;
             closed: boolean;
@@ -11820,7 +12455,20 @@ export interface components {
                 votes: number | null;
             }[];
             totalVotes: number | null;
+            /** @description Number and rating polls, when results are shown to you */
+            stats: {
+                count: number;
+                average: number | null;
+                min: number | null;
+                max: number | null;
+                distribution: {
+                    value: number;
+                    count: number;
+                }[] | null;
+            } | null;
+            /** @description Single-choice polls: the option you chose (see myAnswer) */
             myVote: string | null;
+            myAnswer: components["schemas"]["PollAnswerInput"] | null;
             canVote: boolean;
             canManage: boolean;
             /** @description Someone has voted: options can only be added */
@@ -11836,12 +12484,18 @@ export interface components {
          * @enum {string}
          */
         RoundPhaseInput: "draft" | "released" | "closed";
+        /**
+         * @description normal, or elimination: when it ends, the admin picks the teams that go on to a later round (PUT that round's /teams).
+         * @enum {string}
+         */
+        RoundKindInput: "normal" | "elimination";
         RoundInput: {
             /** Format: uuid */
             id: string;
             name: string;
             position: number;
             phase: components["schemas"]["RoundPhaseInput"];
+            kind: components["schemas"]["RoundKindInput"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -11979,8 +12633,10 @@ export interface components {
             /** @description Saves after it are still accepted, and marked late */
             deadline: string | null;
             fields: components["schemas"]["SubmissionFieldInput"][];
-            /** @description Whether your team can still save (round released) */
+            /** @description Whether your team can still save (round released, and your team is in it) */
             open: boolean;
+            /** @description Your team did not go on to this round (after an elimination round) */
+            eliminated: boolean;
             /** @description Your team's entry, if any */
             entry: components["schemas"]["SubmissionEntryInput"] | null;
         };
@@ -12298,6 +12954,54 @@ export interface components {
                     message: string;
                 } | null;
             }[];
+        };
+        PollValueAnswerInput: {
+            value: string | number;
+            /** Format: date-time */
+            respondedAt: string;
+            /** @description Admins and volunteers only */
+            by: string | null;
+        };
+        ScoreBreakdownInput: {
+            round: components["schemas"]["RoundRefInput"];
+            team: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** @description False when it did not go on to this round */
+            inRound: boolean;
+            /** @description Sum over criteria of the average score */
+            total: number;
+            maxTotal: number;
+            criteria: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                maxScore: number;
+                average: number | null;
+            }[];
+            judges: {
+                judge: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                total: number;
+                /** Format: date-time */
+                updatedAt: string;
+                scores: {
+                    /** Format: uuid */
+                    criterionId: string;
+                    /** @description Null: not scored */
+                    value: number | null;
+                    comment: string | null;
+                }[];
+            }[];
+        };
+        RoundTeamsInput: {
+            /** @description The teams in this round; null when every team is */
+            teamIds: string[] | null;
         };
         RegistrationDayInput: {
             /** @description YYYY-MM-DD, IST */
@@ -12708,6 +13412,8 @@ export interface components {
                 answers: components["schemas"]["Answers"];
                 /** @description When their personal link was last opened (admins and the leader) */
                 linkLastUsedAt: string | null;
+                /** @description Organisers: whether their current link can be sent again unchanged (send-link). False for links made before 0.22.0: issue a new link once. */
+                linkStored: boolean | null;
             }[];
             payment: {
                 mode: components["schemas"]["PaymentMode"];
@@ -12791,6 +13497,14 @@ export interface components {
             /** @description Who confirmed it */
             confirmedBy: string | null;
             memberCount: number;
+            /** @description Active members, the leader included, so lists can be searched */
+            members: {
+                /** Format: uuid */
+                registrationId: string;
+                name: string;
+                email: string;
+                participantCode: string;
+            }[];
             /** @description Members who RSVPed (attending or checked in) */
             attendingCount: number;
             /** @description Staged release: what participants are shown (registered, shortlisted or confirmed) */
@@ -12858,10 +13572,23 @@ export interface components {
             /** Format: date-time */
             sentAt: string;
         };
+        /**
+         * @description choice, dropdown and multi_choice are answered with options; short_text, long_text, number, datetime and rating (1 to scaleMax) with a value.
+         * @enum {string}
+         */
+        PollType: "choice" | "dropdown" | "multi_choice" | "short_text" | "long_text" | "number" | "datetime" | "rating";
+        PollAnswer: {
+            optionId: string | null;
+            optionIds: string[];
+            value: string | number | null;
+        };
         Poll: {
             /** Format: uuid */
             id: string;
             question: string;
+            type: components["schemas"]["PollType"];
+            /** @description Rating polls: the top of the scale */
+            scaleMax: number | null;
             audience: components["schemas"]["Role"][];
             closesAt: string | null;
             closed: boolean;
@@ -12883,7 +13610,20 @@ export interface components {
                 votes: number | null;
             }[];
             totalVotes: number | null;
+            /** @description Number and rating polls, when results are shown to you */
+            stats: {
+                count: number;
+                average: number | null;
+                min: number | null;
+                max: number | null;
+                distribution: {
+                    value: number;
+                    count: number;
+                }[] | null;
+            } | null;
+            /** @description Single-choice polls: the option you chose (see myAnswer) */
             myVote: string | null;
+            myAnswer: components["schemas"]["PollAnswer"] | null;
             canVote: boolean;
             canManage: boolean;
             /** @description Someone has voted: options can only be added */
@@ -12899,12 +13639,18 @@ export interface components {
          * @enum {string}
          */
         RoundPhase: "draft" | "released" | "closed";
+        /**
+         * @description normal, or elimination: when it ends, the admin picks the teams that go on to a later round (PUT that round's /teams).
+         * @enum {string}
+         */
+        RoundKind: "normal" | "elimination";
         Round: {
             /** Format: uuid */
             id: string;
             name: string;
             position: number;
             phase: components["schemas"]["RoundPhase"];
+            kind: components["schemas"]["RoundKind"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -13042,8 +13788,10 @@ export interface components {
             /** @description Saves after it are still accepted, and marked late */
             deadline: string | null;
             fields: components["schemas"]["SubmissionField"][];
-            /** @description Whether your team can still save (round released) */
+            /** @description Whether your team can still save (round released, and your team is in it) */
             open: boolean;
+            /** @description Your team did not go on to this round (after an elimination round) */
+            eliminated: boolean;
             /** @description Your team's entry, if any */
             entry: components["schemas"]["SubmissionEntry"] | null;
         };
@@ -13361,6 +14109,54 @@ export interface components {
                     message: string;
                 } | null;
             }[];
+        };
+        PollValueAnswer: {
+            value: string | number;
+            /** Format: date-time */
+            respondedAt: string;
+            /** @description Admins and volunteers only */
+            by: string | null;
+        };
+        ScoreBreakdown: {
+            round: components["schemas"]["RoundRef"];
+            team: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** @description False when it did not go on to this round */
+            inRound: boolean;
+            /** @description Sum over criteria of the average score */
+            total: number;
+            maxTotal: number;
+            criteria: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                maxScore: number;
+                average: number | null;
+            }[];
+            judges: {
+                judge: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+                total: number;
+                /** Format: date-time */
+                updatedAt: string;
+                scores: {
+                    /** Format: uuid */
+                    criterionId: string;
+                    /** @description Null: not scored */
+                    value: number | null;
+                    comment: string | null;
+                }[];
+            }[];
+        };
+        RoundTeams: {
+            /** @description The teams in this round; null when every team is */
+            teamIds: string[] | null;
         };
         RegistrationDay: {
             /** @description YYYY-MM-DD, IST */

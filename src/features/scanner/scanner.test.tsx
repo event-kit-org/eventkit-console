@@ -436,8 +436,9 @@ describe('scan log', () => {
     const log = await screen.findByRole('table', { name: 'Scan log' });
     const rows = within(log).getAllByRole('row');
     expect(rows[0]).toHaveTextContent('TimeParticipant IDNameStatus');
-    expect(rows[1]).toHaveTextContent('9:35:00 amPX-0002RaviDuplicate');
-    expect(rows[2]).toHaveTextContent('9:30:00 amPX-0001AshaAcceptedOffline');
+    // The ID shows in its own column on wide screens and under the name on phones.
+    expect(rows[1]).toHaveTextContent(/^9:35:00 amPX-0002RaviPX-0002Duplicate$/);
+    expect(rows[2]).toHaveTextContent(/^9:30:00 amPX-0001AshaPX-0001AcceptedOffline$/);
   });
 });
 
@@ -479,7 +480,7 @@ describe('offline scanning', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Offline scan mode is on');
     expect(screen.getByLabelText('1 scans waiting to sync')).toBeInTheDocument();
     const log = screen.getByRole('table', { name: 'Scan log' });
-    expect(log).toHaveTextContent('PX-0001AshaAcceptedOffline · not sent');
+    expect(log).toHaveTextContent('PX-0001AshaPX-0001AcceptedOffline · not sent');
   });
 });
 

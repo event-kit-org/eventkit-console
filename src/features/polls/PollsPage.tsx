@@ -9,6 +9,7 @@ import { RolePicker } from '@/components/RolePicker';
 import { audienceText } from '@/lib/audience';
 import { CardsSkeleton, EmptyState } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,15 +24,31 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { useListFilter } from '@/hooks/useListFilter';
 import { formatIST, fromISTInput } from '@/lib/datetime';
+import {
+  hasOptions,
+  isSingleChoice,
+  type Poll,
+  POLL_TYPES,
+  type PollType,
+  typeLabel,
+} from './poll-kinds';
+import { PollAnswerForm } from './PollAnswerForm';
 
-type Poll = Schemas['Poll'];
+const pollText = (p: Poll) => [p.question, typeLabel(p.type), ...p.options.map((o) => o.label)];
 
-/** Polls on anything (food choices included), for any combination of roles. */
+/** Polls on anything (food choices, feedback, ratings…), for any combination of roles. */
 export function PollsPage() {
   const api = useApi();
   const { event, path } = useEventContext();
@@ -39,15 +56,21 @@ export function PollsPage() {
     queryKey: ['event', event.id, 'polls'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/polls', path)),
   });
+  const search = useListFilter(polls.data ?? [], pollText);
 
   return (
     <div className="grid gap-4">
       <CreatePoll />
+      {polls.data && polls.data.length > 0 && (
+        <SearchInput label="Search polls" value={search.query} onChange={search.setQuery} />
+      )}
       <ErrorAlert error={polls.error} />
       {polls.isPending && <CardsSkeleton />}
-      {polls.data?.length === 0 && <EmptyState icon={BarChart3} title="No polls yet." />}
+      {polls.data && search.filtered.length === 0 && (
+        <EmptyState icon={BarChart3} title={search.active ? 'No poll matches.' : 'No polls yet.'} />
+      )}
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        {polls.data?.map((p) => (
+        {search.filtered.map((p) => (
           <PollCard key={p.id} poll={p} />
         ))}
       </div>
@@ -58,11 +81,7 @@ export function PollsPage() {
 function PollCard({ poll }: { poll: Poll }) {
   const api = useApi();
   const { event } = useEventContext();
-  const [option, setOption] = useState('');
   const p = { params: { path: { eventId: event.id, pollId: poll.id } } };
-  const vote = useEventMutation(event.id, (optionId: string) =>
-    unwrap(api.PUT('/v1/events/{eventId}/polls/{pollId}/vote', { ...p, body: { optionId } })),
-  );
   const toggleResults = useEventMutation(event.id, () =>
     unwrap(
       api.PATCH('/v1/events/{eventId}/polls/{pollId}', {
@@ -74,15 +93,13 @@ function PollCard({ poll }: { poll: Poll }) {
   const addOption = useEventMutation(event.id, (label: string) =>
     unwrap(api.POST('/v1/events/{eventId}/polls/{pollId}/options', { ...p, body: { label } })),
   );
-  const showResults = poll.totalVotes !== null;
-  const id = useId();
-  const total = poll.totalVotes ?? 0;
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle>{poll.question}</CardTitle>
+          <CardTitle className="min-w-0 wrap-anywhere">{poll.question}</CardTitle>
+          <Badge variant="outline">{typeLabel(poll.type)}</Badge>
           {poll.closed && <Badge variant="secondary">Closed</Badge>}
           {poll.mealCheckpoints.length > 0 && <Badge variant="secondary">Meal</Badge>}
         </div>
@@ -94,62 +111,8 @@ function PollCard({ poll }: { poll: Poll }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <RadioGroup
-          aria-label={poll.question}
-          value={option || poll.myVote || ''}
-          onValueChange={setOption}
-          disabled={!poll.canVote}
-          className="gap-2"
-        >
-          <ul className="grid gap-2" aria-label="Options">
-            {poll.options.map((o) => (
-              <li
-                key={o.id}
-                className="relative grid gap-1.5 overflow-hidden rounded-lg border px-3 py-2 text-sm"
-              >
-                {showResults && total > 0 && (
-                  <div
-                    className="absolute inset-y-0 left-0 bg-muted"
-                    style={{ width: `${((o.votes ?? 0) / total) * 100}%` }}
-                    aria-hidden
-                  />
-                )}
-                <div className="relative flex items-center gap-2">
-                  {poll.canVote ? (
-                    <>
-                      <RadioGroupItem value={o.id} id={`${id}-${o.id}`} />
-                      <label htmlFor={`${id}-${o.id}`} className="flex-1 cursor-pointer">
-                        {o.label}
-                      </label>
-                    </>
-                  ) : (
-                    <span className="flex-1">
-                      {o.label}
-                      {poll.myVote === o.id && ' (your choice)'}
-                    </span>
-                  )}
-                  {poll.defaultOptionId === o.id && <Badge variant="outline">default</Badge>}
-                  {showResults && <span className="font-medium tabular-nums">{o.votes}</span>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </RadioGroup>
-        {showResults && (
-          <p className="text-xs text-muted-foreground">{poll.totalVotes} votes in total.</p>
-        )}
-        {poll.canVote && (
-          <div>
-            <Button
-              size="sm"
-              disabled={!option || option === poll.myVote || vote.isPending}
-              onClick={() => vote.mutate(option)}
-            >
-              {poll.myVote ? 'Change vote' : 'Vote'}
-            </Button>
-          </div>
-        )}
-        <ErrorAlert error={vote.error ?? toggleResults.error ?? addOption.error} />
+        <PollAnswerForm poll={poll} />
+        <ErrorAlert error={toggleResults.error ?? addOption.error} />
       </CardContent>
       {poll.canManage && (
         <CardFooter className="flex-wrap gap-2 border-t">
@@ -163,7 +126,9 @@ function PollCard({ poll }: { poll: Poll }) {
               ? 'Hide results from the audience'
               : 'Show results to the audience'}
           </Button>
-          <AddOption onAdd={(label) => addOption.mutate(label)} pending={addOption.isPending} />
+          {hasOptions(poll.type) && (
+            <AddOption onAdd={(label) => addOption.mutate(label)} pending={addOption.isPending} />
+          )}
         </CardFooter>
       )}
     </Card>
@@ -174,7 +139,7 @@ function AddOption({ onAdd, pending }: { onAdd: (label: string) => void; pending
   const [label, setLabel] = useState('');
   return (
     <form
-      className="flex flex-1 gap-2"
+      className="flex min-w-0 flex-1 basis-56 gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         onAdd(label.trim());
@@ -199,6 +164,8 @@ function CreatePoll() {
   const { event, path } = useEventContext();
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
+  const [type, setType] = useState<PollType>('choice');
+  const [scaleMax, setScaleMax] = useState('5');
   const [options, setOptions] = useState('');
   const [audience, setAudience] = useState<Schemas['Role'][]>(['participant']);
   const [closesAt, setClosesAt] = useState('');
@@ -215,11 +182,15 @@ function CreatePoll() {
         ...path,
         body: {
           question,
-          options: labels,
+          type,
+          ...(hasOptions(type) ? { options: labels } : {}),
+          ...(type === 'rating' ? { scaleMax: Number(scaleMax) } : {}),
           audience,
           closesAt: closesAt ? fromISTInput(closesAt) : null,
           resultsVisible,
-          ...(defaultIndex === '' ? {} : { defaultOptionIndex: Number(defaultIndex) }),
+          ...(defaultIndex === '' || !isSingleChoice(type)
+            ? {}
+            : { defaultOptionIndex: Number(defaultIndex) }),
         },
       }),
     ),
@@ -242,8 +213,9 @@ function CreatePoll() {
         <CardHeader>
           <CardTitle>New poll</CardTitle>
           <CardDescription>
-            A food poll needs a default option: checked-in people who don&apos;t vote get it. Link
-            it to meal checkpoints on the Checkpoints page.
+            Ask for a choice, a few choices, text, a number, a rating or a date. A food poll is
+            multiple choice or dropdown with a default option: checked-in people who don&apos;t vote
+            get it. Link it to meal checkpoints on the Checkpoints page.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -266,31 +238,67 @@ function CreatePoll() {
               onChange={(e) => setQuestion(e.target.value)}
             />
             <Field>
-              <FieldLabel htmlFor="poll-options">Options, one per line</FieldLabel>
-              <Textarea
-                id="poll-options"
-                rows={4}
-                value={options}
-                onChange={(e) => setOptions(e.target.value)}
-              />
+              <FieldLabel htmlFor="poll-type">Answer type</FieldLabel>
+              <Select value={type} onValueChange={(v) => setType(v as PollType)}>
+                <SelectTrigger id="poll-type" className="w-full sm:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POLL_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="poll-default">Default option</FieldLabel>
-              <NativeSelect
-                id="poll-default"
-                className="w-full"
-                value={defaultIndex}
-                onChange={(e) => setDefaultIndex(e.target.value)}
-              >
-                <NativeSelectOption value="">None</NativeSelectOption>
-                {labels.map((l, i) => (
-                  <NativeSelectOption key={`${l}-${i}`} value={i}>
-                    {l}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-              <FieldDescription>Needed for food polls.</FieldDescription>
-            </Field>
+            {type === 'rating' && (
+              <Field>
+                <FieldLabel htmlFor="poll-scale">Scale</FieldLabel>
+                <Select value={scaleMax} onValueChange={setScaleMax}>
+                  <SelectTrigger id="poll-scale" className="w-full sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 9 }, (_, i) => String(i + 2)).map((n) => (
+                      <SelectItem key={n} value={n}>
+                        1 to {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            {hasOptions(type) && (
+              <Field>
+                <FieldLabel htmlFor="poll-options">Options, one per line</FieldLabel>
+                <Textarea
+                  id="poll-options"
+                  rows={4}
+                  value={options}
+                  onChange={(e) => setOptions(e.target.value)}
+                />
+              </Field>
+            )}
+            {isSingleChoice(type) && (
+              <Field>
+                <FieldLabel htmlFor="poll-default">Default option</FieldLabel>
+                <NativeSelect
+                  id="poll-default"
+                  className="w-full"
+                  value={defaultIndex}
+                  onChange={(e) => setDefaultIndex(e.target.value)}
+                >
+                  <NativeSelectOption value="">None</NativeSelectOption>
+                  {labels.map((l, i) => (
+                    <NativeSelectOption key={`${l}-${i}`} value={i}>
+                      {l}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+                <FieldDescription>Needed for food polls.</FieldDescription>
+              </Field>
+            )}
             <RolePicker value={audience} onChange={setAudience} />
             <FormField
               label="Closes (IST, optional)"
@@ -313,7 +321,10 @@ function CreatePoll() {
               <Button
                 type="submit"
                 disabled={
-                  !question.trim() || labels.length < 2 || audience.length === 0 || create.isPending
+                  !question.trim() ||
+                  (hasOptions(type) && labels.length < 2) ||
+                  audience.length === 0 ||
+                  create.isPending
                 }
               >
                 Create poll

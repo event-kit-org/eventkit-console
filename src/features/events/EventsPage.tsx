@@ -25,10 +25,19 @@ import {
 } from '@/components/ui/empty';
 import { formatDateIST } from '@/lib/datetime';
 import { roleLabel } from './roles';
+import { SearchInput } from '@/components/SearchInput';
+import { useListFilter } from '@/hooks/useListFilter';
+
+const eventText = (e: { event: { name: string; hostedBy: string; venue: string } }) => [
+  e.event.name,
+  e.event.hostedBy,
+  e.event.venue,
+];
 
 export function EventsPage() {
   const api = useApi();
   const events = useQuery({ queryKey: ['events'], queryFn: () => unwrap(api.GET('/v1/events')) });
+  const search = useListFilter(events.data ?? [], eventText);
 
   return (
     <section className="grid gap-6">
@@ -69,8 +78,14 @@ export function EventsPage() {
           </EmptyContent>
         </Empty>
       )}
+      {events.data && events.data.length > 3 && (
+        <SearchInput label="Search events" value={search.query} onChange={search.setQuery} />
+      )}
+      {search.active && search.filtered.length === 0 && (
+        <p className="text-sm text-muted-foreground">No event matches.</p>
+      )}
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {events.data?.map(({ event, role }) => (
+        {search.filtered.map(({ event, role }) => (
           <li key={event.id}>
             <Link
               to={`/events/${event.id}`}

@@ -11,8 +11,24 @@ const R1 = '66666666-6666-4666-8666-666666666661';
 const R2 = '66666666-6666-4666-8666-666666666662';
 const stamp = event.createdAt;
 const rounds: Schemas['Round'][] = [
-  { id: R1, name: 'Round 1', position: 0, phase: 'released', createdAt: stamp, updatedAt: stamp },
-  { id: R2, name: 'Finals', position: 1, phase: 'draft', createdAt: stamp, updatedAt: stamp },
+  {
+    id: R1,
+    name: 'Round 1',
+    position: 0,
+    phase: 'released',
+    kind: 'normal',
+    createdAt: stamp,
+    updatedAt: stamp,
+  },
+  {
+    id: R2,
+    name: 'Finals',
+    position: 1,
+    phase: 'draft',
+    kind: 'normal',
+    createdAt: stamp,
+    updatedAt: stamp,
+  },
 ];
 const f = (over: Partial<Schemas['SubmissionField']>): Schemas['SubmissionField'] => ({
   id: 'q1',

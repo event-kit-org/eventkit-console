@@ -5,13 +5,14 @@ import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { z } from 'zod';
-import { unwrap } from '@/api/client';
+import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { roleLabel } from '@/features/events/roles';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST, fromISTInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { useListFilter } from '@/hooks/useListFilter';
 
 const schema = z
   .object({
@@ -42,6 +44,9 @@ const schema = z
   });
 type Values = z.infer<typeof schema>;
 
+type LinkRow = Schemas['InviteLink'];
+const linkText = (l: LinkRow) => [l.label, l.role, l.url];
+
 export function LinksPage() {
   const api = useApi();
   const { event, path, features } = useEventContext();
@@ -50,6 +55,7 @@ export function LinksPage() {
     queryKey: ['event', event.id, 'links'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/invite-links', path)),
   });
+  const search = useListFilter(links.data ?? [], linkText);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { role: 'participant', label: '', password: '', expiresAt: '' },
@@ -161,9 +167,14 @@ export function LinksPage() {
       </Card>
       <ErrorAlert error={links.error ?? revoke.error} />
       {links.isPending && <RowsSkeleton />}
-      {links.data?.length === 0 && <EmptyState icon={Link2} title="No links yet." />}
+      {links.data && links.data.length > 0 && (
+        <SearchInput label="Search links" value={search.query} onChange={search.setQuery} />
+      )}
+      {links.data && search.filtered.length === 0 && (
+        <EmptyState icon={Link2} title={search.active ? 'No link matches.' : 'No links yet.'} />
+      )}
       <ul className="grid gap-2" aria-label="Your links">
-        {links.data?.map((l) => (
+        {search.filtered.map((l) => (
           <li
             key={l.id}
             className={cn(

@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { EmptyState, TableSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/table';
 import { teamDisplayStatus } from '@/lib/status';
 import { useEventContext } from '@/features/events/event-context';
+import { useListFilter } from '@/hooks/useListFilter';
 import { formatMoney } from '@/lib/money';
 import { useTeams } from './queries';
 import { PendingReleaseBadge, ReleaseControls } from './TeamRelease';
@@ -35,12 +37,21 @@ const FILTERS = [
   ['pending_release', 'Not released yet'],
 ] as const;
 
+type TeamRow = NonNullable<ReturnType<typeof useTeams>['data']>[number];
+
+/** A team is found by its name, or any member's name, email or participant ID. */
+const teamText = (t: TeamRow) => [
+  t.name,
+  ...t.members.flatMap((m) => [m.name, m.email, m.participantCode]),
+];
+
 export function TeamsPage() {
   const { event } = useEventContext();
   const teams = useTeams();
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const list = (teams.data ?? []).filter(
+  const search = useListFilter(teams.data ?? [], teamText);
+  const list = search.filtered.filter(
     (t) =>
       filter === 'all' ||
       t.status === filter ||
@@ -64,12 +75,18 @@ export function TeamsPage() {
   return (
     <div className="grid gap-4">
       <PageHeader title="Teams" description="Every team that registered, newest first.">
+        <SearchInput
+          label="Search teams and members"
+          placeholder="Team, member, email or ID"
+          value={search.query}
+          onChange={search.setQuery}
+        />
         <Label htmlFor="team-filter" className="text-muted-foreground">
           Show
         </Label>
         <NativeSelect
           id="team-filter"
-          className="w-52"
+          className="min-w-0 flex-1 sm:w-52 sm:flex-none"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
@@ -97,7 +114,10 @@ export function TeamsPage() {
       <ErrorAlert error={teams.error} />
       {teams.isPending && <TableSkeleton cols={6} />}
       {teams.data && list.length === 0 ? (
-        <EmptyState icon={UsersRound} title="No teams here yet." />
+        <EmptyState
+          icon={UsersRound}
+          title={search.active ? 'No team or member matches.' : 'No teams here yet.'}
+        />
       ) : (
         list.length > 0 && (
           <div className="overflow-hidden rounded-lg border">
@@ -117,13 +137,13 @@ export function TeamsPage() {
                     </TableHead>
                   )}
                   <TableHead>Team</TableHead>
-                  <TableHead>Leader</TableHead>
+                  <TableHead className="hidden sm:table-cell">Leader</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Members</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Paid</TableHead>
-                  <TableHead>Decided by</TableHead>
-                  <TableHead>
+                  <TableHead className="hidden text-right md:table-cell">Members</TableHead>
+                  <TableHead className="hidden lg:table-cell">Payment</TableHead>
+                  <TableHead className="hidden lg:table-cell">Paid</TableHead>
+                  <TableHead className="hidden xl:table-cell">Decided by</TableHead>
+                  <TableHead className="hidden sm:table-cell">
                     <span className="sr-only">Review</span>
                   </TableHead>
                 </TableRow>
@@ -142,8 +162,8 @@ export function TeamsPage() {
                         )}
                       </TableCell>
                     )}
-                    <TableCell>
-                      <Link className="font-medium hover:underline" to={t.id}>
+                    <TableCell className="whitespace-normal">
+                      <Link className="font-medium wrap-anywhere hover:underline" to={t.id}>
                         {t.name}
                       </Link>
                       {t.belowMinimum && (
@@ -151,10 +171,14 @@ export function TeamsPage() {
                           below minimum
                         </Badge>
                       )}
+                      {/* The leader column is hidden on phones; show who leads here. */}
+                      <div className="text-xs text-muted-foreground sm:hidden">{t.leader.name}</div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden whitespace-normal sm:table-cell">
                       {t.leader.name}
-                      <div className="text-xs text-muted-foreground">{t.leader.email}</div>
+                      <div className="text-xs break-all text-muted-foreground">
+                        {t.leader.email}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
@@ -162,15 +186,19 @@ export function TeamsPage() {
                         {t.pendingRelease && <PendingReleaseBadge />}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{t.memberCount}</TableCell>
-                    <TableCell className="capitalize">{t.latestProofStatus ?? '—'}</TableCell>
-                    <TableCell className="tabular-nums">
+                    <TableCell className="hidden text-right tabular-nums md:table-cell">
+                      {t.memberCount}
+                    </TableCell>
+                    <TableCell className="hidden capitalize lg:table-cell">
+                      {t.latestProofStatus ?? '—'}
+                    </TableCell>
+                    <TableCell className="hidden tabular-nums lg:table-cell">
                       {t.paidAmount === null ? '—' : formatMoney(t.paidAmount, event.currency)}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
                       {t.confirmedBy ?? t.shortlistedBy ?? '—'}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden text-right sm:table-cell">
                       <Button size="icon-sm" variant="outline" asChild>
                         <Link to={t.id} aria-label={`Review ${t.name}`}>
                           <ArrowRight aria-hidden />

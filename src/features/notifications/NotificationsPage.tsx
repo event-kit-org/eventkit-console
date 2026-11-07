@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { BellOff, Plus } from 'lucide-react';
+import { BellOff, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
-import { useApi } from '@/auth/context';
+import { useApi, useAuth } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { Markdown } from '@/components/Markdown';
 import { MarkdownTextarea } from '@/components/MarkdownTextarea';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
+import { SearchInput } from '@/components/SearchInput';
 import { RolePicker } from '@/components/RolePicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { useListFilter } from '@/hooks/useListFilter';
 import { audienceText, ROLES } from '@/lib/audience';
 import { formatIST } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
@@ -129,7 +132,7 @@ export function NotificationsPage() {
               <Skeleton className="h-9 w-full" />
             </div>
           ) : (
-            <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:grid md:flex-1 md:content-start md:overflow-visible md:px-0 md:pb-0">
+            <ul className="relative -mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:grid md:flex-1 md:content-start md:overflow-visible md:px-0 md:pb-0">
               {list.map((c) => (
                 <li key={c.id} className="shrink-0 md:shrink">
                   <button
@@ -180,10 +183,21 @@ export function NotificationsPage() {
   );
 }
 
+type Notification = Schemas['Notification'];
+const notificationText = (n: Notification) => [n.title, n.body, n.sender.name];
+
 /** One channel: its messages, newest first, and (where you may send) the composer. */
 function Messages({ channel }: { channel: Channel }) {
   const api = useApi();
-  const { event } = useEventContext();
+  const { event, role } = useEventContext();
+  const { user } = useAuth();
+  const remove = useEventMutation(event.id, (notificationId: string) =>
+    unwrap(
+      api.DELETE('/v1/events/{eventId}/channels/{channelId}/notifications/{notificationId}', {
+        params: { path: { eventId: event.id, channelId: channel.id, notificationId } },
+      }),
+    ),
+  );
   const messages = useQuery({
     queryKey: ['event', event.id, 'notifications', channel.id],
     queryFn: () =>
@@ -194,28 +208,60 @@ function Messages({ channel }: { channel: Channel }) {
       ),
     refetchInterval: 30_000,
   });
+  const search = useListFilter(messages.data ?? [], notificationText);
   return (
     <>
-      <header className="flex items-center gap-2 border-b px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
         <h2 className="min-w-0 truncate text-base font-semibold">{channel.name}</h2>
+        {messages.data && messages.data.length > 0 && (
+          <SearchInput
+            label={`Search ${channel.name}`}
+            value={search.query}
+            onChange={search.setQuery}
+          />
+        )}
       </header>
       <div className="grid min-h-48 flex-1 content-start gap-3 p-4 md:max-h-[32rem] md:overflow-y-auto">
-        <ErrorAlert error={messages.error} />
+        <ErrorAlert error={messages.error ?? remove.error} />
         {messages.isPending && <RowsSkeleton rows={3} />}
         {messages.data?.length === 0 && <EmptyState icon={BellOff} title="No notifications yet." />}
-        {messages.data?.map((n) => (
-          <article key={n.id} className="grid gap-1 rounded-lg border p-3">
-            <div className="flex items-start justify-between gap-3">
+        {search.active && search.filtered.length === 0 && (
+          <p className="text-sm text-muted-foreground">No notification matches.</p>
+        )}
+        {search.filtered.map((n) => (
+          <article key={n.id} className="grid min-w-0 gap-1 rounded-lg border p-3">
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h3 className="text-sm font-medium">{n.title}</h3>
+                <h3 className="min-w-0 text-sm font-medium wrap-anywhere">{n.title}</h3>
                 {n.priority === 'urgent' && <Badge variant="destructive">Urgent</Badge>}
               </div>
               <time dateTime={n.sentAt} className="shrink-0 text-xs text-muted-foreground">
                 {formatIST(n.sentAt)}
               </time>
             </div>
-            <Markdown className="text-sm">{n.body}</Markdown>
-            <p className="text-xs text-muted-foreground">{n.sender.name}</p>
+            <Markdown className="text-sm wrap-anywhere">{n.body}</Markdown>
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-xs text-muted-foreground">{n.sender.name}</p>
+              {(role === 'admin' || (role === 'volunteer' && n.sender.id === user?.id)) && (
+                <ConfirmButton
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={`Delete "${n.title}"`}
+                  title="Delete this notification?"
+                  description={
+                    n.priority === 'urgent'
+                      ? 'It disappears from everyone’s feed. The push already sent to phones can’t be taken back.'
+                      : 'It disappears from everyone’s feed.'
+                  }
+                  confirmLabel="Delete"
+                  destructive
+                  disabled={remove.isPending}
+                  onConfirm={() => remove.mutate(n.id)}
+                >
+                  <Trash2 aria-hidden />
+                </ConfirmButton>
+              )}
+            </div>
           </article>
         ))}
       </div>
