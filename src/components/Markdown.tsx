@@ -61,7 +61,7 @@ export function Markdown({
   id?: string;
 }) {
   return (
-    <div id={id} className={cn('grid gap-2 break-words', className)}>
+    <div id={id} className={cn('grid gap-2 wrap-anywhere', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={inert ? inertComponents : components}
