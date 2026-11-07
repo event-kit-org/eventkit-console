@@ -6,6 +6,7 @@ import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { Markdown } from '@/components/Markdown';
+import { MarkdownTextarea } from '@/components/MarkdownTextarea';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { RolePicker } from '@/components/RolePicker';
@@ -22,7 +23,6 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { audienceText, ROLES } from '@/lib/audience';
@@ -257,7 +257,12 @@ function Composer({ channel }: { channel: Channel }) {
       <FormField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
       <Field>
         <FieldLabel htmlFor="send-body">Message</FieldLabel>
-        <Textarea id="send-body" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
+        <MarkdownTextarea
+          id="send-body"
+          rows={3}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
       </Field>
       <Field orientation="horizontal">
         <Checkbox id={urgentId} checked={urgent} onCheckedChange={(c) => setUrgent(c === true)} />
