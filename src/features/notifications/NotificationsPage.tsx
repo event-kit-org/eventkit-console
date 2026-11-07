@@ -5,6 +5,7 @@ import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
+import { Markdown } from '@/components/Markdown';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { RolePicker } from '@/components/RolePicker';
@@ -213,7 +214,7 @@ function Messages({ channel }: { channel: Channel }) {
                 {formatIST(n.sentAt)}
               </time>
             </div>
-            <p className="text-sm whitespace-pre-wrap">{n.body}</p>
+            <Markdown className="text-sm">{n.body}</Markdown>
             <p className="text-xs text-muted-foreground">{n.sender.name}</p>
           </article>
         ))}

@@ -66,6 +66,15 @@ describe('notifications', () => {
     expect(screen.queryByRole('form', { name: 'Send a notification' })).not.toBeInTheDocument();
   });
 
+  it('makes links in a notification clickable', async () => {
+    asRole('admin');
+    use([channel({ canSend: false })], [{ ...note, body: 'Repos: https://drive.example/file/1' }]);
+    go();
+    const link = await screen.findByRole('link', { name: 'https://drive.example/file/1' });
+    expect(link).toHaveAttribute('href', 'https://drive.example/file/1');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
   it('lists channels with their audience and switches between them', async () => {
     asRole('admin');
     use([channel({ canSend: false }), judges], [note, judgeNote]);
