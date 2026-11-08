@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -32,6 +32,7 @@ function poll(over: Partial<Schemas['Poll']> = {}): Schemas['Poll'] {
     canManage: false,
     optionsLocked: false,
     mealCheckpoints: [{ id: 'c', name: 'Lunch' }],
+    group: null,
     ...over,
   };
 }
@@ -265,5 +266,72 @@ describe('polls', () => {
     go();
     expect(await screen.findByText('Lunch?')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Close poll' })).not.toBeInTheDocument();
+  });
+
+  it('creates a question set with several questions', async () => {
+    asRole('admin');
+    usePolls([]);
+    const created = capture('post', `${E}/polls/groups`, [], 201);
+    go();
+    await userEvent.click(await screen.findByRole('button', { name: 'New question set' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await userEvent.type(dialog.getByLabelText('Title'), 'Day 1 feedback');
+    await userEvent.type(dialog.getByLabelText('Question 1 text'), 'Best talk?');
+    await userEvent.type(dialog.getByLabelText('Options, one per line'), 'Keynote\nPanel');
+    await userEvent.click(dialog.getByRole('button', { name: 'Add question' }));
+    await userEvent.type(dialog.getByLabelText('Question 2 text'), 'Rate the food');
+    const types = dialog.getAllByRole('combobox', { name: 'Answer type' });
+    await userEvent.click(types[1]!);
+    await userEvent.click(await screen.findByRole('option', { name: 'Rating' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Create set' }));
+    await waitFor(() =>
+      expect(created[0]?.body).toMatchObject({
+        title: 'Day 1 feedback',
+        audience: ['participant'],
+        questions: [
+          { question: 'Best talk?', type: 'choice', options: ['Keynote', 'Panel'] },
+          { question: 'Rate the food', type: 'rating', scaleMax: 5 },
+        ],
+      }),
+    );
+  });
+
+  it('shows a set as one card with its questions in order, managed from the card', async () => {
+    asRole('admin');
+    const group = (position: number) => ({
+      id: 'g1',
+      title: 'Feedback',
+      description: 'Two minutes.',
+      position,
+    });
+    usePolls([
+      poll({
+        id: 'q2',
+        question: 'Second?',
+        type: 'long_text',
+        options: [],
+        group: group(1),
+        canManage: true,
+      }),
+      poll({ id: 'q1', question: 'First?', group: group(0), canManage: true }),
+      poll({ id: 'solo', question: 'Alone?' }),
+    ]);
+    const patched = capture('patch', `${E}/polls/groups/g1`, []);
+    const removed = capture('delete', `${E}/polls/groups/g1`);
+    go();
+    const card = (await screen.findByRole('heading', { name: 'Feedback' })).closest(
+      '[data-slot=card]',
+    )!;
+    const inCard = within(card as HTMLElement);
+    expect(inCard.getByText('2 questions')).toBeInTheDocument();
+    const order = inCard.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(order[0]).toContain('1. First?');
+    expect(order[1]).toContain('2. Second?');
+    expect(screen.getByText('Alone?')).toBeInTheDocument();
+    await userEvent.click(inCard.getByRole('button', { name: 'Show results to the audience' }));
+    await waitFor(() => expect(patched[0]?.body).toEqual({ resultsVisible: true }));
+    await userEvent.click(inCard.getByRole('button', { name: 'Delete set' }));
+    await confirmDialog('Delete set');
+    await waitFor(() => expect(removed).toHaveLength(1));
   });
 });

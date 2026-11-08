@@ -147,4 +147,62 @@ describe('the shared dashboard', () => {
       expect.objectContaining({ kind: 'field', fieldId: FIELD, chart: 'pie' }),
     ]);
   });
+
+  it('charts a checkpoint over the day, or its meals as a pie', async () => {
+    asRole('reviewer', {}, { registration: true, scanning: true });
+    noTeams();
+    sources();
+    const CP = '33333333-3333-4333-8333-333333333333';
+    server.use(
+      http.get(`${E}/insights/dashboard`, () =>
+        HttpResponse.json([
+          { id: 'c1', kind: 'checkpoint', checkpointId: CP, chart: 'bar', title: null },
+          { id: 'c2', kind: 'checkpoint', checkpointId: CP, chart: 'pie', title: 'Meals' },
+        ]),
+      ),
+      http.get(`${E}/insights/checkpoints/${CP}`, () =>
+        HttpResponse.json({
+          checkpointId: CP,
+          name: 'Lunch',
+          type: 'meal',
+          totals: { accepted: 3, duplicate: 1, refused: 1, people: 3 },
+          series: [
+            { at: '2026-10-31T06:30:00.000Z', accepted: 3, duplicate: 0, refused: 0 },
+            { at: '2026-10-31T07:00:00.000Z', accepted: 0, duplicate: 1, refused: 1 },
+          ],
+          meals: [
+            { label: 'Veg', count: 2 },
+            { label: 'Non-veg', count: 1 },
+          ],
+        }),
+      ),
+    );
+    go();
+    expect(await screen.findByRole('heading', { name: 'Lunch' })).toBeInTheDocument();
+    expect(screen.getAllByText('3 accepted (3 people), 1 already scanned, 1 refused')).toHaveLength(
+      2,
+    );
+    expect(screen.getByRole('heading', { name: 'Meals' })).toBeInTheDocument();
+  });
+
+  it('offers checkpoints when adding a chart, if scanning is on', async () => {
+    asRole('admin', {}, { registration: true, scanning: true });
+    noTeams();
+    sources();
+    const CP = '33333333-3333-4333-8333-333333333333';
+    server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([{ id: CP, name: 'Lunch' }])));
+    const save = capture('put', `${E}/insights/dashboard`, []);
+    go();
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit charts' }));
+    const sheet = within(await screen.findByRole('dialog'));
+    await waitFor(() => expect(sheet.getByRole('option', { name: 'Lunch' })).toBeInTheDocument());
+    await userEvent.selectOptions(sheet.getByLabelText('Add a chart of'), `checkpoint:${CP}`);
+    await userEvent.click(sheet.getByRole('button', { name: 'Add' }));
+    await userEvent.click(sheet.getByRole('button', { name: 'Save charts' }));
+    await waitFor(() =>
+      expect(save[0]?.body).toEqual([
+        expect.objectContaining({ kind: 'checkpoint', checkpointId: CP, chart: 'bar' }),
+      ]),
+    );
+  });
 });

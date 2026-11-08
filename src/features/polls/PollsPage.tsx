@@ -46,8 +46,35 @@ import {
   typeLabel,
 } from './poll-kinds';
 import { PollAnswerForm } from './PollAnswerForm';
+import { CreatePollSet, PollSetCard } from './PollSets';
 
-const pollText = (p: Poll) => [p.question, typeLabel(p.type), ...p.options.map((o) => o.label)];
+const pollText = (p: Poll) => [
+  p.question,
+  p.group?.title,
+  typeLabel(p.type),
+  ...p.options.map((o) => o.label),
+];
+
+/** Polls on their own, and sets (all their questions, in order) where any question matched. */
+function listItems(all: Poll[], matched: readonly Poll[]) {
+  const hit = new Set(matched.map((p) => p.id));
+  const sets = new Set(matched.flatMap((p) => (p.group ? [p.group.id] : [])));
+  const seen = new Set<string>();
+  const items: ({ kind: 'poll'; poll: Poll } | { kind: 'set'; id: string; questions: Poll[] })[] =
+    [];
+  for (const p of all) {
+    if (!p.group) {
+      if (hit.has(p.id)) items.push({ kind: 'poll', poll: p });
+    } else if (sets.has(p.group.id) && !seen.has(p.group.id)) {
+      seen.add(p.group.id);
+      const questions = all
+        .filter((q) => q.group?.id === p.group!.id)
+        .sort((a, b) => a.group!.position - b.group!.position);
+      items.push({ kind: 'set', id: p.group.id, questions });
+    }
+  }
+  return items;
+}
 
 /** Polls on anything (food choices, feedback, ratings…), for any combination of roles. */
 export function PollsPage() {
@@ -58,6 +85,7 @@ export function PollsPage() {
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/polls', path)),
   });
   const search = useListFilter(polls.data ?? [], pollText);
+  const items = listItems(polls.data ?? [], search.filtered);
 
   return (
     <div className="grid gap-4">
@@ -67,13 +95,17 @@ export function PollsPage() {
       )}
       <ErrorAlert error={polls.error} />
       {polls.isPending && <CardsSkeleton />}
-      {polls.data && search.filtered.length === 0 && (
+      {polls.data && items.length === 0 && (
         <EmptyState icon={BarChart3} title={search.active ? 'No poll matches.' : 'No polls yet.'} />
       )}
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        {search.filtered.map((p) => (
-          <PollCard key={p.id} poll={p} />
-        ))}
+        {items.map((item) =>
+          item.kind === 'poll' ? (
+            <PollCard key={item.poll.id} poll={item.poll} />
+          ) : (
+            <PollSetCard key={item.id} questions={item.questions} />
+          ),
+        )}
       </div>
     </div>
   );
@@ -230,9 +262,12 @@ function CreatePoll() {
   const header = (
     <PageHeader title="Polls">
       {!open && (
-        <Button onClick={() => setOpen(true)}>
-          <Plus aria-hidden /> New poll
-        </Button>
+        <>
+          <CreatePollSet />
+          <Button onClick={() => setOpen(true)}>
+            <Plus aria-hidden /> New poll
+          </Button>
+        </>
       )}
     </PageHeader>
   );

@@ -26,6 +26,8 @@ import { useEventMutation } from '@/hooks/useEventMutation';
 import { ChartCard, CountsChart, TrendLine } from './Charts';
 import {
   useAttendance,
+  useCheckpointList,
+  useCheckpointStats,
   useDashboard,
   useFieldCounts,
   usePollCounts,
@@ -153,7 +155,70 @@ function PollWidget({
   );
 }
 
+/**
+ * A checkpoint: bars are scans over the day (accepted, and refused or repeated);
+ * a pie is the meals handed over, or accepted against refused.
+ */
+function CheckpointWidget({ widget }: { widget: Widget & { kind: 'checkpoint' } }) {
+  const stats = useCheckpointStats(widget.checkpointId);
+  const d = stats.data;
+  const t = d?.totals;
+  const series = (d?.series ?? []).map((p) => ({
+    at: p.at,
+    accepted: p.accepted,
+    turnedAway: p.duplicate + p.refused,
+  }));
+  const pie =
+    d?.meals ??
+    (t
+      ? [
+          { label: 'Accepted', count: t.accepted },
+          { label: 'Already scanned', count: t.duplicate },
+          { label: 'Refused', count: t.refused },
+        ]
+      : []);
+  return (
+    <ChartCard
+      title={widget.title || d?.name || 'Checkpoint'}
+      description={
+        t &&
+        `${t.accepted} accepted (${t.people} ${t.people === 1 ? 'person' : 'people'}), ${
+          t.duplicate
+        } already scanned, ${t.refused} refused`
+      }
+      loading={stats.isPending}
+      empty={t && t.accepted + t.duplicate + t.refused === 0 && 'No scans here yet.'}
+      table={
+        widget.chart === 'pie'
+          ? {
+              head: [d?.meals ? 'Meal' : 'Result', 'Count'],
+              rows: pie.map((b) => [b.label, b.count]),
+            }
+          : {
+              head: ['Time', 'Accepted', 'Turned away'],
+              rows: series.map((p) => [timeLabel(p.at), p.accepted, p.turnedAway]),
+            }
+      }
+    >
+      {widget.chart === 'pie' ? (
+        <CountsChart buckets={pie} chart="pie" />
+      ) : (
+        <TrendLine
+          data={series}
+          x="at"
+          label={timeLabel}
+          lines={[
+            { key: 'accepted', label: 'Accepted' },
+            { key: 'turnedAway', label: 'Turned away' },
+          ]}
+        />
+      )}
+    </ChartCard>
+  );
+}
+
 export function WidgetCard({ widget }: { widget: Widget }) {
+  if (widget.kind === 'checkpoint') return <CheckpointWidget widget={widget} />;
   return widget.kind === 'field' ? <FieldWidget widget={widget} /> : <PollWidget widget={widget} />;
 }
 
@@ -166,7 +231,7 @@ export function Dashboard() {
     <section className="grid gap-4" aria-labelledby="dashboard-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="dashboard-title" className="text-base font-semibold">
-          Answers and polls
+          Answers, polls and checkpoints
         </h2>
         {role === 'admin' && dashboard.data && <DashboardEditor saved={widgets} />}
       </div>
@@ -174,7 +239,7 @@ export function Dashboard() {
       {dashboard.data && widgets.length === 0 && (
         <p className="text-sm text-muted-foreground">
           {role === 'admin'
-            ? 'Add charts of registration answers or poll votes with Edit charts.'
+            ? 'Add charts of registration answers, poll votes or checkpoint scans with Edit charts.'
             : 'No charts yet. An admin can add some.'}
         </p>
       )}
@@ -197,9 +262,10 @@ const CHARTABLE: Schemas['EventField']['type'][] = [
 
 function DashboardEditor({ saved }: { saved: Widget[] }) {
   const api = useApi();
-  const { event, path } = useEventContext();
+  const { event, path, features } = useEventContext();
   const fields = useFields();
   const polls = usePollList();
+  const checkpoints = useCheckpointList(features.scanning);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Widget[]>(saved);
   const [source, setSource] = useState('');
@@ -209,8 +275,13 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
 
   const fieldName = new Map((fields.data ?? []).map((f) => [f.id, f.label]));
   const pollName = new Map((polls.data ?? []).map((p) => [p.id, p.question]));
+  const checkpointName = new Map((checkpoints.data ?? []).map((c) => [c.id, c.name]));
   const nameOf = (w: Widget) =>
-    w.kind === 'field' ? fieldName.get(w.fieldId) : pollName.get(w.pollId);
+    w.kind === 'field'
+      ? fieldName.get(w.fieldId)
+      : w.kind === 'poll'
+        ? pollName.get(w.pollId)
+        : checkpointName.get(w.checkpointId);
   const update = (i: number, patch: Partial<Widget>) =>
     setDraft((d) => d.map((w, j) => (j === i ? ({ ...w, ...patch } as Widget) : w)));
   const move = (i: number, by: -1 | 1) =>
@@ -220,11 +291,13 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
       return next;
     });
   const add = () => {
-    const [kind, id] = source.split(':') as ['field' | 'poll', string];
+    const [kind, id] = source.split(':') as ['field' | 'poll' | 'checkpoint', string];
     const widget: Widget =
       kind === 'field'
         ? { id: crypto.randomUUID(), kind, fieldId: id, chart: 'bar' }
-        : { id: crypto.randomUUID(), kind, pollId: id, chart: 'pie' };
+        : kind === 'poll'
+          ? { id: crypto.randomUUID(), kind, pollId: id, chart: 'pie' }
+          : { id: crypto.randomUUID(), kind, checkpointId: id, chart: 'bar' };
     setDraft((d) => [...d, widget]);
     setSource('');
   };
@@ -257,7 +330,9 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
               >
-                <NativeSelectOption value="">Choose a question or poll…</NativeSelectOption>
+                <NativeSelectOption value="">
+                  Choose a question, poll or checkpoint…
+                </NativeSelectOption>
                 <NativeSelectOptGroup label="Registration questions">
                   {(fields.data ?? [])
                     .filter((f) => CHARTABLE.includes(f.type))
@@ -274,6 +349,15 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
                     </NativeSelectOption>
                   ))}
                 </NativeSelectOptGroup>
+                {(checkpoints.data ?? []).length > 0 && (
+                  <NativeSelectOptGroup label="Checkpoints">
+                    {(checkpoints.data ?? []).map((c) => (
+                      <NativeSelectOption key={c.id} value={`checkpoint:${c.id}`}>
+                        {c.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelectOptGroup>
+                )}
               </NativeSelect>
               <Button type="button" onClick={add} disabled={!source || draft.length >= 24}>
                 <Plus aria-hidden /> Add
@@ -283,10 +367,10 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
           <ol className="grid gap-3" aria-label="Charts">
             {draft.map((w, i) => (
               <li key={w.id} className="grid gap-2 rounded-lg border p-3">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium wrap-anywhere">
                   {nameOf(w) ?? 'Unknown'}{' '}
                   <span className="font-normal text-muted-foreground">
-                    ({w.kind === 'field' ? 'question' : 'poll'})
+                    ({w.kind === 'field' ? 'question' : w.kind})
                   </span>
                 </p>
                 <Input
@@ -302,8 +386,12 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
                     value={w.chart}
                     onChange={(e) => update(i, { chart: e.target.value as Widget['chart'] })}
                   >
-                    <NativeSelectOption value="bar">Bars</NativeSelectOption>
-                    <NativeSelectOption value="pie">Pie</NativeSelectOption>
+                    <NativeSelectOption value="bar">
+                      {w.kind === 'checkpoint' ? 'Over time' : 'Bars'}
+                    </NativeSelectOption>
+                    <NativeSelectOption value="pie">
+                      {w.kind === 'checkpoint' ? 'Totals (pie)' : 'Pie'}
+                    </NativeSelectOption>
                   </NativeSelect>
                   <Button
                     variant="ghost"

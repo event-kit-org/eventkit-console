@@ -78,3 +78,30 @@ export function usePollList() {
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/polls', path)),
   });
 }
+
+/** A checkpoint's scans per 30-minute slot, totals and meals; live on the event day. */
+export function useCheckpointStats(checkpointId: string) {
+  const api = useApi();
+  const { event } = useEventContext();
+  return useQuery({
+    queryKey: ['event', event.id, 'insights', 'checkpoint', checkpointId],
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/events/{eventId}/insights/checkpoints/{checkpointId}', {
+          params: { path: { eventId: event.id, checkpointId }, query: { bucket: 30 } },
+        }),
+      ),
+    refetchInterval: LIVE,
+  });
+}
+
+/** Every checkpoint, for picking one to chart (scanning on only). */
+export function useCheckpointList(enabled: boolean) {
+  const api = useApi();
+  const { event, path } = useEventContext();
+  return useQuery({
+    queryKey: ['event', event.id, 'checkpoints'],
+    queryFn: () => unwrap(api.GET('/v1/events/{eventId}/checkpoints', path)),
+    enabled,
+  });
+}
