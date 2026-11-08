@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useEventContext } from '@/features/events/event-context';
+import { formatIST } from '@/lib/datetime';
 
 const score = (n: number | null) => (n === null ? '—' : Number.isInteger(n) ? n : n.toFixed(2));
 
@@ -90,7 +91,12 @@ export function ScoreBreakdownSheet({
                   {b.judges.map((j) => (
                     <li key={j.judge.id} className="grid gap-2 rounded-lg border p-3">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="min-w-0 font-medium wrap-anywhere">{j.judge.name}</span>
+                        <div className="grid min-w-0 gap-0.5">
+                          <span className="font-medium wrap-anywhere">{j.judge.name}</span>
+                          <time dateTime={j.updatedAt} className="text-xs text-muted-foreground">
+                            Last saved {formatIST(j.updatedAt)}
+                          </time>
+                        </div>
                         <Badge variant="secondary" className="tabular-nums">
                           {j.total} / {b.maxTotal}
                         </Badge>

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import type { Schemas } from '@/api/client';
+import { formatIST } from '@/lib/datetime';
 import { asRole, capture, confirmDialog, E } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { apiError, event, server } from '@/test/server';
@@ -233,6 +234,7 @@ describe('judging', () => {
     const sheet = await screen.findByRole('dialog', { name: 'Byte Club' });
     expect(await within(sheet).findByText('Meera')).toBeInTheDocument();
     expect(within(sheet).getByText('Clever')).toBeInTheDocument();
+    expect(within(sheet).getByText(`Last saved ${formatIST(stamp)}`)).toBeInTheDocument();
     expect(within(sheet).getByText('12.50 / 15')).toBeInTheDocument();
     expect(within(sheet).getByText('8.50 / 10')).toBeInTheDocument();
   });
