@@ -147,3 +147,15 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+/*
+ * Menus, selects and dialogs (Radix) lock scrolling while open, which hides the
+ * scrollbar. Keep its space reserved instead, and drop Radix's make-up margin,
+ * so nothing (fixed backgrounds and sidebars included) shifts when one opens.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
