@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CircleAlert, Link2, QrCode, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, Ban, CircleAlert, Link2, QrCode, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
@@ -132,6 +132,9 @@ export function TeamDetailPage() {
   }
   if (team.isError) return <ErrorAlert error={team.error} />;
   const t = team.data;
+  // Cancelling the leader cancels the team; restoring them brings it back.
+  const leader = t.members.find((m) => m.isLeader);
+  const teamCancelled = leader?.status === 'cancelled';
 
   return (
     <div className="grid gap-4">
@@ -174,6 +177,28 @@ export function TeamDetailPage() {
             </ConfirmButton>
           )}
           {admin && <EditTeamDialog team={t} questions={teamFields(fields)} />}
+          {leader &&
+            (teamCancelled ? (
+              <Button
+                variant="outline"
+                disabled={regAction.isPending}
+                onClick={() => regAction.mutate({ id: leader.registrationId, action: 'restore' })}
+              >
+                <RotateCcw aria-hidden /> Restore registration
+              </Button>
+            ) : (
+              <ConfirmButton
+                variant="outline"
+                title={`Cancel ${t.name}'s registration?`}
+                description="The whole team is cancelled and its places free up. You can restore it later."
+                confirmLabel="Cancel registration"
+                destructive
+                disabled={regAction.isPending}
+                onConfirm={() => regAction.mutate({ id: leader.registrationId, action: 'cancel' })}
+              >
+                <Ban aria-hidden /> Cancel registration
+              </ConfirmButton>
+            ))}
           {admin && (
             <ConfirmButton
               variant="outline"
@@ -327,7 +352,9 @@ export function TeamDetailPage() {
                       </ConfirmButton>
                     </>
                   )}
-                  {m.status === 'cancelled' ? (
+                  {/* A member cancelled on their own (e.g. removed by the leader) comes back
+                      here; a cancelled team comes back as a whole, from the top. */}
+                  {m.status === 'cancelled' && !teamCancelled && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -335,22 +362,6 @@ export function TeamDetailPage() {
                     >
                       Restore
                     </Button>
-                  ) : (
-                    <ConfirmButton
-                      size="sm"
-                      variant="outline"
-                      title={`Cancel ${m.name}'s registration?`}
-                      description={
-                        m.isLeader
-                          ? 'This is the leader: the whole team will be cancelled.'
-                          : undefined
-                      }
-                      confirmLabel="Cancel registration"
-                      destructive
-                      onConfirm={() => regAction.mutate({ id: m.registrationId, action: 'cancel' })}
-                    >
-                      Cancel
-                    </ConfirmButton>
                   )}
                 </div>
               </li>

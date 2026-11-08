@@ -176,14 +176,29 @@ describe('teams', () => {
     expect(await screen.findByText(/below the minimum of 2/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Confirm team' }));
     await waitFor(() => expect(confirm).toHaveLength(1));
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
-      'the whole team will be cancelled',
-    );
+    // Cancelling is for the whole team, next to Delete team; members have no Cancel.
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel registration' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('The whole team is cancelled');
     await confirmDialog('Cancel registration');
     await waitFor(() => expect(cancel).toHaveLength(1));
+    // Ravi was cancelled on his own, so he comes back on his own.
     await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
     await waitFor(() => expect(restore).toHaveLength(1));
+  });
+
+  it('restores a cancelled team from the top, not member by member', async () => {
+    asRole('admin');
+    const t = registeredTeam('cancelled');
+    server.use(
+      http.get(`${E}/teams/${t.id}`, () => HttpResponse.json({ ...t, status: 'cancelled' })),
+    );
+    const restore = capture('post', `${E}/registrations/r1/restore`);
+    go(`/teams/${t.id}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Restore registration' }));
+    await waitFor(() => expect(restore).toHaveLength(1));
+    expect(screen.queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel registration' })).not.toBeInTheDocument();
   });
 
   it('shortlists in pay-after-shortlist events and shows payments and errors', async () => {
