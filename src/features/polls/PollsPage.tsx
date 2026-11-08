@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, Plus } from 'lucide-react';
+import { BarChart3, Lock, LockOpen, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { RolePicker } from '@/components/RolePicker';
@@ -93,6 +94,10 @@ function PollCard({ poll }: { poll: Poll }) {
   const addOption = useEventMutation(event.id, (label: string) =>
     unwrap(api.POST('/v1/events/{eventId}/polls/{pollId}/options', { ...p, body: { label } })),
   );
+  // Closing sets the closing time to now; reopening clears it.
+  const setClosesAt = useEventMutation(event.id, (closesAt: string | null) =>
+    unwrap(api.PATCH('/v1/events/{eventId}/polls/{pollId}', { ...p, body: { closesAt } })),
+  );
 
   return (
     <Card className="min-w-0">
@@ -105,14 +110,14 @@ function PollCard({ poll }: { poll: Poll }) {
         </div>
         <CardDescription>
           {audienceText(poll.audience)}
-          {poll.closesAt && ` · closes ${formatIST(poll.closesAt)}`}
+          {poll.closesAt && ` · ${poll.closed ? 'closed' : 'closes'} ${formatIST(poll.closesAt)}`}
           {poll.mealCheckpoints.length > 0 &&
             ` · used at ${poll.mealCheckpoints.map((c) => c.name).join(', ')}`}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         <PollAnswerForm poll={poll} />
-        <ErrorAlert error={toggleResults.error ?? addOption.error} />
+        <ErrorAlert error={toggleResults.error ?? addOption.error ?? setClosesAt.error} />
       </CardContent>
       {poll.canManage && (
         <CardFooter className="flex-wrap gap-2 border-t">
@@ -126,6 +131,32 @@ function PollCard({ poll }: { poll: Poll }) {
               ? 'Hide results from the audience'
               : 'Show results to the audience'}
           </Button>
+          {poll.closed ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={setClosesAt.isPending}
+              onClick={() => setClosesAt.mutate(null)}
+            >
+              <LockOpen aria-hidden /> Reopen poll
+            </Button>
+          ) : (
+            <ConfirmButton
+              size="sm"
+              variant="outline"
+              title="Close this poll now?"
+              description={
+                poll.mealCheckpoints.length > 0
+                  ? 'Nobody can vote or change their vote any more. Meal checkpoints keep using it: people who didn’t vote get the default. You can reopen it.'
+                  : 'Nobody can answer or change their answer any more. You can reopen it.'
+              }
+              confirmLabel="Close poll"
+              disabled={setClosesAt.isPending}
+              onConfirm={() => setClosesAt.mutate(new Date().toISOString())}
+            >
+              <Lock aria-hidden /> Close poll
+            </ConfirmButton>
+          )}
           {hasOptions(poll.type) && (
             <AddOption onAdd={(label) => addOption.mutate(label)} pending={addOption.isPending} />
           )}

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import type { Schemas } from '@/api/client';
-import { asRole, capture, E } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { apiError, event, server } from '@/test/server';
 
@@ -238,5 +238,32 @@ describe('polls', () => {
       }),
     );
     expect(created[0]?.body).not.toHaveProperty('options');
+  });
+
+  it('managers close a poll now, and reopen a closed one', async () => {
+    asRole('admin');
+    usePolls([
+      poll({ id: 'p1', canManage: true, closesAt: null }),
+      poll({ id: 'p2', question: 'Venue?', canManage: true, closed: true, canVote: false }),
+    ]);
+    const closed = capture('patch', `${E}/polls/p1`, poll());
+    const reopened = capture('patch', `${E}/polls/p2`, poll());
+    go();
+    await userEvent.click(await screen.findByRole('button', { name: 'Close poll' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('default');
+    await confirmDialog('Close poll');
+    await waitFor(() => expect(closed[0]?.body).toEqual({ closesAt: expect.any(String) }));
+    const at = Date.parse((closed[0]!.body as { closesAt: string }).closesAt);
+    expect(Math.abs(Date.now() - at)).toBeLessThan(60_000);
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen poll' }));
+    await waitFor(() => expect(reopened[0]?.body).toEqual({ closesAt: null }));
+  });
+
+  it('only managers see close and reopen', async () => {
+    asRole('admin');
+    usePolls([poll({ canManage: false })]);
+    go();
+    expect(await screen.findByText('Lunch?')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close poll' })).not.toBeInTheDocument();
   });
 });
