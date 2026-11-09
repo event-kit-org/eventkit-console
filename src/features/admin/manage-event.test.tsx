@@ -2,7 +2,16 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { asRole, capture, confirmDialog, E, member, proof, registeredTeam } from '@/test/fixtures';
+import {
+  asRole,
+  capture,
+  confirmDialog,
+  E,
+  member,
+  proof,
+  registeredTeam,
+  teamOption,
+} from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { event, server } from '@/test/server';
 import { teamsCsv } from './teams-csv';
@@ -21,7 +30,7 @@ describe('deleting a team', () => {
     );
     const removed = capture('delete', `${E}/teams/${t.id}`);
     const { router } = go(`/teams/${t.id}`);
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete team' }));
+    await teamOption('Delete team');
     expect(await screen.findByRole('alertdialog')).toHaveTextContent(
       'deletes the team and its 2 members for good',
     );

@@ -1,4 +1,4 @@
-import { Mail, Pencil, UserPlus } from 'lucide-react';
+import { Link2, Mail, MoreHorizontal, Pencil, QrCode, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
@@ -22,6 +22,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -33,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEventContext } from '@/features/events/event-context';
 import { FieldInputs } from '@/features/fields/FieldInputs';
 import {
@@ -49,13 +53,26 @@ import { formatMoney } from '@/lib/money';
 type Member = Schemas['Team']['members'][number];
 
 /** Correct a member's name or email; optionally resend everyone's links to the leader. */
-export function EditMemberDialog({ member }: { member: Member }) {
+export function EditMemberDialog({
+  member,
+  open: openProp,
+  onOpenChange,
+}: {
+  member: Member;
+  /** Opened from elsewhere (the member menu): no button of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const api = useApi();
   const { event, features } = useEventContext();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (o: boolean) => (controlled ? onOpenChange?.(o) : setOpenState(o));
   const [name, setName] = useState(member.name);
   const [email, setEmail] = useState(member.email ?? '');
-  const [resend, setResend] = useState(false);
+  // The leader's own address was wrong: they never got the links.
+  const [resend, setResend] = useState(member.isLeader);
   const save = useEventMutation(event.id, () =>
     unwrap(
       api.PATCH('/v1/events/{eventId}/registrations/{registrationId}', {
@@ -83,11 +100,13 @@ export function EditMemberDialog({ member }: { member: Member }) {
         }
       }}
     >
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Pencil aria-hidden /> Edit
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline">
+            <Pencil aria-hidden /> Edit
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form
           className="grid gap-4"
@@ -148,12 +167,21 @@ export function EditMemberDialog({ member }: { member: Member }) {
  * Email a member's current link again, unchanged: to them, or to the leader to
  * pass on. Links made before links were kept need one new link first.
  */
-export function SendLinkMenu({
+/**
+ * Admin: one member's actions behind a ⋯ button. Edit, a new link and a new QR
+ * open their dialogs on the page (`onPick`); Resend link emails the current one.
+ */
+export function MemberMenu({
   member,
+  active,
   onSent,
+  onPick,
 }: {
   member: Member;
+  /** Not cancelled: can be edited and sent their link. */
+  active: boolean;
   onSent: (message: string) => void;
+  onPick: (action: 'edit' | 'link' | 'qr') => void;
 }) {
   const api = useApi();
   const { event, features } = useEventContext();
@@ -172,38 +200,80 @@ export function SendLinkMenu({
     });
   const ready = features.mailing && member.linkStored === true;
   return (
-    <DropdownMenu>
+    // Not modal, so the dialog an item opens takes focus cleanly.
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="outline" disabled={send.isPending}>
-          <Mail aria-hidden /> Send link
+        {/* Row action: a quiet icon, so a list of members doesn't repeat a label. */}
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={`Options for ${member.name}`}
+          title={`Options for ${member.name}`}
+          className="text-muted-foreground hover:text-foreground data-[state=open]:bg-accent"
+        >
+          <MoreHorizontal aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-w-72">
-        {!features.mailing ? (
-          <DropdownMenuLabel className="font-normal text-muted-foreground">
-            Turn on mailing for this event to send links.
-          </DropdownMenuLabel>
-        ) : !ready ? (
-          <DropdownMenuLabel className="font-normal text-muted-foreground">
-            This link was made before links were kept, so it can’t be sent again. Give them a new
-            link once.
-          </DropdownMenuLabel>
-        ) : (
+      <DropdownMenuContent align="end" className="min-w-48">
+        {active && (
           <>
-            <DropdownMenuLabel className="font-normal text-muted-foreground">
-              Their current link, unchanged
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => go('member')}>
-              Email to {member.isLeader ? 'them (leader)' : member.name}
+            <DropdownMenuItem onSelect={() => onPick('edit')}>
+              <Pencil aria-hidden /> Edit
             </DropdownMenuItem>
-            {!member.isLeader && (
-              <DropdownMenuItem onSelect={() => go('leader')}>
-                Email to the team leader
-              </DropdownMenuItem>
+            {/* Mail is off for this event: greyed out, with the reason on hover. A disabled
+                item ignores the pointer, so the tooltip hangs on a wrapper. */}
+            {!features.mailing ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <DropdownMenuItem disabled>
+                      <Mail aria-hidden /> Resend link
+                    </DropdownMenuItem>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  Turn on Mailing (Features) to send links.
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={send.isPending}>
+                  <Mail aria-hidden /> Resend link
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-w-72">
+                  {!ready ? (
+                    <DropdownMenuLabel className="font-normal text-muted-foreground">
+                      This link was made before links were kept, so it can’t be sent again. Give
+                      them a new link once.
+                    </DropdownMenuLabel>
+                  ) : (
+                    <>
+                      <DropdownMenuLabel className="font-normal text-muted-foreground">
+                        Their current link, unchanged
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => go('member')}>
+                        Email to {member.isLeader ? 'them (leader)' : member.name}
+                      </DropdownMenuItem>
+                      {!member.isLeader && (
+                        <DropdownMenuItem onSelect={() => go('leader')}>
+                          Email to the team leader
+                        </DropdownMenuItem>
+                      )}
+                    </>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             )}
+            <DropdownMenuSeparator />
           </>
         )}
+        <DropdownMenuItem onSelect={() => onPick('link')}>
+          <Link2 aria-hidden /> New link
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onPick('qr')}>
+          <QrCode aria-hidden /> New QR
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -213,15 +283,23 @@ export function SendLinkMenu({
 export function EditTeamDialog({
   team,
   questions,
+  open: openProp,
+  onOpenChange,
 }: {
   team: Schemas['Team'];
   questions: Question[];
+  /** Opened from elsewhere (the team menu): no button of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const api = useApi();
   const { event } = useEventContext();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (o: boolean) => (controlled ? onOpenChange?.(o) : setOpenState(o));
   const [name, setName] = useState(team.name);
-  const [draft, setDraft] = useState<Draft>({});
+  const [draft, setDraft] = useState<Draft>(() => toDraft(team.answers, questions));
   const leaderNow = team.members.find((m) => m.isLeader)?.registrationId ?? '';
   const [leader, setLeader] = useState(leaderNow);
   const active = team.members.filter((m) => m.status !== 'cancelled');
@@ -251,11 +329,13 @@ export function EditTeamDialog({
         }
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <Pencil aria-hidden /> Edit team
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button variant="outline">
+            <Pencil aria-hidden /> Edit team
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <form
           className="grid gap-4"
@@ -320,13 +400,21 @@ export function EditTeamDialog({
 export function AddMemberDialog({
   team,
   questions,
+  open: openProp,
+  onOpenChange,
 }: {
   team: Schemas['Team'];
   questions: Question[];
+  /** Opened from elsewhere (the team menu): no button of its own. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const api = useApi();
   const { event } = useEventContext();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (o: boolean) => (controlled ? onOpenChange?.(o) : setOpenState(o));
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [draft, setDraft] = useState<Draft>({});
@@ -359,11 +447,13 @@ export function AddMemberDialog({
         }
       }}
     >
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <UserPlus aria-hidden /> Add member
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline">
+            <UserPlus aria-hidden /> Add member
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[90svh] overflow-y-auto">
         {result ? (
           <div className="grid gap-4">

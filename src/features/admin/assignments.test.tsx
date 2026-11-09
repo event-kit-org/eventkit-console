@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { asRole, capture, confirmDialog, E, registeredTeam } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E, filterBy, registeredTeam } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { event, server } from '@/test/server';
 import { randomFill } from './assignments';
@@ -120,29 +120,81 @@ describe('assignments page', () => {
     await userEvent.tab();
     await waitFor(() => expect(type[0]?.body).toEqual({ text: 'T12' }));
 
-    await userEvent.selectOptions(screen.getByLabelText('Show'), PS);
+    await filterBy('Unassigned in Problem statement');
     expect(screen.queryByText('Byte Club')).not.toBeInTheDocument();
     expect(screen.getByText('Null Ptr')).toBeInTheDocument();
   });
 
-  it('adds options with a limit, and releases a list after confirming', async () => {
+  it('lists each list compactly; Edit renames it and adds options; release asks first', async () => {
     asRole('admin');
     serve();
     const add = capture('post', `${E}/assignment-lists/${PS}/options`, lists()[0], 201);
+    const rename = capture('patch', `${E}/assignment-lists/${PS}`, lists()[0]);
     const release = capture('post', `${E}/assignment-lists/${PS}/release`, lists()[0]);
     go('/assignments');
-    const card = (await screen.findByRole('heading', { name: 'Problem statement' })).closest(
-      '[data-slot="card"]',
-    ) as HTMLElement;
-    expect(within(card).getByText('0 / 1 teams')).toBeInTheDocument();
-    await userEvent.type(within(card).getByLabelText('New option'), 'Water ATM');
-    await userEvent.type(within(card).getByLabelText('Limit'), '3');
-    await userEvent.click(within(card).getByRole('button', { name: 'Add' }));
+    const list = await screen.findByRole('list', { name: 'Lists' });
+    const row = within(list).getByText('Problem statement').closest('li') as HTMLElement;
+    expect(row).toHaveTextContent(/Options · \d+ options?/);
+    expect(row).toHaveTextContent('Hidden');
+    // The options are edited in a dialog, not on the page.
+    expect(screen.queryByLabelText('New option')).not.toBeInTheDocument();
+    await userEvent.click(within(row).getByRole('button', { name: 'Edit' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('0 / 1 teams')).toBeInTheDocument();
+    await userEvent.type(dialog.getByLabelText('New option'), 'Water ATM');
+    await userEvent.type(dialog.getByLabelText('Limit'), '3');
+    await userEvent.click(dialog.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(add[0]?.body).toEqual({ title: 'Water ATM', capacity: 3 }));
+    const name = dialog.getByLabelText('Name');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Problem statements');
+    await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(rename[0]?.body).toEqual({ name: 'Problem statements' }));
 
-    await userEvent.click(within(card).getByRole('button', { name: 'Release to participants' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'More for Problem statement' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Release to participants' }));
     await confirmDialog('Release');
     await waitFor(() => expect(release).toHaveLength(1));
+  });
+
+  it('shows at most three lists as columns, picked in the Lists menu', async () => {
+    asRole('admin');
+    const text = (id: string, name: string, position: number) => ({
+      ...lists()[1]!,
+      id,
+      name,
+      position,
+    });
+    serve([...lists(), text('l3', 'Mentor', 2), text('l4', 'Room', 3)]);
+    const { router } = go('/assignments');
+    const table = await screen.findByRole('table');
+    const headers = () =>
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent);
+    // The first three, then the menu swaps one for another.
+    expect(headers()).toEqual(['Team', 'Status', 'Problem statement', 'Table', 'Mentor']);
+    await userEvent.click(screen.getByRole('button', { name: 'Lists shown: 3 of 4' }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'Room' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Table' }));
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Room' }));
+    // The menu stays open to swap several; close it to look at the table.
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(headers()).toEqual(['Team', 'Status', 'Problem statement', 'Mentor', 'Room']),
+    );
+    expect(router.state.location.search).toMatch(/^\?lists=/);
+  });
+
+  it('has no Lists menu with three lists or fewer', async () => {
+    asRole('admin');
+    serve();
+    go('/assignments');
+    await screen.findByRole('table');
+    expect(screen.queryByRole('button', { name: /^Lists shown/ })).not.toBeInTheDocument();
   });
 
   it('fills unassigned teams at random through the bulk endpoint', async () => {

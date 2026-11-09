@@ -1,5 +1,7 @@
 import {
+  ArrowRight,
   CalendarCheck,
+  ChartLine,
   CircleAlert,
   HandCoins,
   Info,
@@ -11,12 +13,13 @@ import {
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { TilesSkeleton } from '@/components/PageState';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEventContext } from '@/features/events/event-context';
 import { formatIST, toISTInput } from '@/lib/datetime';
 import { formatMoney } from '@/lib/money';
-import { AttendanceCard, Dashboard, RegistrationsCard } from './insights/OverviewCharts';
+import { AttendanceCard, RegistrationsCard } from './insights/OverviewCharts';
 import { useRegistrationsByDay } from './insights/queries';
 import { useProofs, useTeams } from './queries';
 
@@ -113,7 +116,7 @@ export function AdminOverview() {
           <AlertDescription>
             <p>
               Registration is switched off, so participants cannot register. Turn it on in{' '}
-              <Link to="settings">Settings</Link>.
+              <Link to="features">Features</Link>.
             </p>
           </AlertDescription>
         </Alert>
@@ -174,7 +177,12 @@ export function AdminOverview() {
         {features.registration && <RegistrationsCard />}
         {features.scanning && eventDayStarted && <AttendanceCard />}
       </div>
-      {features.registration && <Dashboard />}
+      {/* Everything else charted lives on its own page. */}
+      <Button variant="outline" className="w-fit" asChild>
+        <Link to="statistics">
+          <ChartLine aria-hidden /> More charts in Event statistics <ArrowRight aria-hidden />
+        </Link>
+      </Button>
     </div>
   );
 }

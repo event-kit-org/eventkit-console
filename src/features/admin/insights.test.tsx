@@ -6,7 +6,7 @@ import { asRole, capture, E } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { event, server } from '@/test/server';
 
-const go = () => renderApp(`/events/${event.id}`, { token: 'good-token' });
+const go = (sub = '') => renderApp(`/events/${event.id}${sub}`, { token: 'good-token' });
 const FIELD = '11111111-1111-4111-8111-111111111111';
 const POLL = '22222222-2222-4222-8222-222222222222';
 
@@ -81,6 +81,30 @@ describe('overview charts', () => {
 });
 
 describe('the shared dashboard', () => {
+  it('lives on its own page, linked from the overview', async () => {
+    asRole('admin');
+    noTeams();
+    const { router } = go();
+    await userEvent.click(
+      await screen.findByRole('link', { name: /More charts in Event statistics/ }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/\/statistics$/));
+    expect(await screen.findByRole('heading', { name: 'Event statistics' })).toBeInTheDocument();
+    // No charts yet: say what goes here, and offer the way to add them.
+    expect(screen.getByText('No charts yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add charts' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit charts' })).not.toBeInTheDocument();
+    expect(document.title).toBe(`Event statistics · ${event.name} · eventKit`);
+  });
+
+  it('tells reviewers an admin adds the charts', async () => {
+    asRole('reviewer');
+    noTeams();
+    go('/statistics');
+    expect(await screen.findByText(/An admin can add charts/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add charts' })).not.toBeInTheDocument();
+  });
+
   const sources = () =>
     server.use(
       http.get(`${E}/fields`, () =>
@@ -114,7 +138,7 @@ describe('the shared dashboard', () => {
         HttpResponse.json([{ id: 'w1', kind: 'field', fieldId: FIELD, chart: 'bar', title: null }]),
       ),
     );
-    go();
+    go('/statistics');
     expect(await screen.findByText('3 of 4 teams answered')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Track' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit charts' })).not.toBeInTheDocument();
@@ -125,8 +149,8 @@ describe('the shared dashboard', () => {
     noTeams();
     sources();
     const save = capture('put', `${E}/insights/dashboard`, []);
-    go();
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit charts' }));
+    go('/statistics');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add charts' }));
     const sheet = within(await screen.findByRole('dialog'));
     const source = sheet.getByLabelText('Add a chart of');
     await waitFor(() => expect(sheet.getByRole('option', { name: 'Lunch?' })).toBeInTheDocument());
@@ -180,7 +204,7 @@ describe('the shared dashboard', () => {
         }),
       ),
     );
-    go();
+    go('/statistics');
     expect(await screen.findByRole('heading', { name: 'Lunch' })).toBeInTheDocument();
     expect(screen.getAllByText('3 accepted (3 people), 1 already scanned, 1 refused')).toHaveLength(
       2,
@@ -195,8 +219,8 @@ describe('the shared dashboard', () => {
     const CP = '33333333-3333-4333-8333-333333333333';
     server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([{ id: CP, name: 'Lunch' }])));
     const save = capture('put', `${E}/insights/dashboard`, []);
-    go();
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit charts' }));
+    go('/statistics');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add charts' }));
     const sheet = within(await screen.findByRole('dialog'));
     await waitFor(() => expect(sheet.getByRole('option', { name: 'Lunch' })).toBeInTheDocument());
     await userEvent.selectOptions(sheet.getByLabelText('Add a chart of'), `checkpoint:${CP}`);

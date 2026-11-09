@@ -2,7 +2,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { asRole, capture, E, proof, registeredTeam } from '@/test/fixtures';
+import {
+  asRole,
+  capture,
+  E,
+  memberOption,
+  proof,
+  registeredTeam,
+  teamOption,
+} from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { event, server } from '@/test/server';
 
@@ -20,7 +28,7 @@ describe("a member's details", () => {
       emailedTo: 'asha.r@example.com',
     });
     go(`/teams/${t.id}`);
-    await userEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[0]!);
+    await memberOption('Asha', 'Edit');
     const dialog = within(await screen.findByRole('dialog'));
     expect(dialog.getByLabelText('Send the registration email to the leader again')).toBeChecked();
     const email = dialog.getByLabelText('Email');
@@ -43,7 +51,7 @@ describe("a member's details", () => {
       emailedTo: null,
     });
     go(`/teams/${t.id}`);
-    await userEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[1]!);
+    await memberOption('Ravi', 'Edit');
     const dialog = within(await screen.findByRole('dialog'));
     await userEvent.type(dialog.getByLabelText('Name'), ' K');
     await userEvent.click(dialog.getByRole('button', { name: 'Save' }));
@@ -72,7 +80,7 @@ describe('adding a member', () => {
       201,
     );
     go(`/teams/${t.id}`);
-    await userEvent.click(await screen.findByRole('button', { name: 'Add member' }));
+    await teamOption('Add member');
     const dialog = within(await screen.findByRole('dialog'));
     expect(dialog.getByText(/more is due for them/)).toBeInTheDocument();
     await userEvent.type(dialog.getByLabelText('Name'), 'Dev');
@@ -90,8 +98,9 @@ describe('adding a member', () => {
     const t = registeredTeam('confirmed');
     server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
     go(`/teams/${t.id}`);
-    await screen.findAllByRole('button', { name: 'Edit' });
-    expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Team options' }));
+    expect(await screen.findByRole('menuitem', { name: /Edit team/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Add member/ })).not.toBeInTheDocument();
   });
 
   it('lists who is still to be paid for', async () => {
@@ -130,6 +139,8 @@ describe('payments', () => {
       ),
     );
     go('/payments');
+    expect(await screen.findByRole('row', { name: /Byte Club/ })).toHaveTextContent('Dev');
+    await userEvent.click(screen.getByRole('button', { name: 'View receipt from Byte Club' }));
     expect(await screen.findByText(/₹500 for Dev/)).toBeInTheDocument();
   });
 });

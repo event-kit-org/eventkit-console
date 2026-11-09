@@ -137,3 +137,21 @@ export async function confirmDialog(action: string) {
   const dialog = await screen.findByRole('alertdialog');
   await userEvent.click(within(dialog).getByRole('button', { name: action }));
 }
+
+/** Picks `option` from a list's filter button (FilterMenu). */
+export async function filterBy(option: string) {
+  await userEvent.click(screen.getByRole('button', { name: /^Show: / }));
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: option }));
+}
+
+/** Picks `item` from the team page's Options menu (edit, add member, cancel, delete…). */
+export async function teamOption(item: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Team options' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${item}$`) }));
+}
+
+/** Picks `item` from one member's ⋯ menu on the team page. */
+export async function memberOption(member: string, item: string) {
+  await userEvent.click(await screen.findByRole('button', { name: `Options for ${member}` }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${item}$`) }));
+}

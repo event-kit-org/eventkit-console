@@ -144,7 +144,7 @@ describe('settings', () => {
       { id: 'k3', name: 'Portal', key: 'ek_secret' },
       201,
     );
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    renderApp(`/events/${event.id}/portal`, { token: 'good-token' });
     expect(await screen.findByText(/ek_ab…/)).toBeInTheDocument();
     expect(screen.queryByText(/ek_cd…/)).not.toBeInTheDocument();
     const del = capture('delete', `${E}/api-keys/k1`, { id: 'k1' });
@@ -174,7 +174,7 @@ describe('settings', () => {
   it('shows the event ID and API URL, and copies them', async () => {
     const user = userEvent.setup();
     asRole('admin');
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    renderApp(`/events/${event.id}/portal`, { token: 'good-token' });
     expect(await screen.findByText(event.id)).toBeInTheDocument();
     expect(screen.getByText(API)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Copy Event ID' }));
@@ -194,7 +194,7 @@ describe('settings', () => {
       currency: 'INR',
     });
     const toggle = capture('patch', `${E}/features/registration`, features()[1]);
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    renderApp(`/events/${event.id}/features`, { token: 'good-token' });
     expect(await screen.findByRole('switch', { name: 'registration' })).toBeChecked();
     const activate = screen.getAllByRole('button', { name: 'Activate' });
     await userEvent.click(activate[0]!);
@@ -214,7 +214,7 @@ describe('settings', () => {
       ),
     );
     const set = capture('put', `${E}/payment-qr`, { event, role: 'admin' });
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
     expect(await screen.findByRole('img', { name: 'UPI QR code' })).toBeInTheDocument();
     await userEvent.upload(
       screen.getByLabelText('UPI QR image'),
@@ -228,14 +228,17 @@ describe('settings', () => {
 
   it('warns when a paid event has no way to pay, but not once instructions exist', async () => {
     asRole('admin');
-    const { unmount } = renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    const { unmount } = renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
     expect(await screen.findByText(/Teams don't know how to pay yet/)).toBeInTheDocument();
     unmount();
     asRole('admin', { paymentInstructions: 'UPI: club@upi' });
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    const again = renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
     expect(await screen.findByText('Payment instructions file')).toBeInTheDocument();
     expect(screen.queryByText(/Teams don't know how to pay yet/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText('How to pay')).toHaveValue('UPI: club@upi');
+    again.unmount();
+    // The written instructions are part of the event's details, on Settings.
+    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    expect(await screen.findByLabelText('How to pay')).toHaveValue('UPI: club@upi');
   });
 
   it('uploads, shows and removes the payment instructions file', async () => {
@@ -247,7 +250,7 @@ describe('settings', () => {
     );
     const set = capture('put', `${E}/payment-instructions-file`, { event, role: 'admin' });
     const removed = capture('delete', `${E}/payment-instructions-file`, { event, role: 'admin' });
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
     expect(await screen.findByRole('link', { name: 'View the current file' })).toHaveAttribute(
       'href',
       'https://storage.test/pay.pdf?signed=1',

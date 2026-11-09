@@ -1,10 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import { Download, Eye, EyeOff, MoreHorizontal, Plus, Shuffle, Trash2 } from 'lucide-react';
+import {
+  Columns3,
+  Download,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Shuffle,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmButton, ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { FilterMenu } from '@/components/FilterMenu';
 import { SearchInput } from '@/components/SearchInput';
 import { PageHeader } from '@/components/PageHeader';
 import { CardsSkeleton } from '@/components/PageState';
@@ -21,14 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -40,8 +44,10 @@ import {
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -55,7 +61,6 @@ import {
 } from '@/components/ui/empty';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
@@ -75,6 +80,7 @@ import {
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { useListFilter } from '@/hooks/useListFilter';
+import { useSearchParam } from '@/hooks/useSearchParam';
 import { teamDisplayStatus } from '@/lib/status';
 import { fillLabel, randomFill } from './assignments';
 import { useTeams } from './queries';
@@ -140,11 +146,22 @@ export function AssignmentsPage() {
         </Empty>
       ) : (
         <>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {all.map((l) => (
-              <ListCard key={l.id} list={l} teams={active} />
-            ))}
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle as="h3">Lists</CardTitle>
+              <CardDescription>
+                What teams get. Edit a list to change its options; release it when teams should see
+                it.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y" aria-label="Lists">
+                {all.map((l) => (
+                  <ListRow key={l.id} list={l} teams={active} />
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
           <AssignmentGrid lists={all} teams={active} />
         </>
       )}
@@ -229,10 +246,12 @@ function NewListDialog() {
   );
 }
 
-function ListCard({ list, teams }: { list: List; teams: Team[] }) {
+/** One list as a compact row: what it is, how far along, and its actions behind ⋯. */
+function ListRow({ list, teams }: { list: List; teams: Team[] }) {
   const api = useApi();
   const { event } = useEventContext();
   const p = { params: { path: { eventId: event.id, listId: list.id } } };
+  const [dialog, setDialog] = useState<'edit' | 'release' | 'delete' | null>(null);
   // The random fill being confirmed: worked out once, when the dialog opens.
   const [plan, setPlan] = useState<ReturnType<typeof randomFill> | null>(null);
   const release = useEventMutation(event.id, (show: boolean) =>
@@ -255,64 +274,88 @@ function ListCard({ list, teams }: { list: List; teams: Team[] }) {
     ),
   );
   const released = list.releasedAt !== null;
+  const options = list.options.length;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle as="h3">{list.name}</CardTitle>
-        <CardDescription>
-          {list.kind === 'options' ? 'Options' : 'Typed values'} · {list.assignedTeams} of{' '}
-          {teams.length} teams assigned
-        </CardDescription>
-        <CardAction className="flex items-center gap-1">
-          <Badge variant={released ? 'default' : 'secondary'}>
-            {released ? 'Released' : 'Hidden'}
-          </Badge>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={`More for ${list.name}`}>
-                <MoreHorizontal aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {list.kind === 'options' && (
-                <DropdownMenuItem
-                  disabled={unassigned.length === 0 || list.options.length === 0}
-                  onSelect={() => setPlan(randomFill(unassigned, list.options))}
-                >
-                  <Shuffle aria-hidden /> Random fill
-                </DropdownMenuItem>
-              )}
-              {released && (
-                <DropdownMenuItem onSelect={() => release.mutate(false)}>
-                  <EyeOff aria-hidden /> Hide from participants
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => remove.mutate(undefined)}>
-                <Trash2 aria-hidden /> Delete list
+    <li className="grid gap-2 py-3 first:pt-0 last:pb-0">
+      <div className="flex items-center gap-3">
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium wrap-anywhere">{list.name}</span>
+            <Badge variant={released ? 'default' : 'secondary'}>
+              {released ? 'Released' : 'Hidden'}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {list.kind === 'options'
+              ? `Options · ${options} ${options === 1 ? 'option' : 'options'}`
+              : 'Typed values'}{' '}
+            · {list.assignedTeams} of {teams.length} teams assigned
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setDialog('edit')}>
+          <Pencil aria-hidden /> Edit
+        </Button>
+        {/* Not modal, so the dialog an item opens takes focus cleanly. */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`More for ${list.name}`}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <MoreHorizontal aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-52">
+            {released ? (
+              <DropdownMenuItem onSelect={() => release.mutate(false)}>
+                <EyeOff aria-hidden /> Hide from participants
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        {list.kind === 'options' && <OptionsTable list={list} />}
-        <ErrorAlert error={release.error ?? remove.error ?? fill.error} />
-        {!released && (
-          <ConfirmButton
-            variant="outline"
-            className="w-fit"
-            title={`Release ${list.name}?`}
-            description="Every team sees its value on its team page at once. You can hide it again."
-            confirmLabel="Release"
-            onConfirm={() => release.mutate(true)}
-            disabled={release.isPending}
-          >
-            <Eye aria-hidden /> Release to participants
-          </ConfirmButton>
-        )}
-      </CardContent>
+            ) : (
+              <DropdownMenuItem onSelect={() => setDialog('release')}>
+                <Eye aria-hidden /> Release to participants
+              </DropdownMenuItem>
+            )}
+            {list.kind === 'options' && (
+              <DropdownMenuItem
+                disabled={unassigned.length === 0 || options === 0}
+                onSelect={() => setPlan(randomFill(unassigned, list.options))}
+              >
+                <Shuffle aria-hidden /> Random fill
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => setDialog('delete')}>
+              <Trash2 aria-hidden /> Delete list
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <ErrorAlert error={release.error ?? remove.error ?? fill.error} />
+      {dialog === 'edit' && <EditListDialog list={list} onClose={() => setDialog(null)} />}
+      <ConfirmDialog
+        open={dialog === 'release'}
+        onOpenChange={(o) => !o && setDialog(null)}
+        title={`Release ${list.name}?`}
+        description="Every team sees its value on its team page at once. You can hide it again."
+        confirmLabel="Release"
+        confirmDisabled={release.isPending}
+        onConfirm={() => release.mutate(true)}
+      />
+      <ConfirmDialog
+        open={dialog === 'delete'}
+        onOpenChange={(o) => !o && setDialog(null)}
+        title={`Delete ${list.name}?`}
+        description={`Every team's value on it goes too${
+          list.assignedTeams > 0 ? ` (${list.assignedTeams} assigned)` : ''
+        }. This can't be undone.`}
+        confirmLabel="Delete list"
+        destructive
+        confirmDisabled={remove.isPending}
+        onConfirm={() => remove.mutate(undefined)}
+      />
       <AlertDialog open={plan !== null} onOpenChange={(o) => !o && setPlan(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -330,7 +373,62 @@ function ListCard({ list, teams }: { list: List; teams: Team[] }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </li>
+  );
+}
+
+/** Rename a list and, for options, edit what teams can get. Changes save as you make them. */
+function EditListDialog({ list, onClose }: { list: List; onClose: () => void }) {
+  const api = useApi();
+  const { event } = useEventContext();
+  const [name, setName] = useState(list.name);
+  const rename = useEventMutation(event.id, (next: string) =>
+    unwrap(
+      api.PATCH('/v1/events/{eventId}/assignment-lists/{listId}', {
+        params: { path: { eventId: event.id, listId: list.id } },
+        body: { name: next },
+      }),
+    ),
+  );
+  const saveName = () => {
+    const next = name.trim();
+    if (next && next !== list.name) rename.mutate(next);
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit {list.name}</DialogTitle>
+          <DialogDescription>
+            {list.kind === 'options'
+              ? 'Changes save as you make them. Teams pick up a changed option at once.'
+              : 'Typed values are filled in per team, in the table below the lists.'}
+          </DialogDescription>
+        </DialogHeader>
+        <Field>
+          <FieldLabel htmlFor={`list-name-${list.id}`}>Name</FieldLabel>
+          <Input
+            id={`list-name-${list.id}`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => e.key === 'Enter' && saveName()}
+          />
+        </Field>
+        <ErrorAlert error={rename.error} />
+        {list.kind === 'options' && <OptionsTable list={list} />}
+        <DialogFooter>
+          <Button
+            onClick={() => {
+              saveName();
+              onClose();
+            }}
+          >
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -493,44 +591,94 @@ const teamText = (t: Team) => [
   ...Object.values(t.assignments).map((a) => a.label),
 ];
 
+/** How many lists the team table shows side by side; more and the columns squeeze. */
+const MAX_COLUMNS = 3;
+
 function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
   const [filter, setFilter] = useState('');
   const search = useListFilter(teams, teamText);
+  // At most three lists as columns, so the table never squeezes; which ones is
+  // picked in the Lists menu and kept in the address. Default: the first three.
+  const [shownParam, setShown] = useSearchParam('lists');
+  const picked = shownParam.split(',').filter((id) => lists.some((l) => l.id === id));
+  const columns = (picked.length > 0 ? lists.filter((l) => picked.includes(l.id)) : lists).slice(
+    0,
+    MAX_COLUMNS,
+  );
+  const shownIds = new Set(columns.map((l) => l.id));
+  const toggleColumn = (id: string, show: boolean) => {
+    const next = new Set(shownIds);
+    if (show) next.add(id);
+    else next.delete(id);
+    setShown([...next].join(','));
+  };
   const shown = filter ? search.filtered.filter((t) => !t.assignments[filter]) : search.filtered;
   return (
     <Card>
       <CardHeader>
         <CardTitle as="h3">Teams</CardTitle>
         <CardDescription>Changes save as you make them.</CardDescription>
-        <CardAction>
-          <Field orientation="horizontal">
-            <FieldLabel htmlFor="assign-filter" className="sr-only">
-              Show
-            </FieldLabel>
-            <NativeSelect
-              id="assign-filter"
-              size="sm"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            >
-              <NativeSelectOption value="">All teams</NativeSelectOption>
-              {lists.map((l) => (
-                <NativeSelectOption key={l.id} value={l.id}>
-                  Unassigned in {l.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
-        </CardAction>
       </CardHeader>
       <CardContent className="grid gap-3">
         {teams.length > 0 && (
-          <SearchInput
-            label="Search teams"
-            placeholder="Team, member or value"
-            value={search.query}
-            onChange={search.setQuery}
-          />
+          <div className="flex min-w-0 items-center gap-2">
+            <SearchInput
+              label="Search teams"
+              placeholder="Team, member or value"
+              className="min-w-0 flex-1 sm:w-72 sm:flex-none"
+              value={search.query}
+              onChange={search.setQuery}
+            />
+            <FilterMenu
+              label="Show"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                ['', 'All teams'],
+                ...lists.map((l) => [l.id, `Unassigned in ${l.name}`] as const),
+              ]}
+              fallback=""
+            />
+            {lists.length > MAX_COLUMNS && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="shrink-0"
+                    aria-label={`Lists shown: ${columns.length} of ${lists.length}`}
+                  >
+                    <Columns3 aria-hidden />
+                    {/* Icon only while the toolbar is tight; the count reads out regardless. */}
+                    <span className="hidden lg:inline">
+                      {columns.length} of {lists.length} lists
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-52">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Lists in the table (up to {MAX_COLUMNS})
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {lists.map((l) => {
+                    const on = shownIds.has(l.id);
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={l.id}
+                        checked={on}
+                        // Three shown: untick one to pick another. One is always shown.
+                        disabled={on ? columns.length === 1 : columns.length >= MAX_COLUMNS}
+                        // Keep the menu open to swap several.
+                        onSelect={(e) => e.preventDefault()}
+                        onCheckedChange={(c) => toggleColumn(l.id, c === true)}
+                      >
+                        {l.name}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         )}
         {shown.length === 0 ? (
           <Empty>
@@ -550,7 +698,7 @@ function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
               <TableRow>
                 <TableHead className="sticky left-0 z-10 bg-card">Team</TableHead>
                 <TableHead className="hidden md:table-cell">Status</TableHead>
-                {lists.map((l) => (
+                {columns.map((l) => (
                   <TableHead key={l.id} className="min-w-44">
                     {l.name}
                   </TableHead>
@@ -566,7 +714,7 @@ function AssignmentGrid({ lists, teams }: { lists: List[]; teams: Team[] }) {
                   <TableCell className="hidden md:table-cell">
                     <StatusBadge status={teamDisplayStatus(t)} />
                   </TableCell>
-                  {lists.map((l) => (
+                  {columns.map((l) => (
                     <TableCell key={l.id}>
                       <AssignCell list={l} team={t} />
                     </TableCell>

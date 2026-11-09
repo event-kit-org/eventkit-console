@@ -1,11 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Ban, CircleAlert, Link2, QrCode, RotateCcw, Send, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  CircleAlert,
+  Link2,
+  MoreHorizontal,
+  Pencil,
+  RotateCcw,
+  Send,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmButton, ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { CardsSkeleton } from '@/components/PageState';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,13 +25,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -37,16 +48,16 @@ import { teamDisplayStatus } from '@/lib/status';
 import { formatMoney } from '@/lib/money';
 import { useReleaseTeams } from './release';
 import { PendingReleaseBadge } from './TeamRelease';
-import {
-  AddMemberDialog,
-  EditMemberDialog,
-  EditTeamDialog,
-  SendLinkMenu,
-} from './TeamMemberDialogs';
+import { AddMemberDialog, EditMemberDialog, EditTeamDialog, MemberMenu } from './TeamMemberDialogs';
 
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
   const { state } = useLocation();
+  const [dialog, setDialog] = useState<'edit' | 'add' | 'cancel' | 'delete' | null>(null);
+  const [memberDialog, setMemberDialog] = useState<{
+    member: Schemas['Team']['members'][number];
+    kind: 'edit' | 'link' | 'qr';
+  } | null>(null);
   const api = useApi();
   const { event, role, features } = useEventContext();
   // Reviewers shortlist, confirm and cancel; links, QR codes, receipts and deleting are for admins.
@@ -141,6 +152,11 @@ export function TeamDetailPage() {
   const leader = t.members.find((m) => m.isLeader);
   const teamCancelled = leader?.status === 'cancelled';
 
+  // Room left in the team, and the team still in: admins can add someone.
+  const canAddMember =
+    admin &&
+    t.status !== 'cancelled' &&
+    t.members.filter((m) => m.status !== 'cancelled').length < event.maxTeamSize;
   return (
     <div className="grid gap-4">
       <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
@@ -182,44 +198,101 @@ export function TeamDetailPage() {
               <Send aria-hidden /> Release decision
             </ConfirmButton>
           )}
-          {admin && <EditTeamDialog team={t} questions={teamFields(fields)} />}
-          {leader &&
-            (teamCancelled ? (
-              <Button
-                variant="outline"
-                disabled={regAction.isPending}
-                onClick={() => regAction.mutate({ id: leader.registrationId, action: 'restore' })}
-              >
-                <RotateCcw aria-hidden /> Restore registration
-              </Button>
-            ) : (
-              <ConfirmButton
-                variant="outline"
-                title={`Cancel ${t.name}'s registration?`}
-                description="The whole team is cancelled and its places free up. You can restore it later."
-                confirmLabel="Cancel registration"
-                destructive
-                disabled={regAction.isPending}
-                onConfirm={() => regAction.mutate({ id: leader.registrationId, action: 'cancel' })}
-              >
-                <Ban aria-hidden /> Cancel registration
-              </ConfirmButton>
-            ))}
-          {admin && (
-            <ConfirmButton
-              variant="outline"
-              title={`Delete ${t.name}?`}
-              description={`This deletes the team and its ${t.members.length} ${
-                t.members.length === 1 ? 'member' : 'members'
-              } for good: registrations, check-ins, votes, receipts and scores. Their places free up. This can't be undone; to keep a record, cancel the team instead.`}
-              confirmLabel="Delete team"
-              destructive
-              disabled={remove.isPending}
-              onConfirm={() => remove.mutate()}
-            >
-              <Trash2 aria-hidden /> Delete team
-            </ConfirmButton>
+          {(admin || leader) && (
+            // Edit, cancel and delete are less common than the steps above: tucked in a menu.
+            // Not modal, so the dialog an item opens takes focus cleanly.
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" aria-label="Team options">
+                  <MoreHorizontal aria-hidden /> Options
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-52">
+                {admin && (
+                  <DropdownMenuItem onSelect={() => setDialog('edit')}>
+                    <Pencil aria-hidden /> Edit team
+                  </DropdownMenuItem>
+                )}
+                {canAddMember && (
+                  <DropdownMenuItem onSelect={() => setDialog('add')}>
+                    <UserPlus aria-hidden /> Add member
+                  </DropdownMenuItem>
+                )}
+                {leader &&
+                  (teamCancelled ? (
+                    <DropdownMenuItem
+                      disabled={regAction.isPending}
+                      onSelect={() =>
+                        regAction.mutate({ id: leader.registrationId, action: 'restore' })
+                      }
+                    >
+                      <RotateCcw aria-hidden /> Restore registration
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      // Yellow: it can be undone, unlike Delete.
+                      className="text-amber-600 *:[svg]:text-amber-600 focus:bg-amber-500/10 focus:text-amber-600 focus:**:text-amber-600 dark:text-amber-400 dark:*:[svg]:text-amber-400 dark:focus:text-amber-400 dark:focus:**:text-amber-400"
+                      disabled={regAction.isPending}
+                      onSelect={() => setDialog('cancel')}
+                    >
+                      <Ban aria-hidden /> Cancel registration
+                    </DropdownMenuItem>
+                  ))}
+                {admin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={remove.isPending}
+                      onSelect={() => setDialog('delete')}
+                    >
+                      <Trash2 aria-hidden /> Delete team
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
+          {dialog === 'add' && (
+            <AddMemberDialog
+              team={t}
+              questions={memberFields(fields)}
+              open
+              onOpenChange={(o) => !o && setDialog(null)}
+            />
+          )}
+          {dialog === 'edit' && (
+            <EditTeamDialog
+              team={t}
+              questions={teamFields(fields)}
+              open
+              onOpenChange={(o) => !o && setDialog(null)}
+            />
+          )}
+          {leader && (
+            <ConfirmDialog
+              open={dialog === 'cancel'}
+              onOpenChange={(o) => !o && setDialog(null)}
+              title={`Cancel ${t.name}'s registration?`}
+              description="The whole team is cancelled and its places free up. You can restore it later."
+              confirmLabel="Cancel registration"
+              destructive
+              confirmDisabled={regAction.isPending}
+              onConfirm={() => regAction.mutate({ id: leader.registrationId, action: 'cancel' })}
+            />
+          )}
+          <ConfirmDialog
+            open={dialog === 'delete'}
+            onOpenChange={(o) => !o && setDialog(null)}
+            title={`Delete ${t.name}?`}
+            description={`This deletes the team and its ${t.members.length} ${
+              t.members.length === 1 ? 'member' : 'members'
+            } for good: registrations, check-ins, votes, receipts and scores. Their places free up. This can't be undone; to keep a record, cancel the team instead.`}
+            confirmLabel="Delete team"
+            destructive
+            confirmDisabled={remove.isPending}
+            onConfirm={() => remove.mutate()}
+          />
         </div>
       </div>
       <Decisions team={t} />
@@ -247,17 +320,12 @@ export function TeamDetailPage() {
       />
       <Card>
         <CardHeader>
-          <CardTitle>Members</CardTitle>
-          <CardDescription>
-            {t.members.length} {t.members.length === 1 ? 'person' : 'people'}
-          </CardDescription>
-          {admin &&
-            t.status !== 'cancelled' &&
-            t.members.filter((m) => m.status !== 'cancelled').length < event.maxTeamSize && (
-              <CardAction>
-                <AddMemberDialog team={t} questions={memberFields(fields)} />
-              </CardAction>
-            )}
+          <CardTitle className="flex flex-wrap items-baseline gap-x-2">
+            Members
+            <span className="text-sm font-normal text-muted-foreground">
+              {t.members.length} {t.members.length === 1 ? 'person' : 'people'}
+            </span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
           {sentNote && (
@@ -280,11 +348,56 @@ export function TeamDetailPage() {
               </AlertDescription>
             </Alert>
           )}
+          {memberDialog?.kind === 'edit' && (
+            <EditMemberDialog
+              member={memberDialog.member}
+              open
+              onOpenChange={(o) => !o && setMemberDialog(null)}
+            />
+          )}
+          {memberDialog && memberDialog.kind !== 'edit' && (
+            <ConfirmDialog
+              open
+              onOpenChange={(o) => !o && setMemberDialog(null)}
+              {...(memberDialog.kind === 'link'
+                ? {
+                    title: `Give ${memberDialog.member.name} a new personal link?`,
+                    description: 'Their current link stops working.',
+                    confirmLabel: 'New link',
+                    body: features.mailing && (
+                      <Field orientation="horizontal">
+                        <Checkbox
+                          id="email-leader-new-link"
+                          checked={emailLeader}
+                          onCheckedChange={(c) => setEmailLeader(c === true)}
+                        />
+                        <FieldLabel htmlFor="email-leader-new-link" className="font-normal">
+                          Email it to the team leader to pass on
+                        </FieldLabel>
+                      </Field>
+                    ),
+                    onConfirm: () => {
+                      const m = memberDialog.member;
+                      reissue.mutate(
+                        { id: m.registrationId, emailLeader: features.mailing && emailLeader },
+                        { onSuccess: (link) => setNewLink({ name: m.name, ...link }) },
+                      );
+                    },
+                  }
+                : {
+                    title: `Give ${memberDialog.member.name} a new QR code?`,
+                    description: 'The old one stops scanning.',
+                    confirmLabel: 'New QR',
+                    onConfirm: () => rotateQr.mutate(memberDialog.member.registrationId),
+                  })}
+            />
+          )}
           <ul className="divide-y">
             {t.members.map((m) => (
               <li
                 key={m.registrationId}
-                className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                // The ⋯ stays top right, even on phones.
+                className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
               >
                 <div className="grid min-w-0 gap-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -308,56 +421,14 @@ export function TeamDetailPage() {
                   </div>
                   <AnswerList fields={memberFields(fields)} answers={m.answers} />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {admin && m.status !== 'cancelled' && <EditMemberDialog member={m} />}
-                  {admin && m.status !== 'cancelled' && (
-                    <SendLinkMenu member={m} onSent={setSentNote} />
-                  )}
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   {admin && (
-                    <>
-                      <ConfirmButton
-                        size="sm"
-                        variant="outline"
-                        title={`Give ${m.name} a new personal link?`}
-                        description="Their current link stops working."
-                        body={
-                          features.mailing && (
-                            <Field orientation="horizontal">
-                              <Checkbox
-                                id={`email-leader-${m.registrationId}`}
-                                checked={emailLeader}
-                                onCheckedChange={(c) => setEmailLeader(c === true)}
-                              />
-                              <FieldLabel
-                                htmlFor={`email-leader-${m.registrationId}`}
-                                className="font-normal"
-                              >
-                                Email it to the team leader to pass on
-                              </FieldLabel>
-                            </Field>
-                          )
-                        }
-                        confirmLabel="New link"
-                        onConfirm={() =>
-                          reissue.mutate(
-                            { id: m.registrationId, emailLeader: features.mailing && emailLeader },
-                            { onSuccess: (link) => setNewLink({ name: m.name, ...link }) },
-                          )
-                        }
-                      >
-                        <Link2 aria-hidden /> New link
-                      </ConfirmButton>
-                      <ConfirmButton
-                        size="sm"
-                        variant="outline"
-                        title={`Give ${m.name} a new QR code?`}
-                        description="The old one stops scanning."
-                        confirmLabel="New QR"
-                        onConfirm={() => rotateQr.mutate(m.registrationId)}
-                      >
-                        <QrCode aria-hidden /> New QR
-                      </ConfirmButton>
-                    </>
+                    <MemberMenu
+                      member={m}
+                      active={m.status !== 'cancelled'}
+                      onSent={setSentNote}
+                      onPick={(kind) => setMemberDialog({ member: m, kind })}
+                    />
                   )}
                   {/* A member cancelled on their own (e.g. removed by the leader) comes back
                       here; a cancelled team comes back as a whole, from the top. */}

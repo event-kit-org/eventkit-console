@@ -3,10 +3,14 @@ import { RequireAuth } from '@/auth/RequireAuth';
 import { AppShell } from '@/components/AppShell';
 import { CheckpointsPage } from '@/features/admin/CheckpointsPage';
 import { CreateEventPage } from '@/features/admin/CreateEventPage';
+import { EventStatistics } from '@/features/admin/EventStatistics';
+import { FeaturesPage } from '@/features/admin/FeaturesPage';
 import { FieldsPage } from '@/features/admin/FieldsPage';
 import { AssignmentsPage } from '@/features/admin/AssignmentsPage';
 import { LinksPage } from '@/features/admin/LinksPage';
+import { PaymentSetupPage } from '@/features/admin/PaymentSetupPage';
 import { PaymentsPage } from '@/features/admin/PaymentsPage';
+import { PortalConnectionPage } from '@/features/admin/PortalConnectionPage';
 import { PeoplePage } from '@/features/admin/PeoplePage';
 import { RequireRole } from '@/features/admin/RequireAdmin';
 import { SettingsPage } from '@/features/admin/SettingsPage';
@@ -63,6 +67,7 @@ export const routes: RouteObject[] = [
               {
                 element: <RequireRole roles={['admin', 'reviewer']} />,
                 children: [
+                  { path: 'statistics', element: <EventStatistics /> },
                   { path: 'teams', element: <TeamsPage /> },
                   { path: 'teams/:teamId', element: <TeamDetailPage /> },
                   { path: 'payments', element: <PaymentsPage /> },
@@ -78,6 +83,9 @@ export const routes: RouteObject[] = [
                   { path: 'submissions', element: <SubmissionsPage /> },
                   { path: 'submissions/:submissionId', element: <SubmissionPage /> },
                   { path: 'checkpoints', element: <CheckpointsPage /> },
+                  { path: 'portal', element: <PortalConnectionPage /> },
+                  { path: 'features', element: <FeaturesPage /> },
+                  { path: 'payment', element: <PaymentSetupPage /> },
                   { path: 'settings', element: <SettingsPage /> },
                 ],
               },

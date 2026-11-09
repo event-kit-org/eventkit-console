@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Schemas } from '@/api/client';
-import { asRole, capture, confirmDialog, E, registeredTeam } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E, filterBy, registeredTeam } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { event, server } from '@/test/server';
 
@@ -314,7 +314,7 @@ describe('answers on admin team pages', () => {
     );
     renderApp(`/events/${event.id}/teams`, { token: 'good-token' });
     expect(await screen.findByRole('link', { name: 'Rejected' })).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Show'), 'confirmation_pending');
+    await filterBy('Confirmation pending');
     expect(screen.getByRole('link', { name: 'Waiting' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Rejected' })).not.toBeInTheDocument();
   });

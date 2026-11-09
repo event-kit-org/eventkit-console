@@ -2,6 +2,7 @@ import { ArrowRight, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { FilterMenu } from '@/components/FilterMenu';
 import { EmptyState, TableSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { SearchInput } from '@/components/SearchInput';
@@ -10,8 +11,6 @@ import { ProofStatusBadge, StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import {
   Table,
   TableBody,
@@ -103,27 +102,22 @@ export function TeamsPage() {
         title="Teams"
         description="Every team that registered, newest first. Click a column to sort."
       >
-        <SearchInput
-          label="Search teams and members"
-          placeholder="Team, member, email or ID"
-          value={search.query}
-          onChange={search.setQuery}
-        />
-        <Label htmlFor="team-filter" className="text-muted-foreground">
-          Show
-        </Label>
-        <NativeSelect
-          id="team-filter"
-          className="min-w-0 flex-1 sm:w-52 sm:flex-none"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          {FILTERS.map(([value, label]) => (
-            <NativeSelectOption key={value} value={value}>
-              {label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          <SearchInput
+            label="Search teams and members"
+            placeholder="Team, member, email or ID"
+            className="min-w-0 flex-1 sm:w-72 sm:flex-none"
+            value={search.query}
+            onChange={search.setQuery}
+          />
+          <FilterMenu
+            label="Show"
+            value={filter}
+            onChange={setFilter}
+            options={FILTERS}
+            fallback="all"
+          />
+        </div>
       </PageHeader>
       {staged && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">

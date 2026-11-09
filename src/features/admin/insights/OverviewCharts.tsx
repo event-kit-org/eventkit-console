@@ -28,7 +28,6 @@ import {
   useAttendance,
   useCheckpointList,
   useCheckpointStats,
-  useDashboard,
   useFieldCounts,
   usePollCounts,
   usePollList,
@@ -227,36 +226,6 @@ export function WidgetCard({ widget }: { widget: Widget }) {
   return widget.kind === 'field' ? <FieldWidget widget={widget} /> : <PollWidget widget={widget} />;
 }
 
-/** The shared charts every organiser sees; admins edit them. */
-export function Dashboard() {
-  const { role } = useEventContext();
-  const dashboard = useDashboard();
-  const widgets = dashboard.data ?? [];
-  return (
-    <section className="grid gap-4" aria-labelledby="dashboard-title">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="dashboard-title" className="text-base font-semibold">
-          Answers, polls and checkpoints
-        </h2>
-        {role === 'admin' && dashboard.data && <DashboardEditor saved={widgets} />}
-      </div>
-      <ErrorAlert error={dashboard.error} />
-      {dashboard.data && widgets.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          {role === 'admin'
-            ? 'Add charts of registration answers, poll votes or checkpoint scans with Edit charts.'
-            : 'No charts yet. An admin can add some.'}
-        </p>
-      )}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {widgets.map((w) => (
-          <WidgetCard key={w.id} widget={w} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 const CHARTABLE: Schemas['EventField']['type'][] = [
   'choice',
   'dropdown',
@@ -265,7 +234,17 @@ const CHARTABLE: Schemas['EventField']['type'][] = [
   'short_text',
 ];
 
-function DashboardEditor({ saved }: { saved: Widget[] }) {
+/** Admins pick, order and title the charts on the Event statistics page. */
+export function DashboardEditor({
+  saved,
+  label = 'Edit charts',
+  primary = false,
+}: {
+  saved: Widget[];
+  label?: string;
+  /** The page's main action (no charts yet) rather than a secondary one. */
+  primary?: boolean;
+}) {
   const api = useApi();
   const { event, path, features } = useEventContext();
   const fields = useFields();
@@ -316,13 +295,13 @@ function DashboardEditor({ saved }: { saved: Widget[] }) {
       }}
     >
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm">
-          <ChartPie aria-hidden /> Edit charts
+        <Button variant={primary ? 'default' : 'outline'} size="sm">
+          <ChartPie aria-hidden /> {label}
         </Button>
       </SheetTrigger>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Charts on the overview</SheetTitle>
+          <SheetTitle>Event statistics charts</SheetTitle>
           <SheetDescription>Every organiser of this event sees the same charts.</SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 px-4">

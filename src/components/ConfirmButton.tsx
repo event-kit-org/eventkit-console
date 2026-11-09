@@ -58,3 +58,49 @@ export function ConfirmButton({
     </AlertDialog>
   );
 }
+
+/** The same "are you sure?" dialog, opened from elsewhere (a menu item). */
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel,
+  destructive = false,
+  body,
+  confirmDisabled = false,
+  onConfirm,
+}: {
+  open: boolean;
+  /** Inputs the confirmation needs, shown under the description. */
+  body?: ReactNode;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: ReactNode;
+  confirmLabel: string;
+  destructive?: boolean;
+  confirmDisabled?: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
+        </AlertDialogHeader>
+        {body}
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep</AlertDialogCancel>
+          <AlertDialogAction
+            variant={destructive ? 'destructive' : 'default'}
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

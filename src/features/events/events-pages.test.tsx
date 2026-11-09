@@ -67,8 +67,12 @@ describe('event layout', () => {
     renderApp(`/events/${event.id}`, { token: 'good-token' });
     expect(await screen.findByRole('heading', { name: 'PESOS X Silicon' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Event sections' });
-    expect(nav).toHaveTextContent('OverviewRegistrationTeamsPaymentsAssignmentsEvent day');
-    expect(nav).toHaveTextContent('SetupRegistration formLinksTeam & rolesPortal & settings');
+    expect(nav).toHaveTextContent(
+      'OverviewEvent statisticsRegistrationTeamsPaymentsAssignmentsEvent day',
+    );
+    expect(nav).toHaveTextContent(
+      'SetupRegistration formPortal connectionLinksTeam & rolesFeaturesPayment setupSettings',
+    );
     // Scanning happens on the portal; the page still opens by its address.
     expect(nav).toHaveTextContent('Event dayCheckpointsAttendeesPollsNotifications');
     expect(nav).toHaveTextContent('JudgingSubmissionsJudgingLeaderboards');

@@ -7,10 +7,13 @@ import {
   capture,
   confirmDialog,
   E,
+  filterBy,
   member,
+  memberOption,
   proof,
   registeredTeam,
   team,
+  teamOption,
 } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { apiError, BUCKET, event, server } from '@/test/server';
@@ -179,10 +182,10 @@ describe('teams', () => {
       'href',
       `/events/${event.id}/teams/44444444-4444-4444-8444-444444444444`,
     );
-    await userEvent.selectOptions(screen.getByLabelText('Show'), 'registered');
+    await filterBy('Registered');
     expect(screen.queryByRole('link', { name: 'Byte Club' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Waiting One' })).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Show'), 'flagged');
+    await filterBy('Below minimum');
     expect(screen.getByText('No teams here yet.')).toBeInTheDocument();
   });
 
@@ -215,7 +218,7 @@ describe('teams', () => {
     // Receipt states read as badges, the same as on the team page.
     const charlie = screen.getByRole('link', { name: 'Charlie' }).closest('tr')!;
     expect(within(charlie).getByText('pending')).toHaveAttribute('data-slot', 'badge');
-    await userEvent.selectOptions(screen.getByLabelText('Show'), 'registered');
+    await filterBy('Registered');
     expect(screen.getByText('1 of 3 teams')).toBeInTheDocument();
   });
 
@@ -244,7 +247,7 @@ describe('teams', () => {
     expect(document.title).toBe(`${t.name} · Teams · ${event.name} · eventKit`);
     await userEvent.click(screen.getByRole('link', { name: 'All teams' }));
     await waitFor(() => expect(router.state.location.search).toBe('?status=registered'));
-    expect(screen.getByLabelText('Show')).toHaveValue('registered');
+    expect(screen.getByRole('button', { name: 'Show: Registered' })).toBeInTheDocument();
   });
 
   it('confirms a team (no payment) and cancels or restores registrations', async () => {
@@ -261,9 +264,9 @@ describe('teams', () => {
     expect(await screen.findByText(/below the minimum of 2/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Confirm team' }));
     await waitFor(() => expect(confirm).toHaveLength(1));
-    // Cancelling is for the whole team, next to Delete team; members have no Cancel.
+    // Cancelling is for the whole team, in its Options menu; members have no Cancel.
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel registration' }));
+    await teamOption('Cancel registration');
     expect(await screen.findByRole('alertdialog')).toHaveTextContent('The whole team is cancelled');
     await confirmDialog('Cancel registration');
     await waitFor(() => expect(cancel).toHaveLength(1));
@@ -280,10 +283,11 @@ describe('teams', () => {
     );
     const restore = capture('post', `${E}/registrations/r1/restore`);
     go(`/teams/${t.id}`);
-    await userEvent.click(await screen.findByRole('button', { name: 'Restore registration' }));
+    await teamOption('Restore registration');
     await waitFor(() => expect(restore).toHaveLength(1));
     expect(screen.queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Cancel registration' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Team options' }));
+    expect(screen.queryByRole('menuitem', { name: /Cancel registration/ })).not.toBeInTheDocument();
   });
 
   it('shortlists in pay-after-shortlist events and shows payments and errors', async () => {
@@ -340,13 +344,13 @@ describe('teams', () => {
     expect(await screen.findByText('PX-0001')).toBeInTheDocument();
     expect(screen.getByText(/link last opened/)).toBeInTheDocument();
     expect(screen.getByText(/link never opened/)).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole('button', { name: 'New link' })[1]!);
+    await memberOption('Ravi', 'New link');
     await confirmDialog('New link');
     expect(await screen.findByText('https://portal.test/me/ek_new')).toBeInTheDocument();
     expect(reissue).toHaveLength(1);
     // Without mailing, nothing can be emailed.
     expect(reissue[0]!.body).toEqual({ emailLeader: false });
-    await userEvent.click(screen.getAllByRole('button', { name: 'New QR' })[0]!);
+    await memberOption('Asha', 'New QR');
     await confirmDialog('New QR');
     await waitFor(() => expect(rotate).toHaveLength(1));
     await userEvent.upload(
@@ -409,7 +413,7 @@ describe('editing a team', () => {
     server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
     const saved = capture('patch', `${E}/teams/${t.id}`, t);
     go(`/teams/${t.id}`);
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit team' }));
+    await teamOption('Edit team');
     const dialog = within(await screen.findByRole('dialog'));
     await userEvent.clear(dialog.getByLabelText('Team name'));
     await userEvent.type(dialog.getByLabelText('Team name'), 'Byte Club 2');
@@ -431,7 +435,7 @@ describe('editing a team', () => {
       ),
     );
     go(`/teams/${t.id}`);
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit team' }));
+    await teamOption('Edit team');
     const dialog = within(await screen.findByRole('dialog'));
     await userEvent.type(dialog.getByLabelText('Team name'), 'x');
     await userEvent.click(dialog.getByRole('button', { name: 'Save' }));
@@ -448,7 +452,7 @@ describe('sending a link again', () => {
       emailedTo: 'ravi@example.com',
     });
     go(`/teams/${t.id}`);
-    await userEvent.click((await screen.findAllByRole('button', { name: 'Send link' }))[1]!);
+    await memberOption('Ravi', 'Resend link');
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Email to Ravi' }));
     await waitFor(() => expect(sent[0]?.body).toEqual({ to: 'member' }));
     expect(
@@ -456,15 +460,34 @@ describe('sending a link again', () => {
     ).toBeInTheDocument();
   });
 
-  it('explains when a link is too old to send, or mail is off', async () => {
+  it('greys out Resend link while mailing is off', async () => {
+    asRole('admin', {}, { registration: true, mailing: false });
+    const t = registeredTeam('confirmed');
+    server.use(http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)));
+    go(`/teams/${t.id}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Options for Ravi' }));
+    expect(await screen.findByRole('menuitem', { name: 'Resend link' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    // Hovering says why.
+    await userEvent.hover(screen.getByRole('menuitem', { name: 'Resend link' }).parentElement!);
+    expect(
+      (await screen.findAllByText('Turn on Mailing (Features) to send links.'))[0],
+    ).toBeInTheDocument();
+    // The rest still works without mail.
+    expect(screen.getByRole('menuitem', { name: 'New link' })).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('explains when a link is too old to send again', async () => {
     asRole('admin', {}, { registration: true, mailing: true });
     const old = registeredTeam('confirmed');
     old.members[1] = { ...old.members[1]!, linkStored: false };
     server.use(http.get(`${E}/teams/${old.id}`, () => HttpResponse.json(old)));
     go(`/teams/${old.id}`);
-    await userEvent.click((await screen.findAllByRole('button', { name: 'Send link' }))[1]!);
+    await memberOption('Ravi', 'Resend link');
     expect(await screen.findByText(/made before links were kept/)).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /^Email to/ })).not.toBeInTheDocument();
   });
 });
 
@@ -480,7 +503,7 @@ describe('new personal links', () => {
       emailedTo: 'asha@example.com',
     });
     go(`/teams/${t.id}`);
-    await userEvent.click((await screen.findAllByRole('button', { name: 'New link' }))[1]!);
+    await memberOption('Ravi', 'New link');
     const dialog = within(await screen.findByRole('alertdialog'));
     expect(dialog.getByLabelText('Email it to the team leader to pass on')).toBeChecked();
     await userEvent.click(dialog.getByRole('button', { name: 'New link' }));
@@ -500,7 +523,7 @@ describe('payments', () => {
     receiptUrl: `https://storage.test/events/e/receipts/t/r.${ext}?signed=1`,
   });
 
-  it('approves a receipt', async () => {
+  it('lists receipts in a table, and approves one from its popup', async () => {
     asRole('admin');
     server.use(http.get(`${E}/payment-proofs`, () => HttpResponse.json([item('pending')])));
     const approve = capture(
@@ -509,29 +532,39 @@ describe('payments', () => {
       proof('approved'),
     );
     go('/payments');
-    expect(await screen.findByRole('img', { name: 'Receipt from Byte Club' })).toHaveAttribute(
-      'src',
-      expect.stringContaining('signed=1'),
-    );
-    expect(screen.getByText(/₹1,000 for 2 people/)).toBeInTheDocument();
-    // The receipt's team name opens the team.
-    expect(screen.getByRole('link', { name: 'Byte Club' })).toHaveAttribute(
+    const row = await screen.findByRole('row', { name: /Byte Club/ });
+    expect(row).toHaveTextContent('₹1,000');
+    expect(row).toHaveTextContent('2 people');
+    // The team name opens the team; the receipt itself waits for a click.
+    expect(within(row).getByRole('link', { name: 'Byte Club' })).toHaveAttribute(
       'href',
       `/events/${event.id}/teams/t`,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    expect(approve).toHaveLength(0);
-    const dialog = within(await screen.findByRole('alertdialog'));
+    expect(screen.queryByRole('img', { name: 'Receipt from Byte Club' })).not.toBeInTheDocument();
+    await userEvent.click(within(row).getByRole('button', { name: 'View receipt from Byte Club' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('img', { name: 'Receipt from Byte Club' })).toHaveAttribute(
+      'src',
+      expect.stringContaining('signed=1'),
+    );
+    expect(dialog.getByText(/₹1,000 for 2 people/)).toBeInTheDocument();
     const received = dialog.getByLabelText('Amount received (₹)');
     expect(received).toHaveValue(null);
     expect(dialog.getByRole('button', { name: 'Approve' })).toBeDisabled();
     await userEvent.type(received, '800');
     await userEvent.click(dialog.getByRole('button', { name: 'Approve' }));
+    // Asks once more, naming the amount, before anything is saved.
+    expect(approve).toHaveLength(0);
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'Approve ₹800 from Byte Club?',
+    );
+    await confirmDialog('Approve');
     await waitFor(() => expect(approve).toHaveLength(1));
     expect(approve[0]!.body).toEqual({ paidAmount: 80000 });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('rejects with a note', async () => {
+  it('rejects with a note from the popup', async () => {
     asRole('admin');
     server.use(http.get(`${E}/payment-proofs`, () => HttpResponse.json([item('pending', 'pdf')])));
     const reject = capture(
@@ -540,16 +573,20 @@ describe('payments', () => {
       proof('rejected'),
     );
     go('/payments');
-    expect(await screen.findByRole('link', { name: 'Open receipt (PDF)' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
-    const send = screen.getByRole('button', { name: 'Reject with note' });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'View receipt from Byte Club' }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('link', { name: 'Open receipt (PDF)' })).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Reject' }));
+    const send = dialog.getByRole('button', { name: 'Reject with note' });
     expect(send).toBeDisabled();
-    await userEvent.type(screen.getByLabelText('Reason for rejecting'), 'Amount is wrong');
+    await userEvent.type(dialog.getByLabelText('Reason for rejecting'), 'Amount is wrong');
     await userEvent.click(send);
     await waitFor(() => expect(reject[0]?.body).toEqual({ note: 'Amount is wrong' }));
   });
 
-  it('filters by status', async () => {
+  it('filters by status from the filter button, beside the search', async () => {
     asRole('admin');
     const seen: string[] = [];
     server.use(
@@ -559,11 +596,17 @@ describe('payments', () => {
         return HttpResponse.json(status === 'rejected' ? [item('rejected')] : []);
       }),
     );
-    go('/payments');
-    expect(await screen.findByText('Nothing here.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('tab', { name: 'Rejected' }));
-    expect(await screen.findByText('Rejected: Wrong amount')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    const { router } = go('/payments');
+    expect(await screen.findByText('Nothing waiting for review.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show: Waiting for review' })).toBeInTheDocument();
+    await filterBy('Rejected');
+    expect(router.state.location.search).toBe('?status=rejected');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'View receipt from Byte Club' }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Rejected: Wrong amount')).toBeInTheDocument();
+    expect(dialog.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(seen).toEqual(['pending', 'rejected']);
   });
 });
@@ -727,9 +770,12 @@ describe('reviewers', () => {
     expect(screen.queryByRole('button', { name: /New link/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Attach a receipt')).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Event sections' });
-    await waitFor(() => expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments'));
+    await waitFor(() =>
+      expect(nav).toHaveTextContent('OverviewEvent statisticsRegistrationTeamsPayments'),
+    );
     expect(nav).not.toHaveTextContent('Scanner');
-    expect(nav).not.toHaveTextContent('Portal & settings');
+    expect(nav).not.toHaveTextContent('Portal connection');
+    expect(nav).not.toHaveTextContent('Settings');
   });
 
   it("can't open admin pages directly", async () => {

@@ -99,7 +99,7 @@ export function LinksPage() {
           <AlertDescription className="text-current">
             <p>
               Links point to your event's portal. Set its URL in{' '}
-              <Link to="../settings">Portal &amp; settings</Link> to get shareable links.
+              <Link to="../portal">Portal connection</Link> to get shareable links.
             </p>
           </AlertDescription>
         </Alert>

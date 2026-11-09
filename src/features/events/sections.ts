@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  ChartLine,
   Bell,
   ClipboardList,
   ListChecks,
@@ -10,10 +11,13 @@ import {
   Link2,
   Contact,
   MapPin,
+  Plug,
   Settings,
+  ToggleRight,
   Trophy,
   UserCog,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -31,7 +35,13 @@ const REVIEW = ['admin', 'reviewer'];
 
 /** The event's sections, grouped as the sidebar shows them, most used first. */
 export const SECTIONS: { group: string | null; links: Section[] }[] = [
-  { group: null, links: [{ to: '', label: 'Overview', icon: Gauge, roles: REVIEW }] },
+  {
+    group: null,
+    links: [
+      { to: '', label: 'Overview', icon: Gauge, roles: REVIEW },
+      { to: 'statistics', label: 'Event statistics', icon: ChartLine, roles: REVIEW },
+    ],
+  },
   {
     group: 'Registration',
     links: [
@@ -62,9 +72,12 @@ export const SECTIONS: { group: string | null; links: Section[] }[] = [
     group: 'Setup',
     links: [
       { to: 'form', label: 'Registration form', icon: ClipboardList },
+      { to: 'portal', label: 'Portal connection', icon: Plug },
       { to: 'links', label: 'Links', icon: Link2 },
       { to: 'people', label: 'Team & roles', icon: UserCog },
-      { to: 'settings', label: 'Portal & settings', icon: Settings },
+      { to: 'features', label: 'Features', icon: ToggleRight },
+      { to: 'payment', label: 'Payment setup', icon: Wallet },
+      { to: 'settings', label: 'Settings', icon: Settings },
     ],
   },
 ];

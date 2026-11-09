@@ -66,16 +66,27 @@ export function SettingsPage() {
   return (
     <div className="grid max-w-3xl gap-6">
       <PageHeader
-        title="Portal & settings"
-        description="Where your portal lives, which features are on, how teams pay, the event's details, and managing the event."
+        title="Settings"
+        description="The event's details, RSVP, staged release, and managing the event. Features, payment setup and the portal each have their own page."
       />
       {search.get('new') && (
         <Alert>
           <CircleCheck aria-hidden />
           <AlertDescription>
             <p>
-              Event created. Next: set your portal's URL, switch on the features you need, upload
-              your UPI QR if teams pay, then create an API key and{' '}
+              Event created. Next: set your portal&apos;s URL and create an API key in{' '}
+              <Link to="../portal" relative="path">
+                Portal connection
+              </Link>
+              , switch on the{' '}
+              <Link to="../features" relative="path">
+                features
+              </Link>{' '}
+              you need, set up{' '}
+              <Link to="../payment" relative="path">
+                payment
+              </Link>{' '}
+              if teams pay, then make{' '}
               <Link to="../links" relative="path">
                 links
               </Link>
@@ -84,15 +95,11 @@ export function SettingsPage() {
           </AlertDescription>
         </Alert>
       )}
-      <PortalCard />
-      <RsvpCard />
-      <StagedReleaseCard />
-      <FeaturesCard />
-      <PaymentInstructionsFileCard />
-      <PaymentQrCard />
       {/* Remounts when the deadline changes elsewhere (Manage event), so saving the
           details can't put the old deadline back. */}
       <EditEventCard key={event.registrationDeadline} />
+      <RsvpCard />
+      <StagedReleaseCard />
       <ManageEventCard />
     </div>
   );
@@ -157,7 +164,8 @@ const PATHS = [
 type PathName = (typeof PATHS)[number][0];
 
 /** Where the event's portal lives, and the paths its links use. */
-function PortalCard() {
+/** The portal's address and paths, the values it connects with, and its API keys. */
+export function PortalCard() {
   const api = useApi();
   const { event, path, isOwner } = useEventContext();
   const [url, setUrl] = useState(event.portalUrl ?? '');
@@ -354,7 +362,8 @@ function PortalCard() {
   );
 }
 
-function FeaturesCard() {
+/** Which parts of eventKit this event uses: registration, scanning, mailing. */
+export function FeaturesCard() {
   const api = useApi();
   const { event, path, isOwner } = useEventContext();
   const toggles = useQuery({
@@ -425,7 +434,7 @@ function FeaturesCard() {
   );
 }
 
-function PaymentInstructionsFileCard() {
+export function PaymentInstructionsFileCard() {
   const api = useApi();
   const { event, path } = useEventContext();
   const file = useQuery({
@@ -494,7 +503,7 @@ function PaymentInstructionsFileCard() {
   );
 }
 
-function PaymentQrCard() {
+export function PaymentQrCard() {
   const api = useApi();
   const { event, path } = useEventContext();
   const input = useRef<HTMLInputElement>(null);
@@ -530,8 +539,8 @@ function PaymentQrCard() {
           <Alert variant="destructive">
             <CircleAlert aria-hidden />
             <AlertDescription>
-              Teams don't know how to pay yet: add written instructions (Event details), an
-              instructions file, or a QR code.
+              Teams don't know how to pay yet: add written instructions (Settings → Event details),
+              an instructions file, or a QR code.
             </AlertDescription>
           </Alert>
         )}
