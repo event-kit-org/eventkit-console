@@ -18,6 +18,7 @@ import { EventHome } from '@/features/events/EventHome';
 import { EventLayout } from '@/features/events/EventLayout';
 import { EventsPage } from '@/features/events/EventsPage';
 import { JudgingPage } from '@/features/judging/JudgingPage';
+import { LeaderboardsPage } from '@/features/judging/LeaderboardsPage';
 import { NotificationsPage } from '@/features/notifications/NotificationsPage';
 import { SubmissionPage } from '@/features/submissions/SubmissionPage';
 import { SubmissionsPage } from '@/features/submissions/SubmissionsPage';
@@ -51,6 +52,7 @@ export const routes: RouteObject[] = [
               { path: 'polls', element: <PollsPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'judging', element: <JudgingPage /> },
+              { path: 'leaderboards', element: <LeaderboardsPage /> },
               {
                 element: <RequireRole roles={['admin', 'volunteer']} />,
                 children: [

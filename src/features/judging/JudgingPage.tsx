@@ -1,30 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
-import { Trophy } from 'lucide-react';
-import { useState } from 'react';
+import { ListOrdered, Trophy } from 'lucide-react';
+import { Link } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
+import { Button } from '@/components/ui/button';
 import { useEventContext } from '@/features/events/event-context';
 import { CriteriaEditor } from './CriteriaEditor';
-import { Leaderboard } from './Leaderboard';
 import { RoundsStrip } from './RoundsStrip';
-import { SavedLeaderboards } from './SavedLeaderboards';
-import { Tracks } from './Tracks';
-import { useRounds } from './rounds';
+import { usePickedRound } from './rounds';
 
 /**
- * The owner edits rounds, each round's rubric and the leaderboard's visibility
- * here. Judges score on the event's portal.
+ * The owner edits rounds and each round's rubric here. Judges score on the
+ * event's portal; the results are on the Leaderboards page.
  */
 export function JudgingPage() {
   const api = useApi();
-  const { event, path, role } = useEventContext();
-  const rounds = useRounds();
-  const [picked, setPicked] = useState<string | null>(null);
-  const all = rounds.data ?? [];
-  const selected = all.find((r) => r.id === picked) ?? all[0];
+  const { event, path } = useEventContext();
+  const { rounds, all, selected, setPicked } = usePickedRound();
   const roundId = selected?.id;
   const criteria = useQuery({
     queryKey: ['event', event.id, 'criteria', roundId],
@@ -41,7 +36,15 @@ export function JudgingPage() {
       <PageHeader
         title="Judging"
         description="Judges score teams on the event's portal against each round's rubric."
-      />
+      >
+        {selected && (
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`../leaderboards?round=${selected.id}`} relative="path">
+              <ListOrdered aria-hidden /> See leaderboard
+            </Link>
+          </Button>
+        )}
+      </PageHeader>
       <ErrorAlert error={rounds.error} />
       {rounds.isPending && <RowsSkeleton rows={2} />}
       {rounds.data && <RoundsStrip rounds={all} selected={selected} onSelect={setPicked} />}
@@ -51,21 +54,12 @@ export function JudgingPage() {
         </EmptyState>
       )}
       {selected && (
-        <>
-          <CriteriaEditor
-            round={selected}
-            rounds={all}
-            criteria={criteria.data ?? []}
-            loading={criteria.isPending}
-          />
-          <Leaderboard roundId={selected.id} />
-        </>
-      )}
-      {rounds.data && all.length > 0 && role === 'admin' && (
-        <>
-          <SavedLeaderboards rounds={all} />
-          <Tracks />
-        </>
+        <CriteriaEditor
+          round={selected}
+          rounds={all}
+          criteria={criteria.data ?? []}
+          loading={criteria.isPending}
+        />
       )}
     </div>
   );

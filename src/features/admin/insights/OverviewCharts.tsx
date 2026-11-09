@@ -52,6 +52,7 @@ export function RegistrationsCard() {
   const last = days.at(-1);
   return (
     <ChartCard
+      heading="h2"
       title="Registrations over time"
       description={
         last
@@ -81,6 +82,8 @@ export function AttendanceCard() {
   const now = points.at(-1);
   return (
     <ChartCard
+      live={series.dataUpdatedAt}
+      heading="h2"
       title="Attendance"
       description={
         now
@@ -143,6 +146,7 @@ function PollWidget({
   const d = counts.data;
   return (
     <ChartCard
+      live={counts.dataUpdatedAt}
       title={widget.title || d?.question || 'Poll'}
       description={d && `${d.votes} vote${d.votes === 1 ? '' : 's'}`}
       action={action}
@@ -179,6 +183,7 @@ function CheckpointWidget({ widget }: { widget: Widget & { kind: 'checkpoint' } 
       : []);
   return (
     <ChartCard
+      live={stats.dataUpdatedAt}
       title={widget.title || d?.name || 'Checkpoint'}
       description={
         t &&

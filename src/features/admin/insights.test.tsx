@@ -42,6 +42,7 @@ describe('overview charts', () => {
     );
     const rows = within(card as HTMLElement).getAllByRole('row');
     expect(rows[2]).toHaveTextContent('21 Oct257');
+    expect(within(rows[2]!).getAllByRole('cell')[1]).toHaveClass('text-right');
   });
 
   it('says when nobody has registered, and hides attendance before the event day', async () => {
@@ -74,6 +75,8 @@ describe('overview charts', () => {
     expect(
       await screen.findByText('35 inside now, 5 out through a gate, 40 checked in'),
     ).toBeInTheDocument();
+    // It refreshes on its own, and says so.
+    expect(screen.getByText(/Live · updated \d+s ago/)).toBeInTheDocument();
   });
 });
 

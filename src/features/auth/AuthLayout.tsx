@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import logo from '@/assets/logo.png';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export function AuthLayout({
   title,
@@ -11,6 +12,7 @@ export function AuthLayout({
   description: string;
   children: ReactNode;
 }) {
+  usePageTitle(title);
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-muted p-4 md:p-10">
       <div className="flex items-center gap-2 font-semibold">

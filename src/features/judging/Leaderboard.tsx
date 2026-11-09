@@ -148,7 +148,7 @@ export function Leaderboard({ roundId }: { roundId?: string }) {
                     {role === 'admin' ? (
                       <Button
                         variant="link"
-                        className="h-auto p-0 text-left wrap-anywhere whitespace-normal"
+                        className="h-auto min-h-6 p-0 text-left wrap-anywhere whitespace-normal"
                         onClick={() => setOpen(e.team)}
                       >
                         {e.team.name}

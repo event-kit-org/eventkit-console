@@ -20,7 +20,11 @@ export function AccountPage() {
   const { user } = useAuth();
   return (
     <div className="grid max-w-2xl gap-4">
-      <PageHeader title="Account settings" description="Your eventKit account, for every event." />
+      <PageHeader
+        as="h1"
+        title="Account settings"
+        description="Your eventKit account, for every event."
+      />
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>

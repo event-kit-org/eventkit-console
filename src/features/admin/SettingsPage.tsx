@@ -222,7 +222,7 @@ function PortalCard() {
             onChange={(e) => setUrl(e.target.value)}
           />
           <Collapsible>
-            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+            <CollapsibleTrigger className="group flex min-h-8 items-center gap-1 text-left text-sm font-medium text-muted-foreground hover:text-foreground">
               <ChevronRight
                 className="size-4 transition-transform group-data-[state=open]:rotate-90"
                 aria-hidden

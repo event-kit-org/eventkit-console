@@ -3,6 +3,7 @@ import {
   Bell,
   ClipboardList,
   ListChecks,
+  ListOrdered,
   FileUp,
   CreditCard,
   Gauge,
@@ -28,7 +29,7 @@ export interface Section {
 /** Reviewers work through teams and payments; everything else is for admins. */
 const REVIEW = ['admin', 'reviewer'];
 
-/** The event's sections, grouped as the sidebar shows them. */
+/** The event's sections, grouped as the sidebar shows them, most used first. */
 export const SECTIONS: { group: string | null; links: Section[] }[] = [
   { group: null, links: [{ to: '', label: 'Overview', icon: Gauge, roles: REVIEW }] },
   {
@@ -37,25 +38,32 @@ export const SECTIONS: { group: string | null; links: Section[] }[] = [
       { to: 'teams', label: 'Teams', icon: Users, roles: REVIEW },
       { to: 'payments', label: 'Payments', icon: CreditCard, roles: REVIEW },
       { to: 'assignments', label: 'Assignments', icon: ListChecks },
-      { to: 'form', label: 'Registration form', icon: ClipboardList },
-      { to: 'links', label: 'Links', icon: Link2 },
     ],
   },
   {
     group: 'Event day',
     links: [
       { to: 'checkpoints', label: 'Checkpoints', icon: MapPin },
-      { to: 'attendees', label: 'People', icon: Contact },
+      { to: 'attendees', label: 'Attendees', icon: Contact },
       { to: 'polls', label: 'Polls', icon: BarChart3 },
       { to: 'notifications', label: 'Notifications', icon: Bell },
-      { to: 'submissions', label: 'Submissions', icon: FileUp },
-      { to: 'judging', label: 'Judging', icon: Trophy },
     ],
   },
   {
+    group: 'Judging',
+    links: [
+      { to: 'submissions', label: 'Submissions', icon: FileUp },
+      { to: 'judging', label: 'Judging', icon: Trophy },
+      { to: 'leaderboards', label: 'Leaderboards', icon: ListOrdered },
+    ],
+  },
+  {
+    // One-off setup, used least once the event is running.
     group: 'Setup',
     links: [
-      { to: 'people', label: 'People', icon: UserCog },
+      { to: 'form', label: 'Registration form', icon: ClipboardList },
+      { to: 'links', label: 'Links', icon: Link2 },
+      { to: 'people', label: 'Team & roles', icon: UserCog },
       { to: 'settings', label: 'Portal & settings', icon: Settings },
     ],
   },

@@ -17,6 +17,7 @@ import { useEventContext } from '@/features/events/event-context';
 import { formatIST, toISTInput } from '@/lib/datetime';
 import { formatMoney } from '@/lib/money';
 import { AttendanceCard, Dashboard, RegistrationsCard } from './insights/OverviewCharts';
+import { useRegistrationsByDay } from './insights/queries';
 import { useProofs, useTeams } from './queries';
 
 type Tile = {
@@ -49,6 +50,10 @@ export function AdminOverview() {
   const [openedAt] = useState(Date.now);
   const eventDayStarted =
     openedAt >= new Date(`${toISTInput(event.startAt).slice(0, 10)}T00:00:00+05:30`).getTime();
+  // Today's new teams, from the same numbers as the registrations chart (shared cache).
+  const byDay = useRegistrationsByDay();
+  const todayIST = toISTInput(new Date(openedAt).toISOString()).slice(0, 10);
+  const newToday = byDay.data?.find((d) => d.date === todayIST)?.teams ?? 0;
 
   const paidTeams = registered.filter((t) => t.paidAmount !== null);
   const collected = paidTeams.reduce((n, t) => n + (t.paidAmount ?? 0), 0);
@@ -66,7 +71,13 @@ export function AdminOverview() {
       : [];
 
   const tiles: Tile[] = [
-    { label: 'Teams registered', value: registered.length, icon: UsersRound, to: 'teams' },
+    {
+      label: 'Teams registered',
+      value: registered.length,
+      icon: UsersRound,
+      to: 'teams',
+      foot: byDay.data ? (newToday > 0 ? `+${newToday} today` : 'None new today') : undefined,
+    },
     {
       label: 'Confirmed people',
       value: `${confirmedPeople} / ${event.maxParticipants}`,
@@ -131,7 +142,7 @@ export function AdminOverview() {
                   <CardDescription className="flex items-center justify-between">
                     {label} <Icon className="size-4" aria-hidden />
                   </CardDescription>
-                  <CardTitle as="h3" className="text-2xl font-semibold tabular-nums">
+                  <CardTitle as="p" className="text-2xl font-semibold tabular-nums">
                     {value}
                   </CardTitle>
                 </CardHeader>

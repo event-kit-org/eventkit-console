@@ -1,5 +1,6 @@
 import { FileText, Receipt } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
@@ -115,7 +116,14 @@ function ProofCard({ proof }: { proof: Schemas['PaymentProofForReview'] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{proof.team.name}</CardTitle>
+        <CardTitle>
+          <Link
+            to={`/events/${event.id}/teams/${proof.team.id}`}
+            className="wrap-anywhere underline-offset-4 hover:underline"
+          >
+            {proof.team.name}
+          </Link>
+        </CardTitle>
         <CardDescription>
           {formatMoney(proof.amount, proof.currency)} for{' '}
           {proof.members.length > 0

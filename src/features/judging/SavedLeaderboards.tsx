@@ -80,7 +80,7 @@ export function SavedLeaderboards({ rounds }: { rounds: Round[] }) {
     <Card>
       <CardHeader className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1.5">
-          <CardTitle>Leaderboards</CardTitle>
+          <CardTitle>Saved leaderboards</CardTitle>
           <CardDescription>
             Rank teams across rounds: overall, per track, the top few. Each has its own way of
             adding up and its own audience.

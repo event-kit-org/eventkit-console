@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquareText, Trash2 } from 'lucide-react';
+import { ArrowUpRight, MessageSquareText, Trash2 } from 'lucide-react';
+import { Link } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { RowsSkeleton } from '@/components/PageState';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   Sheet,
@@ -62,6 +64,13 @@ export function ScoreBreakdownSheet({
           <SheetDescription>
             {b ? `${b.round.name}: who gave what, criterion by criterion.` : 'Judging breakdown'}
           </SheetDescription>
+          {team && (
+            <Button variant="outline" size="sm" className="w-fit" asChild>
+              <Link to={`/events/${event.id}/teams/${team.id}`}>
+                Open team page <ArrowUpRight aria-hidden />
+              </Link>
+            </Button>
+          )}
         </SheetHeader>
         <div className="grid gap-4 px-4 pb-6">
           <ErrorAlert error={breakdown.error ?? remove.error} />

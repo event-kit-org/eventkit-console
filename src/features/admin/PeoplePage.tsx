@@ -70,7 +70,7 @@ export function PeoplePage() {
   return (
     <div className="grid gap-4">
       <PageHeader
-        title="People"
+        title="Team & roles"
         description="Who runs this event with you, and its volunteers and judges."
       />
       <ErrorAlert error={members.error ?? change.error ?? remove.error ?? judging.error} />

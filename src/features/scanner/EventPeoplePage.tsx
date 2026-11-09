@@ -5,7 +5,9 @@ import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { EmptyState, TableSkeleton } from '@/components/PageState';
+import { LiveStamp } from '@/components/LiveStamp';
 import { PageHeader } from '@/components/PageHeader';
+import { SortableHead } from '@/components/SortableHead';
 import { SearchInput } from '@/components/SearchInput';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +23,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEventContext } from '@/features/events/event-context';
 import { useListFilter } from '@/hooks/useListFilter';
+import { useSort } from '@/hooks/useSort';
 import { formatIST, timeAgo } from '@/lib/datetime';
 
 /** Re-renders every 30 s so "12 min ago" keeps counting. */
@@ -37,6 +40,13 @@ function useNow(everyMs = 30_000) {
 type Outside = Schemas['OutsidePerson'];
 const personText = (p: Outside) => [p.name, p.participantCode, p.teamName, p.phone, p.reason];
 
+const SORTS = {
+  name: (p: Outside) => p.name,
+  team: (p: Outside) => p.teamName,
+  // Earliest first: who has been out longest.
+  left: (p: Outside) => p.outsideSince,
+};
+
 export function EventPeoplePage() {
   const api = useApi();
   const { event, path, features } = useEventContext();
@@ -48,6 +58,7 @@ export function EventPeoplePage() {
     refetchInterval: 15_000,
   });
   const search = useListFilter(outside.data ?? [], personText);
+  const sort = useSort(search.filtered, SORTS);
 
   if (!features.scanning) {
     return (
@@ -59,10 +70,10 @@ export function EventPeoplePage() {
   }
 
   const all = outside.data ?? [];
-  const people = search.filtered;
+  const people = sort.sorted;
   return (
     <div className="grid gap-4">
-      <PageHeader title="People" description="Who is at the event right now.">
+      <PageHeader title="Attendees" description="Who is at the event right now.">
         {all.length > 0 && (
           <SearchInput
             label="Search people outside"
@@ -84,8 +95,8 @@ export function EventPeoplePage() {
           </CardTitle>
           <CardDescription>
             Went out through an entry & exit checkpoint and not back in yet, longest out first.
-            Refreshes every 15 seconds.
           </CardDescription>
+          {outside.data && <LiveStamp updatedAt={outside.dataUpdatedAt} />}
         </CardHeader>
         <CardContent className="grid gap-3">
           <ErrorAlert error={outside.error} />
@@ -93,8 +104,12 @@ export function EventPeoplePage() {
           {outside.data && all.length === 0 && (
             <EmptyState icon={DoorOpen} title="Everyone who left has come back." />
           )}
-          {search.active && people.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nobody outside matches.</p>
+          {search.active && (
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {people.length === 0
+                ? 'Nobody outside matches.'
+                : `${people.length} of ${all.length} match`}
+            </p>
           )}
           {people.length > 0 && (
             <div className="overflow-x-auto rounded-lg border">
@@ -102,11 +117,27 @@ export function EventPeoplePage() {
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="hidden md:table-cell">Participant ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Team</TableHead>
+                    <SortableHead
+                      label="Name"
+                      active={sort.key === 'name'}
+                      dir={sort.dir}
+                      onSort={() => sort.toggle('name')}
+                    />
+                    <SortableHead
+                      label="Team"
+                      className="hidden md:table-cell"
+                      active={sort.key === 'team'}
+                      dir={sort.dir}
+                      onSort={() => sort.toggle('team')}
+                    />
                     <TableHead className="hidden sm:table-cell">Phone</TableHead>
                     <TableHead className="hidden lg:table-cell">Reason</TableHead>
-                    <TableHead>Left</TableHead>
+                    <SortableHead
+                      label="Left"
+                      active={sort.key === 'left'}
+                      dir={sort.dir}
+                      onSort={() => sort.toggle('left')}
+                    />
                   </TableRow>
                 </TableHeader>
                 <TableBody>

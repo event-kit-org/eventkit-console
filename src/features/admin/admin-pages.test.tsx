@@ -63,6 +63,30 @@ describe('admin overview', () => {
     expect(tiles).toEqual(['2', '2']);
   });
 
+  it('shows how many teams registered today, by the IST date', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 20 Oct, 23:00 UTC is already 21 Oct in IST.
+    vi.setSystemTime(new Date('2026-10-20T23:00:00.000Z'));
+    asRole('admin');
+    const day = (date: string, teams: number) => ({
+      date,
+      teams,
+      people: teams * 2,
+      totalTeams: teams,
+      totalPeople: teams * 2,
+    });
+    server.use(
+      http.get(`${E}/teams`, () => HttpResponse.json([summary()])),
+      http.get(`${E}/insights/registrations`, () =>
+        HttpResponse.json([day('2026-10-20', 5), day('2026-10-21', 3)]),
+      ),
+    );
+    go('');
+    const tile = (await screen.findByText('Teams registered')).closest('a')!;
+    expect(await within(tile).findByText('+3 today')).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it('staff are sent to the portal', async () => {
     asRole('volunteer');
     go('/teams');
@@ -160,6 +184,67 @@ describe('teams', () => {
     expect(screen.getByRole('link', { name: 'Waiting One' })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Show'), 'flagged');
     expect(screen.getByText('No teams here yet.')).toBeInTheDocument();
+  });
+
+  it('sorts by a column, counts what the filter leaves, and shows receipt states as badges', async () => {
+    asRole('admin');
+    server.use(
+      http.get(`${E}/teams`, () =>
+        HttpResponse.json([
+          summary({ id: 't1', name: 'Alpha', memberCount: 2, latestProofStatus: 'approved' }),
+          summary({ id: 't2', name: 'Charlie', memberCount: 4, latestProofStatus: 'pending' }),
+          summary({ id: 't3', name: 'Bravo', memberCount: 3, status: 'registered' }),
+        ]),
+      ),
+    );
+    const { router } = go('/teams');
+    expect(await screen.findByText('3 teams')).toBeInTheDocument();
+    const names = () =>
+      screen.getAllByRole('link', { name: /^(Alpha|Bravo|Charlie)$/ }).map((a) => a.textContent);
+    await userEvent.click(screen.getByRole('button', { name: 'Members' }));
+    expect(names()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(router.state.location.search).toBe('?sort=members');
+    await userEvent.click(screen.getByRole('button', { name: 'Members' }));
+    expect(names()).toEqual(['Charlie', 'Bravo', 'Alpha']);
+    expect(screen.getByRole('columnheader', { name: /Members/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Team' }));
+    expect(names()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    // Receipt states read as badges, the same as on the team page.
+    const charlie = screen.getByRole('link', { name: 'Charlie' }).closest('tr')!;
+    expect(within(charlie).getByText('pending')).toHaveAttribute('data-slot', 'badge');
+    await userEvent.selectOptions(screen.getByLabelText('Show'), 'registered');
+    expect(screen.getByText('1 of 3 teams')).toBeInTheDocument();
+  });
+
+  it('keeps the search and filter in the address, and names the team in the breadcrumb', async () => {
+    asRole('admin');
+    const t = registeredTeam('registered');
+    server.use(
+      http.get(`${E}/teams`, () =>
+        HttpResponse.json([
+          summary(),
+          summary({ id: t.id, name: 'Waiting One', status: 'registered', latestProofStatus: null }),
+        ]),
+      ),
+      http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)),
+    );
+    const { router } = go('/teams?status=registered');
+    expect(await screen.findByRole('link', { name: 'Waiting One' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Byte Club' })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole('searchbox'), 'x');
+    await waitFor(() => expect(router.state.location.search).toBe('?status=registered&q=x'));
+    await userEvent.clear(screen.getByRole('searchbox'));
+    await userEvent.click(screen.getByRole('link', { name: 'Review Waiting One' }));
+    const crumbs = await screen.findByRole('navigation', { name: 'breadcrumb' });
+    await waitFor(() => expect(within(crumbs).getByText(t.name)).toBeInTheDocument());
+    expect(within(crumbs).getByRole('link', { name: 'Teams' })).toBeInTheDocument();
+    expect(document.title).toBe(`${t.name} · Teams · ${event.name} · eventKit`);
+    await userEvent.click(screen.getByRole('link', { name: 'All teams' }));
+    await waitFor(() => expect(router.state.location.search).toBe('?status=registered'));
+    expect(screen.getByLabelText('Show')).toHaveValue('registered');
   });
 
   it('confirms a team (no payment) and cancels or restores registrations', async () => {
@@ -429,6 +514,11 @@ describe('payments', () => {
       expect.stringContaining('signed=1'),
     );
     expect(screen.getByText(/₹1,000 for 2 people/)).toBeInTheDocument();
+    // The receipt's team name opens the team.
+    expect(screen.getByRole('link', { name: 'Byte Club' })).toHaveAttribute(
+      'href',
+      `/events/${event.id}/teams/t`,
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
     expect(approve).toHaveLength(0);
     const dialog = within(await screen.findByRole('alertdialog'));

@@ -1,3 +1,4 @@
+import type { Schemas } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import type { DisplayStatus } from '@/lib/status';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,24 @@ export function StatusBadge({ status }: { status: DisplayStatus }) {
       className={cn(TONE[status])}
     >
       {LABEL[status]}
+    </Badge>
+  );
+}
+
+const PROOF_TONE: Record<Schemas['PaymentProofStatus'], string> = {
+  pending: 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
+  approved: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  rejected: '',
+};
+
+/** A payment receipt's review state, in the same colours as team statuses. */
+export function ProofStatusBadge({ status }: { status: Schemas['PaymentProofStatus'] }) {
+  return (
+    <Badge
+      variant={status === 'rejected' ? 'destructive' : 'secondary'}
+      className={cn('capitalize', PROOF_TONE[status])}
+    >
+      {status}
     </Badge>
   );
 }

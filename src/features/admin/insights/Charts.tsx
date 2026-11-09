@@ -41,6 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { LiveStamp } from '@/components/LiveStamp';
+import { cn } from '@/lib/utils';
 
 type Bucket = Schemas['ChartBucket'];
 
@@ -58,8 +60,14 @@ export function ChartCard({
   empty,
   table,
   children,
+  heading = 'h3',
+  live,
 }: {
   title: string;
+  /** When the numbers last arrived, for charts that refresh on their own. */
+  live?: number;
+  /** h2 when the card sits straight under the page title, h3 inside a section. */
+  heading?: 'h2' | 'h3';
   description?: ReactNode;
   action?: ReactNode;
   loading?: boolean;
@@ -71,8 +79,9 @@ export function ChartCard({
   return (
     <Card className="min-w-0">
       <CardHeader>
-        <CardTitle as="h3">{title}</CardTitle>
+        <CardTitle as={heading}>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
+        {live !== undefined && <LiveStamp updatedAt={live} />}
         {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="grid gap-3">
@@ -101,8 +110,13 @@ export function ChartCard({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {table.head.map((h) => (
-                        <TableHead key={h}>{h}</TableHead>
+                      {table.head.map((h, j) => (
+                        <TableHead
+                          key={h}
+                          className={cn(typeof table.rows[0]?.[j] === 'number' && 'text-right')}
+                        >
+                          {h}
+                        </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -110,7 +124,10 @@ export function ChartCard({
                     {table.rows.map((r, i) => (
                       <TableRow key={i}>
                         {r.map((c, j) => (
-                          <TableCell key={j} className="tabular-nums">
+                          <TableCell
+                            key={j}
+                            className={cn('tabular-nums', typeof c === 'number' && 'text-right')}
+                          >
                             {c}
                           </TableCell>
                         ))}

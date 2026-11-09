@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatIST } from '@/lib/datetime';
 import { QuestionPreview } from '@/features/admin/QuestionCard';
+import { useDetailCrumb } from '@/components/detail-crumb';
 import { useEventContext } from '@/features/events/event-context';
 import { PHASE_TONE, PhaseBadge } from '@/features/judging/rounds';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -29,6 +30,7 @@ export function SubmissionPage() {
   const { submissionId = '' } = useParams();
   const submissions = useSubmissions();
   const submission = submissions.data?.find((s) => s.id === submissionId);
+  useDetailCrumb(submission?.title);
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-6">
       <Link
@@ -261,7 +263,7 @@ function WhoSubmitted({ submissionId }: { submissionId: string }) {
               >
                 {status.data.pending.map((t) => (
                   <li key={t.id} className="wrap-anywhere">
-                    {t.name}
+                    <TeamLink eventId={event.id} team={t} />
                   </li>
                 ))}
               </ul>
@@ -274,7 +276,9 @@ function WhoSubmitted({ submissionId }: { submissionId: string }) {
               <ul aria-label="Submitted" className="grid gap-1 rounded-lg border p-3 text-sm">
                 {status.data.submitted.map((s) => (
                   <li key={s.team.id} className="flex flex-wrap justify-between gap-x-3">
-                    <span className="min-w-0 wrap-anywhere">{s.team.name}</span>
+                    <span className="min-w-0 wrap-anywhere">
+                      <TeamLink eventId={event.id} team={s.team} />
+                    </span>
                     <span className="text-muted-foreground">
                       {s.responses > 1 && `${s.responses} responses · `}
                       {formatIST(s.lastAt)}
@@ -287,5 +291,13 @@ function WhoSubmitted({ submissionId }: { submissionId: string }) {
         </Tabs>
       )}
     </section>
+  );
+}
+
+function TeamLink({ eventId, team }: { eventId: string; team: { id: string; name: string } }) {
+  return (
+    <Link to={`/events/${eventId}/teams/${team.id}`} className="underline-offset-4 hover:underline">
+      {team.name}
+    </Link>
   );
 }

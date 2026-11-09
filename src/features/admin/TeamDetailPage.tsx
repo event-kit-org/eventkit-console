@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Ban, CircleAlert, Link2, QrCode, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
@@ -9,7 +9,7 @@ import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { CardsSkeleton } from '@/components/PageState';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StatusBadge } from '@/components/StatusBadge';
+import { ProofStatusBadge, StatusBadge } from '@/components/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { useDetailCrumb } from '@/components/detail-crumb';
 import { useEventContext } from '@/features/events/event-context';
 import { useTracks } from '@/features/judging/Tracks';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -45,6 +46,7 @@ import {
 
 export function TeamDetailPage() {
   const { teamId = '' } = useParams();
+  const { state } = useLocation();
   const api = useApi();
   const { event, role, features } = useEventContext();
   // Reviewers shortlist, confirm and cancel; links, QR codes, receipts and deleting are for admins.
@@ -64,6 +66,7 @@ export function TeamDetailPage() {
     queryKey: ['event', event.id, 'team', teamId],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/teams/{teamId}', params)),
   });
+  useDetailCrumb(team.data?.name);
 
   const move = useEventMutation(event.id, (action: 'shortlist' | 'confirm') =>
     unwrap(
@@ -141,7 +144,8 @@ export function TeamDetailPage() {
   return (
     <div className="grid gap-4">
       <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
-        <Link to=".." relative="path">
+        {/* Back to the list as it was: same search and filter. */}
+        <Link to={`..${(state as { list?: string } | null)?.list ?? ''}`} relative="path">
           <ArrowLeft aria-hidden /> All teams
         </Link>
       </Button>
@@ -459,12 +463,7 @@ export function TeamDetailPage() {
                     </span>
                   )}
                   <span className="text-muted-foreground">uploaded {formatIST(p.uploadedAt)}</span>
-                  <Badge
-                    variant={p.status === 'rejected' ? 'destructive' : 'secondary'}
-                    className="capitalize"
-                  >
-                    {p.status}
-                  </Badge>
+                  <ProofStatusBadge status={p.status} />
                   {p.rejectionNote && (
                     <span className="text-muted-foreground">— {p.rejectionNote}</span>
                   )}

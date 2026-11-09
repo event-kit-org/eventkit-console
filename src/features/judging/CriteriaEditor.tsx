@@ -68,14 +68,6 @@ export function CriteriaEditor({
     ),
   );
   const others = rounds.filter((r) => r.id !== round.id);
-  const visibility = useEventMutation(event.id, () =>
-    unwrap(
-      api.PATCH('/v1/events/{eventId}', {
-        ...path,
-        body: { leaderboardVisible: !event.leaderboardVisible },
-      }),
-    ),
-  );
 
   return (
     <Card>
@@ -188,23 +180,7 @@ export function CriteriaEditor({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/50 p-3 text-sm">
-          <span>
-            Leaderboard:{' '}
-            {event.leaderboardVisible ? 'everyone can see it' : 'admins and judges only'}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={visibility.isPending}
-            onClick={() => visibility.mutate(undefined)}
-          >
-            {event.leaderboardVisible ? 'Hide from everyone' : 'Show to everyone'}
-          </Button>
-        </div>
-        <ErrorAlert
-          error={add.error ?? remove.error ?? update.error ?? duplicate.error ?? visibility.error}
-        />
+        <ErrorAlert error={add.error ?? remove.error ?? update.error ?? duplicate.error} />
       </CardContent>
     </Card>
   );

@@ -67,10 +67,11 @@ describe('event layout', () => {
     renderApp(`/events/${event.id}`, { token: 'good-token' });
     expect(await screen.findByRole('heading', { name: 'PESOS X Silicon' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Event sections' });
-    expect(nav).toHaveTextContent('OverviewRegistrationTeamsPayments');
-    expect(nav).toHaveTextContent('SetupPeoplePortal & settings');
+    expect(nav).toHaveTextContent('OverviewRegistrationTeamsPaymentsAssignmentsEvent day');
+    expect(nav).toHaveTextContent('SetupRegistration formLinksTeam & rolesPortal & settings');
     // Scanning happens on the portal; the page still opens by its address.
-    expect(nav).toHaveTextContent('Event dayCheckpointsPeoplePollsNotificationsSubmissionsJudging');
+    expect(nav).toHaveTextContent('Event dayCheckpointsAttendeesPollsNotifications');
+    expect(nav).toHaveTextContent('JudgingSubmissionsJudgingLeaderboards');
   });
 
   it('names the open section in the breadcrumb, and collapses the sidebar', async () => {

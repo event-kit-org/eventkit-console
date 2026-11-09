@@ -69,7 +69,7 @@ async function menu(item: string) {
   await userEvent.click(await screen.findByRole('button', { name: /^Actions for / }));
   await userEvent.click(await screen.findByRole('menuitem', { name: item }));
 }
-const go = () => renderApp(`/events/${event.id}/judging`, { token: 'good-token' });
+const go = (page = 'judging') => renderApp(`/events/${event.id}/${page}`, { token: 'good-token' });
 
 describe('judging', () => {
   it('admins edit the rubric of the selected round and the leaderboard visibility', async () => {
@@ -78,13 +78,10 @@ describe('judging', () => {
     const added = capture('post', `${E}/criteria`, criteria[0], 201);
     const removed = capture('delete', `${E}/criteria/c2`);
     const edited = capture('patch', `${E}/criteria/c1`, criteria[0]);
-    const shown = capture('patch', E, {
-      event: { ...event, leaderboardVisible: true },
-      role: 'admin',
-    });
     go();
     expect(await screen.findByText('How original')).toBeInTheDocument();
-    expect(await screen.findByText('Byte Club')).toBeInTheDocument();
+    // The ranking lives on its own page now.
+    expect(screen.queryByText('Byte Club')).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Criterion'), 'Impact');
     await userEvent.type(screen.getByLabelText('Description for judges'), 'Who it helps');
     await userEvent.clear(screen.getByLabelText('Maximum score'));
@@ -115,8 +112,33 @@ describe('judging', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Remove Demo' }));
     await waitFor(() => expect(removed).toHaveLength(1));
+  });
+
+  it('shows the round’s leaderboard on its own page, where admins set who sees it', async () => {
+    asRole('admin');
+    use();
+    const shown = capture('patch', E, {
+      event: { ...event, leaderboardVisible: true },
+      role: 'admin',
+    });
+    go('leaderboards');
+    expect(await screen.findByText('Byte Club')).toBeInTheDocument();
+    expect(screen.queryByText('How original')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show to everyone' }));
     await waitFor(() => expect(shown[0]?.body).toEqual({ leaderboardVisible: true }));
+  });
+
+  it('keeps the picked round in the address and links the two pages', async () => {
+    asRole('admin');
+    const asked = use();
+    const { router } = go();
+    await screen.findByText('How original');
+    await pick('Round', /Finals/);
+    await waitFor(() => expect(router.state.location.search).toBe(`?round=${R2}`));
+    await userEvent.click(screen.getByRole('link', { name: 'See leaderboard' }));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/\/leaderboards$/));
+    expect(router.state.location.search).toBe(`?round=${R2}`);
+    expect(asked).toContain(R2);
   });
 
   it('picks rounds from a dropdown; phase, rename, add and delete from its menu', async () => {
@@ -183,7 +205,7 @@ describe('judging', () => {
     expect(await screen.findByText('Elimination')).toBeInTheDocument();
     await pick('Round phase', 'Closed');
     const dialog = await screen.findByRole('dialog', { name: /Who goes on from Round 1/ });
-    expect(within(dialog).getByLabelText('Top')).toHaveValue(2);
+    await waitFor(() => expect(within(dialog).getByLabelText('Top')).toHaveValue(2));
     expect(within(dialog).getByRole('checkbox', { name: /Alpha/ })).toBeChecked();
     expect(within(dialog).getByRole('checkbox', { name: /Beta/ })).toBeChecked();
     expect(within(dialog).getByRole('checkbox', { name: /Gamma/ })).not.toBeChecked();
@@ -235,7 +257,7 @@ describe('judging', () => {
       ),
     );
     const removed = capture('delete', `${E}/judging/teams/t1/scores/j1`);
-    go();
+    go('leaderboards');
     await userEvent.click(await screen.findByRole('button', { name: 'Byte Club' }));
     const sheet = await screen.findByRole('dialog', { name: 'Byte Club' });
     expect(await within(sheet).findByText('Meera')).toBeInTheDocument();
@@ -243,6 +265,10 @@ describe('judging', () => {
     expect(within(sheet).getByText(`Last saved ${formatIST(stamp)}`)).toBeInTheDocument();
     expect(within(sheet).getByText('12.50 / 15')).toBeInTheDocument();
     expect(within(sheet).getByText('8.50 / 10')).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: /Open team page/ })).toHaveAttribute(
+      'href',
+      `/events/${event.id}/teams/t1`,
+    );
 
     // An admin clears a judge's scores so they can score the team again.
     await userEvent.click(within(sheet).getByRole('button', { name: 'Remove scores' }));
@@ -254,7 +280,7 @@ describe('judging', () => {
   it('reviewers see team names but no breakdown', async () => {
     asRole('reviewer');
     use();
-    go();
+    go('leaderboards');
     expect(await screen.findByText('Byte Club')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Byte Club' })).not.toBeInTheDocument();
   });
@@ -355,7 +381,7 @@ describe('judging', () => {
         HttpResponse.json({ visibleToEveryone: false, round: null, entries: [] }),
       ),
     );
-    go();
+    go('leaderboards');
     expect(await screen.findByText('No scores yet.')).toBeInTheDocument();
   });
 });
@@ -387,7 +413,7 @@ describe('scores, tracks and leaderboards', () => {
         return HttpResponse.json(board());
       }),
     );
-    go();
+    go('leaderboards');
     expect(await screen.findByText('12.50 / 15')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('switch', { name: 'Even out lenient and harsh judges' }),
@@ -429,7 +455,7 @@ describe('scores, tracks and leaderboards', () => {
         } satisfies Schemas['ScoreBreakdown']),
       ),
     );
-    go();
+    go('leaderboards');
     await screen.findByText('12.50 / 15');
     await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Leaderboard' }));
@@ -469,9 +495,9 @@ describe('scores, tracks and leaderboards', () => {
       ),
     );
     const removed = capture('delete', `${E}/leaderboards/lb1`);
-    go();
+    go('leaderboards');
     const card = within(
-      (await screen.findByText('Leaderboards')).closest('[data-slot="card"]') as HTMLElement,
+      (await screen.findByText('Saved leaderboards')).closest('[data-slot="card"]') as HTMLElement,
     );
     expect(await card.findByText(/Every team · Round 1 \+ Finals ×2 · Add up/)).toBeInTheDocument();
     await userEvent.click(card.getByRole('button', { name: /^Overall/ }));
@@ -523,7 +549,7 @@ describe('scores, tracks and leaderboards', () => {
       teamCount: 2,
     });
     const removed = capture('delete', `${E}/tracks/tr1`);
-    go();
+    go('leaderboards');
     const list = await screen.findByRole('list', { name: 'Tracks' });
     expect(within(list).getByText('2 teams')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('New track'), 'Web');

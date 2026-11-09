@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
@@ -11,35 +11,40 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { DetailCrumbContext } from './detail-crumb';
 import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { sectionFor } from '@/features/events/sections';
 import { useOpenEventId } from '@/hooks/useOpenEventId';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { AppSidebar } from './AppSidebar';
 
 export function AppShell() {
+  const [detail, setDetail] = useState<string | null>(null);
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-          />
-          <Crumbs />
-        </header>
-        <div className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <DetailCrumbContext.Provider value={setDetail}>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+            />
+            <Crumbs detail={detail} />
+          </header>
+          <div className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">
+            <Outlet />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </DetailCrumbContext.Provider>
   );
 }
 
 /** Where you are: Events › the event › its section. */
-function Crumbs() {
+function Crumbs({ detail }: { detail: string | null }) {
   const api = useApi();
   const { pathname } = useLocation();
   const eventId = useOpenEventId();
@@ -53,20 +58,28 @@ function Crumbs() {
 
   const trail: { label: string; to?: string }[] = [{ label: 'Events', to: '/' }];
   if (pathname === '/events/new') trail.push({ label: 'Create an event' });
+  if (pathname === '/account') trail.push({ label: 'Account settings' });
   if (eventId) {
     const base = `/events/${eventId}`;
     trail.push({ label: event.data?.event.name ?? 'Event', to: base });
     const section = sectionFor(pathname.slice(base.length));
     if (section.to) trail.push({ label: section.label, to: `${base}/${section.to}` });
+    // A page inside a section (one team, one submission) adds its own name.
+    if (section.to && detail && pathname.split('/').filter(Boolean).length > 3) {
+      trail.push({ label: detail });
+    }
   }
   // The last crumb is the page you're on; the ones before it link back.
   trail[trail.length - 1]!.to = undefined;
+
+  // "Events" leads every trail, so it only names the tab on the events list.
+  usePageTitle(...(trail.length > 1 ? trail.slice(1) : trail).map((c) => c.label).reverse());
 
   return (
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
         {trail.map((c, i) => (
-          <Fragment key={c.label}>
+          <Fragment key={i}>
             {i > 0 && (
               // Phones show only the page you're on.
               <BreadcrumbSeparator className="hidden md:block" />

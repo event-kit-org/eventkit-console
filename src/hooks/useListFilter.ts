@@ -16,8 +16,11 @@ export const normalise = (s: string) =>
 export function useListFilter<T>(
   items: readonly T[],
   text: (item: T) => (string | null | undefined)[],
+  /** Keep the query somewhere else, such as the address (see useSearchParam). */
+  state?: readonly [string, (query: string) => void],
 ) {
-  const [query, setQuery] = useState('');
+  const own = useState('');
+  const [query, setQuery] = state ?? own;
   const deferred = useDeferredValue(query);
   const filtered = useMemo(() => {
     const words = normalise(deferred).split(/\s+/).filter(Boolean);

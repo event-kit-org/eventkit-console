@@ -1,11 +1,12 @@
 import { ArrowRight, UsersRound } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { EmptyState, TableSkeleton } from '@/components/PageState';
 import { PageHeader } from '@/components/PageHeader';
 import { SearchInput } from '@/components/SearchInput';
-import { StatusBadge } from '@/components/StatusBadge';
+import { SortableHead } from '@/components/SortableHead';
+import { ProofStatusBadge, StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,9 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { teamDisplayStatus } from '@/lib/status';
+import { type DisplayStatus, teamDisplayStatus } from '@/lib/status';
 import { useEventContext } from '@/features/events/event-context';
 import { useListFilter } from '@/hooks/useListFilter';
+import { useSearchParam } from '@/hooks/useSearchParam';
+import { useSort } from '@/hooks/useSort';
 import { formatMoney } from '@/lib/money';
 import { useTeams } from './queries';
 import { PendingReleaseBadge, ReleaseControls } from './TeamRelease';
@@ -45,13 +48,33 @@ const teamText = (t: TeamRow) => [
   ...t.members.flatMap((m) => [m.name, m.email, m.participantCode]),
 ];
 
+/** Status sorts along the way a team moves, not alphabetically. */
+const STATUS_ORDER: DisplayStatus[] = [
+  'registered',
+  'shortlisted',
+  'confirmation_pending',
+  'confirmed',
+  'attending',
+  'checked_in',
+  'cancelled',
+];
+
+const SORTS = {
+  name: (t: TeamRow) => t.name,
+  status: (t: TeamRow) => STATUS_ORDER.indexOf(teamDisplayStatus(t)),
+  members: (t: TeamRow) => t.memberCount,
+  paid: (t: TeamRow) => t.paidAmount,
+};
+
 export function TeamsPage() {
   const { event } = useEventContext();
+  const { search: listQuery } = useLocation();
   const teams = useTeams();
-  const [filter, setFilter] = useState('all');
+  // In the address, so they survive opening a team and coming back.
+  const [filter, setFilter] = useSearchParam('status', 'all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const search = useListFilter(teams.data ?? [], teamText);
-  const list = search.filtered.filter(
+  const search = useListFilter(teams.data ?? [], teamText, useSearchParam('q'));
+  const filtered = search.filtered.filter(
     (t) =>
       filter === 'all' ||
       t.status === filter ||
@@ -59,6 +82,8 @@ export function TeamsPage() {
       (filter === 'flagged' && t.belowMinimum) ||
       (filter === 'pending_release' && t.pendingRelease),
   );
+  const sort = useSort(filtered, SORTS);
+  const list = sort.sorted;
   const pending = (teams.data ?? []).filter((t) => t.pendingRelease);
   // Release controls show while staged release is on, or decisions still wait.
   const staged = event.stagedRelease || pending.length > 0;
@@ -74,7 +99,10 @@ export function TeamsPage() {
 
   return (
     <div className="grid gap-4">
-      <PageHeader title="Teams" description="Every team that registered, newest first.">
+      <PageHeader
+        title="Teams"
+        description="Every team that registered, newest first. Click a column to sort."
+      >
         <SearchInput
           label="Search teams and members"
           placeholder="Team, member, email or ID"
@@ -112,6 +140,13 @@ export function TeamsPage() {
         </div>
       )}
       <ErrorAlert error={teams.error} />
+      {teams.data && teams.data.length > 0 && (
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {list.length === teams.data.length
+            ? `${list.length} ${list.length === 1 ? 'team' : 'teams'}`
+            : `${list.length} of ${teams.data.length} teams`}
+        </p>
+      )}
       {teams.isPending && <TableSkeleton cols={6} />}
       {teams.data && list.length === 0 ? (
         <EmptyState
@@ -136,12 +171,36 @@ export function TeamsPage() {
                       />
                     </TableHead>
                   )}
-                  <TableHead>Team</TableHead>
+                  <SortableHead
+                    label="Team"
+                    active={sort.key === 'name'}
+                    dir={sort.dir}
+                    onSort={() => sort.toggle('name')}
+                  />
                   <TableHead className="hidden sm:table-cell">Leader</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden text-right md:table-cell">Members</TableHead>
+                  <SortableHead
+                    label="Status"
+                    active={sort.key === 'status'}
+                    dir={sort.dir}
+                    onSort={() => sort.toggle('status')}
+                  />
+                  <SortableHead
+                    label="Members"
+                    align="right"
+                    className="hidden md:table-cell"
+                    active={sort.key === 'members'}
+                    dir={sort.dir}
+                    onSort={() => sort.toggle('members')}
+                  />
                   <TableHead className="hidden lg:table-cell">Payment</TableHead>
-                  <TableHead className="hidden lg:table-cell">Paid</TableHead>
+                  <SortableHead
+                    label="Paid"
+                    align="right"
+                    className="hidden lg:table-cell"
+                    active={sort.key === 'paid'}
+                    dir={sort.dir}
+                    onSort={() => sort.toggle('paid')}
+                  />
                   <TableHead className="hidden xl:table-cell">Decided by</TableHead>
                   <TableHead className="hidden sm:table-cell">
                     <span className="sr-only">Review</span>
@@ -163,7 +222,11 @@ export function TeamsPage() {
                       </TableCell>
                     )}
                     <TableCell className="whitespace-normal">
-                      <Link className="font-medium wrap-anywhere hover:underline" to={t.id}>
+                      <Link
+                        className="font-medium wrap-anywhere hover:underline"
+                        to={t.id}
+                        state={{ list: listQuery }}
+                      >
                         {t.name}
                       </Link>
                       {t.belowMinimum && (
@@ -189,10 +252,14 @@ export function TeamsPage() {
                     <TableCell className="hidden text-right tabular-nums md:table-cell">
                       {t.memberCount}
                     </TableCell>
-                    <TableCell className="hidden capitalize lg:table-cell">
-                      {t.latestProofStatus ?? '—'}
+                    <TableCell className="hidden lg:table-cell">
+                      {t.latestProofStatus ? (
+                        <ProofStatusBadge status={t.latestProofStatus} />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
-                    <TableCell className="hidden tabular-nums lg:table-cell">
+                    <TableCell className="hidden text-right tabular-nums lg:table-cell">
                       {t.paidAmount === null ? '—' : formatMoney(t.paidAmount, event.currency)}
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
@@ -200,7 +267,7 @@ export function TeamsPage() {
                     </TableCell>
                     <TableCell className="hidden text-right sm:table-cell">
                       <Button size="icon-sm" variant="outline" asChild>
-                        <Link to={t.id} aria-label={`Review ${t.name}`}>
+                        <Link to={t.id} state={{ list: listQuery }} aria-label={`Review ${t.name}`}>
                           <ArrowRight aria-hidden />
                         </Link>
                       </Button>
