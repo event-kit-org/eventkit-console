@@ -81,13 +81,19 @@ export function FieldInputs({
                 ))}
               </NativeSelect>
             ) : f.type === 'long_text' ? (
-              <Textarea {...common} value={value} onChange={(e) => set(e.target.value)} />
+              <Textarea
+                {...common}
+                maxLength={5000}
+                value={value}
+                onChange={(e) => set(e.target.value)}
+              />
             ) : (
               <Input
                 {...common}
                 type={
                   f.type === 'number' ? 'number' : f.type === 'datetime' ? 'datetime-local' : 'text'
                 }
+                maxLength={f.type === 'short_text' ? 1000 : undefined}
                 value={value}
                 onChange={(e) => set(e.target.value)}
               />

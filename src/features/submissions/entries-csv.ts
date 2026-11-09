@@ -10,22 +10,24 @@ const toCsv = (rows: string[][]) => rows.map((r) => r.map(cell).join(',')).join(
 
 const entryColumns = (s: Submission, e: Entry | undefined) => [
   e?.submittedBy?.name ?? '',
-  e ? formatIST(e.updatedAt) : '',
+  e ? formatIST(e.createdAt) : '',
   e ? (e.late ? 'yes' : '') : '',
   ...s.fields.map((f) => answerText(e?.answers[f.id], f.type)),
 ];
 
-/** One form's entries: a row per team that submitted, a column per question. */
+/** One form's responses: a row per response (by team, oldest first), a column per question. */
 export function entriesCsv(submission: Submission, entries: Entry[]): string {
   const header = [
     'Team',
     'Submitted by',
-    'Last saved (IST)',
+    'Sent (IST)',
     'Late',
     ...submission.fields.map((f) => f.label),
   ];
   const rows = [...entries]
-    .sort((a, b) => a.team.name.localeCompare(b.team.name))
+    .sort(
+      (a, b) => a.team.name.localeCompare(b.team.name) || a.createdAt.localeCompare(b.createdAt),
+    )
     .map((e) => [e.team.name, ...entryColumns(submission, e)]);
   return toCsv([header, ...rows]);
 }
@@ -33,7 +35,7 @@ export function entriesCsv(submission: Submission, entries: Entry[]): string {
 /**
  * Every form of a round side by side: a row per team in the round (those
  * that submitted nothing too), and for each form its own columns, headed
- * "Form › Question".
+ * "Form › Question". A team that sent several responses shows its latest.
  */
 export function roundCsv(
   teams: { id: string; name: string }[],
@@ -42,7 +44,7 @@ export function roundCsv(
   const header = [
     'Team',
     ...forms.flatMap(({ submission: s }) =>
-      ['Submitted by', 'Last saved (IST)', 'Late', ...s.fields.map((f) => f.label)].map(
+      ['Submitted by', 'Sent (IST)', 'Late', ...s.fields.map((f) => f.label)].map(
         (label) => `${s.title} › ${label}`,
       ),
     ),
@@ -54,7 +56,9 @@ export function roundCsv(
       ...forms.flatMap(({ submission, entries }) =>
         entryColumns(
           submission,
-          entries.find((e) => e.team.id === t.id),
+          entries
+            .filter((e) => e.team.id === t.id)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0],
         ),
       ),
     ]);

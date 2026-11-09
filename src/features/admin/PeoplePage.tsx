@@ -13,7 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -51,6 +53,17 @@ export function PeoplePage() {
   const remove = useEventMutation(event.id, (userId: string) =>
     unwrap(api.DELETE('/v1/events/{eventId}/members/{userId}', p(userId))),
   );
+  // Admins score teams on the portal only while this is on; they stay admins.
+  const judging = useEventMutation(
+    event.id,
+    ({ userId, canJudge }: { userId: string; canJudge: boolean }) =>
+      unwrap(
+        api.PUT('/v1/events/{eventId}/members/{userId}/judging', {
+          ...p(userId),
+          body: { canJudge },
+        }),
+      ),
+  );
   const organisers = members.data?.filter(isOrganiser) ?? [];
   const staff = members.data?.filter((m) => !isOrganiser(m)) ?? [];
 
@@ -60,7 +73,7 @@ export function PeoplePage() {
         title="People"
         description="Who runs this event with you, and its volunteers and judges."
       />
-      <ErrorAlert error={members.error ?? change.error ?? remove.error} />
+      <ErrorAlert error={members.error ?? change.error ?? remove.error ?? judging.error} />
       {members.isPending && <TableSkeleton rows={4} cols={3} />}
       {members.data && (
         <>
@@ -68,6 +81,8 @@ export function PeoplePage() {
             organisers={organisers}
             onRole={(userId, role) => change.mutate({ userId, role })}
             onRemove={(userId) => remove.mutate(userId)}
+            onJudging={(userId, canJudge) => judging.mutate({ userId, canJudge })}
+            judgingBusy={judging.isPending}
           />
           <Staff
             staff={staff}
@@ -85,6 +100,8 @@ function Organisers(props: {
   organisers: Member[];
   onRole: (userId: string, role: OrganiserRole) => void;
   onRemove: (userId: string) => void;
+  onJudging: (userId: string, canJudge: boolean) => void;
+  judgingBusy: boolean;
 }) {
   const { isOwner } = useEventContext();
   const { user } = useAuth();
@@ -96,7 +113,8 @@ function Organisers(props: {
           Co-admins can do everything except delete the event, billing, API keys and organisers.
           Reviewers work through teams and payments: shortlisting, confirming and receipts. Both
           need an eventKit account and work in this console. Reviewers who want to leave ask the
-          owner to remove them.
+          owner to remove them. Admins score teams on the portal only once judging is turned on for
+          them; any admin can turn it on.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -137,6 +155,19 @@ function Organisers(props: {
                           </NativeSelectOption>
                         ))}
                       </NativeSelect>
+                    )}
+                    {m.role === 'admin' && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Switch
+                          id={`judges-${m.userId}`}
+                          checked={m.canJudge}
+                          disabled={props.judgingBusy}
+                          onCheckedChange={(on) => props.onJudging(m.userId, on)}
+                        />
+                        <Label htmlFor={`judges-${m.userId}`} className="text-xs font-normal">
+                          Judges
+                        </Label>
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="text-right">

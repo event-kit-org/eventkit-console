@@ -10,6 +10,8 @@ import { useEventContext } from '@/features/events/event-context';
 import { CriteriaEditor } from './CriteriaEditor';
 import { Leaderboard } from './Leaderboard';
 import { RoundsStrip } from './RoundsStrip';
+import { SavedLeaderboards } from './SavedLeaderboards';
+import { Tracks } from './Tracks';
 import { useRounds } from './rounds';
 
 /**
@@ -18,7 +20,7 @@ import { useRounds } from './rounds';
  */
 export function JudgingPage() {
   const api = useApi();
-  const { event, path } = useEventContext();
+  const { event, path, role } = useEventContext();
   const rounds = useRounds();
   const [picked, setPicked] = useState<string | null>(null);
   const all = rounds.data ?? [];
@@ -57,6 +59,12 @@ export function JudgingPage() {
             loading={criteria.isPending}
           />
           <Leaderboard roundId={selected.id} />
+        </>
+      )}
+      {rounds.data && all.length > 0 && role === 'admin' && (
+        <>
+          <SavedLeaderboards rounds={all} />
+          <Tracks />
         </>
       )}
     </div>

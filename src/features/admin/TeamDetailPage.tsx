@@ -24,7 +24,9 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
+import { useTracks } from '@/features/judging/Tracks';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { AnswerList } from '@/features/fields/FieldInputs';
 import { memberFields, teamFields } from '@/features/fields/fields';
@@ -217,6 +219,7 @@ export function TeamDetailPage() {
         </div>
       </div>
       <Decisions team={t} />
+      {admin && <TeamTrack teamId={t.id} trackId={t.trackId} />}
       {t.belowMinimum && (
         <Alert variant="destructive">
           <CircleAlert aria-hidden />
@@ -489,5 +492,40 @@ function Decisions({ team }: { team: Schemas['Team'] }) {
         .map(([what, d]) => `${what} by ${d!.name}${d!.at ? ` · ${formatIST(d!.at)}` : ''}`)
         .join('. ')}
     </p>
+  );
+}
+
+/** Admin: the track the team competes in (shown once the event has tracks). */
+function TeamTrack({ teamId, trackId }: { teamId: string; trackId: string | null }) {
+  const api = useApi();
+  const { event } = useEventContext();
+  const tracks = useTracks();
+  const set = useEventMutation(event.id, (id: string | null) =>
+    unwrap(
+      api.PUT('/v1/events/{eventId}/teams/{teamId}/track', {
+        params: { path: { eventId: event.id, teamId } },
+        body: { trackId: id },
+      }),
+    ),
+  );
+  if (!tracks.data?.length) return null;
+  return (
+    <Field className="max-w-xs">
+      <FieldLabel htmlFor="team-track">Track</FieldLabel>
+      <NativeSelect
+        id="team-track"
+        value={trackId ?? ''}
+        disabled={set.isPending}
+        onChange={(e) => set.mutate(e.target.value || null)}
+      >
+        <NativeSelectOption value="">No track</NativeSelectOption>
+        {tracks.data.map((tr) => (
+          <NativeSelectOption key={tr.id} value={tr.id}>
+            {tr.name}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      <ErrorAlert error={set.error} />
+    </Field>
   );
 }

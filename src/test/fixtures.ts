@@ -56,6 +56,7 @@ export function team(overrides: Partial<Schemas['Team']> = {}): Schemas['Team'] 
     id: '44444444-4444-4444-8444-444444444444',
     name: 'Byte Club',
     leaderRegistrationId: 'r1',
+    trackId: null,
     createdAt: event.createdAt,
     status: 'registered',
     belowMinimum: false,

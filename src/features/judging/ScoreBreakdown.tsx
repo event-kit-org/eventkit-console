@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquareText } from 'lucide-react';
+import { MessageSquareText, Trash2 } from 'lucide-react';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
+import { ConfirmButton } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { RowsSkeleton } from '@/components/PageState';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useEventContext } from '@/features/events/event-context';
+import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST } from '@/lib/datetime';
 
 const score = (n: number | null) => (n === null ? '—' : Number.isInteger(n) ? n : n.toFixed(2));
@@ -43,6 +45,14 @@ export function ScoreBreakdownSheet({
       ),
     enabled: team !== null,
   });
+  // Clears one judge's scores and comment, so they can score the team again.
+  const remove = useEventMutation(event.id, (judgeId: string) =>
+    unwrap(
+      api.DELETE('/v1/events/{eventId}/judging/teams/{teamId}/scores/{judgeId}', {
+        params: { path: { eventId: event.id, teamId: team!.id, judgeId }, query: { roundId } },
+      }),
+    ),
+  );
   const b = breakdown.data;
   return (
     <Sheet open={team !== null} onOpenChange={(open) => !open && onClose()}>
@@ -54,7 +64,7 @@ export function ScoreBreakdownSheet({
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 px-4 pb-6">
-          <ErrorAlert error={breakdown.error} />
+          <ErrorAlert error={breakdown.error ?? remove.error} />
           {breakdown.isPending && <RowsSkeleton rows={3} />}
           {b && (
             <>
@@ -105,28 +115,41 @@ export function ScoreBreakdownSheet({
                         {j.scores.map((s) => {
                           const c = b.criteria.find((x) => x.id === s.criterionId)!;
                           return (
-                            <li key={s.criterionId} className="grid gap-0.5">
-                              <div className="flex items-baseline justify-between gap-3">
-                                <span className="min-w-0 wrap-anywhere text-muted-foreground">
-                                  {c.name}
-                                </span>
-                                <span className="shrink-0 tabular-nums">
-                                  {score(s.value)} / {c.maxScore}
-                                </span>
-                              </div>
-                              {s.comment && (
-                                <p className="flex gap-1.5 text-xs wrap-anywhere text-muted-foreground">
-                                  <MessageSquareText
-                                    aria-hidden
-                                    className="mt-0.5 size-3 shrink-0"
-                                  />
-                                  <span className="min-w-0">{s.comment}</span>
-                                </p>
-                              )}
+                            <li
+                              key={s.criterionId}
+                              className="flex items-baseline justify-between gap-3"
+                            >
+                              <span className="min-w-0 wrap-anywhere text-muted-foreground">
+                                {c.name}
+                              </span>
+                              <span className="shrink-0 tabular-nums">
+                                {score(s.value)} / {c.maxScore}
+                              </span>
                             </li>
                           );
                         })}
                       </ul>
+                      {j.comment && (
+                        <p className="flex gap-1.5 wrap-anywhere text-muted-foreground">
+                          <MessageSquareText aria-hidden className="mt-1 size-3.5 shrink-0" />
+                          <span className="min-w-0 whitespace-pre-line">{j.comment}</span>
+                        </p>
+                      )}
+                      {b.round.phase !== 'closed' && (
+                        <ConfirmButton
+                          variant="ghost"
+                          size="sm"
+                          className="justify-self-start text-muted-foreground"
+                          title={`Remove ${j.judge.name}'s scores?`}
+                          description={`Their scores and comment on ${b.team.name} in ${b.round.name} go, so they can score it again. This can't be undone.`}
+                          confirmLabel="Remove scores"
+                          destructive
+                          disabled={remove.isPending}
+                          onConfirm={() => remove.mutate(j.judge.id)}
+                        >
+                          <Trash2 aria-hidden /> Remove scores
+                        </ConfirmButton>
+                      )}
                     </li>
                   ))}
                 </ul>

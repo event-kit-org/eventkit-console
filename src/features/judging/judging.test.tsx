@@ -34,6 +34,7 @@ const board = (visibleToEveryone = false): Schemas['Leaderboard'] => ({
       rank: 1,
       team: { id: 't1', name: 'Byte Club' },
       total: 12.5,
+      normalisedTotal: 12,
       maxTotal: 15,
       judges: 2,
       criteria: [],
@@ -51,6 +52,8 @@ function use(list = rounds) {
     }),
     http.get(`${E}/leaderboard`, () => HttpResponse.json(board())),
     http.get(`${E}/rounds/:roundId/teams`, () => HttpResponse.json({ teamIds: null })),
+    http.get(`${E}/tracks`, () => HttpResponse.json([])),
+    http.get(`${E}/leaderboards`, () => HttpResponse.json([])),
   );
   return asked;
 }
@@ -167,6 +170,7 @@ describe('judging', () => {
         rank: i + 1,
         team: { id: `t${i}`, name },
         total: 10 - i,
+        normalisedTotal: 10 - i,
         maxTotal: 10,
         judges: 1,
         criteria: [],
@@ -220,15 +224,17 @@ describe('judging', () => {
               judge: { id: 'j1', name: 'Meera' },
               total: 13,
               updatedAt: stamp,
+              comment: 'Clever',
               scores: [
-                { criterionId: 'c1', value: 9, comment: 'Clever' },
-                { criterionId: 'c2', value: 4, comment: null },
+                { criterionId: 'c1', value: 9 },
+                { criterionId: 'c2', value: 4 },
               ],
             },
           ],
         } satisfies Schemas['ScoreBreakdown']),
       ),
     );
+    const removed = capture('delete', `${E}/judging/teams/t1/scores/j1`);
     go();
     await userEvent.click(await screen.findByRole('button', { name: 'Byte Club' }));
     const sheet = await screen.findByRole('dialog', { name: 'Byte Club' });
@@ -237,6 +243,12 @@ describe('judging', () => {
     expect(within(sheet).getByText(`Last saved ${formatIST(stamp)}`)).toBeInTheDocument();
     expect(within(sheet).getByText('12.50 / 15')).toBeInTheDocument();
     expect(within(sheet).getByText('8.50 / 10')).toBeInTheDocument();
+
+    // An admin clears a judge's scores so they can score the team again.
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Remove scores' }));
+    await confirmDialog('Remove scores');
+    await waitFor(() => expect(removed).toHaveLength(1));
+    expect(new URL(removed[0]!.url).searchParams.get('roundId')).toBe(R1);
   });
 
   it('reviewers see team names but no breakdown', async () => {
@@ -263,6 +275,8 @@ describe('judging', () => {
       description: '',
       position: 0,
       deadline: null,
+      closesAt: null,
+      allowMultiple: false,
       fields: [
         {
           id: `${id}-f`,
@@ -310,7 +324,7 @@ describe('judging', () => {
     const [header, alpha, beta, extra] = (await blobs[0]!.text())
       .replace('\ufeff', '')
       .split('\r\n');
-    expect(header).toBe('Team,Repo › Submitted by,Repo › Last saved (IST),Repo › Late,Repo › Link');
+    expect(header).toBe('Team,Repo › Submitted by,Repo › Sent (IST),Repo › Late,Repo › Link');
     expect(alpha).toMatch(/^Alpha,Asha,.+,,https:\/\/x\.test$/);
     expect(beta).toBe('Beta,,,,');
     expect(extra).toBeUndefined();
@@ -343,5 +357,186 @@ describe('judging', () => {
     );
     go();
     expect(await screen.findByText('No scores yet.')).toBeInTheDocument();
+  });
+});
+
+describe('scores, tracks and leaderboards', () => {
+  const saved = (over: Partial<Schemas['SavedLeaderboard']> = {}): Schemas['SavedLeaderboard'] => ({
+    id: 'lb1',
+    name: 'Overall',
+    method: 'sum',
+    normalise: false,
+    track: null,
+    topN: null,
+    visibility: 'public',
+    position: 0,
+    rounds: [
+      { round: { id: R1, name: 'Round 1', phase: 'draft' }, weight: 1 },
+      { round: { id: R2, name: 'Finals', phase: 'draft' }, weight: 2 },
+    ],
+    ...over,
+  });
+
+  it('ranks by normalised totals on request', async () => {
+    asRole('admin');
+    use();
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(`${E}/leaderboard`, ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get('normalise'));
+        return HttpResponse.json(board());
+      }),
+    );
+    go();
+    expect(await screen.findByText('12.50 / 15')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Even out lenient and harsh judges' }),
+    );
+    expect(await screen.findByText('12.00 / 15')).toBeInTheDocument();
+    expect(screen.getByText('raw 12.50')).toBeInTheDocument();
+    expect(asked).toContain('true');
+  });
+
+  it('downloads the leaderboard and each judge’s scores as CSV', async () => {
+    asRole('admin');
+    use();
+    const blobs: Blob[] = [];
+    Object.assign(URL, {
+      createObjectURL: (b: Blob) => (blobs.push(b), 'blob:x'),
+      revokeObjectURL: () => {},
+    });
+    server.use(
+      http.get(`${E}/judging/teams/t1/breakdown`, () =>
+        HttpResponse.json({
+          round: { id: R1, name: 'Round 1', phase: 'draft' },
+          team: { id: 't1', name: 'Byte Club' },
+          inRound: true,
+          total: 12.5,
+          maxTotal: 15,
+          criteria: [],
+          judges: [
+            {
+              judge: { id: 'j1', name: 'Meera' },
+              total: 13,
+              updatedAt: stamp,
+              comment: 'Clever, needs polish',
+              scores: [
+                { criterionId: 'c1', value: 9 },
+                { criterionId: 'c2', value: 4 },
+              ],
+            },
+          ],
+        } satisfies Schemas['ScoreBreakdown']),
+      ),
+    );
+    go();
+    await screen.findByText('12.50 / 15');
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Leaderboard' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: "Each judge's scores and comments" }),
+    );
+    await waitFor(() => expect(blobs).toHaveLength(2));
+    const [boardCsv, judges] = await Promise.all(blobs.map((b) => b.text()));
+    expect(boardCsv!.split('\r\n')[0]).toContain('Rank,Team,Total,Normalised total');
+    expect(judges!.split('\r\n')[1]).toMatch(/^Byte Club,Meera,9,4,13,"Clever, needs polish",/);
+  });
+
+  it('sets up a saved leaderboard over rounds, and shows its ranking', async () => {
+    asRole('admin');
+    use();
+    const made = capture('post', `${E}/leaderboards`, saved(), 201);
+    server.use(
+      http.get(`${E}/leaderboards`, () => HttpResponse.json([saved()])),
+      http.get(`${E}/leaderboards/lb1/results`, () =>
+        HttpResponse.json({
+          leaderboard: saved(),
+          entries: [
+            {
+              rank: 1,
+              team: { id: 't1', name: 'Byte Club' },
+              total: 32,
+              maxTotal: 45,
+              rounds: [
+                { roundId: R1, total: 12, maxTotal: 15 },
+                { roundId: R2, total: 10, maxTotal: 15 },
+              ],
+              lastRoundId: R2,
+            },
+          ],
+        }),
+      ),
+    );
+    const removed = capture('delete', `${E}/leaderboards/lb1`);
+    go();
+    const card = within(
+      (await screen.findByText('Leaderboards')).closest('[data-slot="card"]') as HTMLElement,
+    );
+    expect(await card.findByText(/Every team · Round 1 \+ Finals ×2 · Add up/)).toBeInTheDocument();
+    await userEvent.click(card.getByRole('button', { name: /^Overall/ }));
+    expect(await card.findByText('32 / 45')).toBeInTheDocument();
+
+    await userEvent.click(card.getByRole('button', { name: 'New leaderboard' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New leaderboard' });
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Finals top 3');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Finals' }));
+    await userEvent.clear(within(dialog).getByLabelText('Show the top (optional)'));
+    await userEvent.type(within(dialog).getByLabelText('Show the top (optional)'), '3');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Who sees it'), 'judges');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+    await waitFor(() =>
+      expect(made[0]?.body).toEqual({
+        name: 'Finals top 3',
+        method: 'sum',
+        normalise: false,
+        trackId: null,
+        topN: 3,
+        visibility: 'judges',
+        rounds: [{ roundId: R2, weight: 1 }],
+      }),
+    );
+
+    await userEvent.click(card.getByRole('button', { name: 'Delete Overall' }));
+    await confirmDialog('Delete leaderboard');
+    await waitFor(() => expect(removed).toHaveLength(1));
+  });
+
+  it('keeps a list of tracks', async () => {
+    asRole('admin');
+    use();
+    server.use(
+      http.get(`${E}/tracks`, () =>
+        HttpResponse.json([{ id: 'tr1', name: 'AI', position: 0, teamCount: 2 }]),
+      ),
+    );
+    const added = capture(
+      'post',
+      `${E}/tracks`,
+      { id: 'tr2', name: 'Web', position: 1, teamCount: 0 },
+      201,
+    );
+    const renamed = capture('patch', `${E}/tracks/tr1`, {
+      id: 'tr1',
+      name: 'ML',
+      position: 0,
+      teamCount: 2,
+    });
+    const removed = capture('delete', `${E}/tracks/tr1`);
+    go();
+    const list = await screen.findByRole('list', { name: 'Tracks' });
+    expect(within(list).getByText('2 teams')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('New track'), 'Web');
+    await userEvent.click(screen.getByRole('button', { name: 'Add track' }));
+    await waitFor(() => expect(added[0]?.body).toEqual({ name: 'Web' }));
+    await userEvent.click(within(list).getByRole('button', { name: 'Rename AI' }));
+    const name = within(list).getByLabelText('Name of AI');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'ML');
+    await userEvent.click(within(list).getByRole('button', { name: 'Save name' }));
+    await waitFor(() => expect(renamed[0]?.body).toEqual({ name: 'ML' }));
+    await userEvent.click(within(list).getByRole('button', { name: 'Delete AI' }));
+    await confirmDialog('Delete track');
+    await waitFor(() => expect(removed).toHaveLength(1));
   });
 });

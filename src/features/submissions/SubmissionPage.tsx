@@ -1,4 +1,5 @@
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Lock, LockOpen, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { unwrap } from '@/api/client';
@@ -8,11 +9,15 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, QuestionsSkeleton } from '@/components/PageState';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatIST } from '@/lib/datetime';
 import { QuestionPreview } from '@/features/admin/QuestionCard';
 import { useEventContext } from '@/features/events/event-context';
-import { PhaseBadge } from '@/features/judging/rounds';
+import { PHASE_TONE, PhaseBadge } from '@/features/judging/rounds';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { fromISTInput, toISTInput } from '@/lib/datetime';
 import { useSubmissions, type Submission } from './queries';
@@ -54,12 +59,23 @@ function Editor({ submission }: { submission: Submission }) {
   const [description, setDescription] = useState(submission.description);
   const savedDeadline = submission.deadline ? toISTInput(submission.deadline) : '';
   const [deadline, setDeadline] = useState(savedDeadline);
+  const savedClose = submission.closesAt ? toISTInput(submission.closesAt) : '';
+  const [closesAt, setClosesAt] = useState(savedClose);
+  const [allowMultiple, setAllowMultiple] = useState(submission.allowMultiple);
+  // Closed on its own once its close time has come (closing the round closes it too).
+  const formClosed = submission.closesAt !== null && Date.parse(submission.closesAt) <= Date.now();
   const [active, setActive] = useState<Active>(null);
   const fields = [...submission.fields].sort((a, b) => a.position - b.position);
   const move = useMoveField(submission.id, fields);
   const save = useEventMutation(
     event.id,
-    (body: { title: string; description: string; deadline: string | null }) =>
+    (body: {
+      title?: string;
+      description?: string;
+      deadline?: string | null;
+      closesAt?: string | null;
+      allowMultiple?: boolean;
+    }) =>
       unwrap(
         api.PATCH('/v1/events/{eventId}/submissions/{submissionId}', {
           params: { path: { eventId: event.id, submissionId: submission.id } },
@@ -70,12 +86,31 @@ function Editor({ submission }: { submission: Submission }) {
   const dirty =
     title.trim() !== submission.title ||
     description !== submission.description ||
-    deadline !== savedDeadline;
+    deadline !== savedDeadline ||
+    closesAt !== savedClose ||
+    allowMultiple !== submission.allowMultiple;
+  // Close now, or reopen (clear the close time); the round's phase is set on Judging.
+  const closeNow = () => {
+    const now = new Date().toISOString();
+    setClosesAt(toISTInput(now));
+    save.mutate({ closesAt: now });
+  };
+  const reopen = () => {
+    setClosesAt('');
+    save.mutate({ closesAt: null });
+  };
 
   return (
     <>
       <PageHeader title={submission.title}>
-        <PhaseBadge phase={submission.round.phase} />
+        <div className="flex flex-wrap gap-2">
+          <PhaseBadge phase={submission.round.phase} />
+          {formClosed && submission.round.phase !== 'closed' && (
+            <Badge variant="secondary" className={PHASE_TONE.closed}>
+              Submissions closed
+            </Badge>
+          )}
+        </div>
       </PageHeader>
       <form
         className="grid gap-4 rounded-xl border bg-card p-4"
@@ -85,6 +120,8 @@ function Editor({ submission }: { submission: Submission }) {
             title: title.trim(),
             description,
             deadline: deadline ? fromISTInput(deadline) : null,
+            closesAt: closesAt ? fromISTInput(closesAt) : null,
+            allowMultiple,
           });
         }}
       >
@@ -104,15 +141,47 @@ function Editor({ submission }: { submission: Submission }) {
           value={deadline}
           onChange={(e) => setDeadline(e.target.value)}
         />
+        <FormField
+          label="Closes at (optional, IST)"
+          type="datetime-local"
+          hint="No more submissions after it, even while the round is released, so judges can carry on. Closing the round closes it too. Leave it empty to keep it open."
+          value={closesAt}
+          onChange={(e) => setClosesAt(e.target.value)}
+        />
+        <div className="flex items-start gap-3">
+          <Switch
+            id="allow-multiple"
+            checked={allowMultiple}
+            onCheckedChange={setAllowMultiple}
+            className="mt-0.5"
+          />
+          <div className="grid gap-1">
+            <Label htmlFor="allow-multiple">Teams can submit more than once</Label>
+            <p className="text-sm text-muted-foreground">
+              Off: one response per team. Either way a response can't be edited; delete one below to
+              let a team submit again.
+            </p>
+          </div>
+        </div>
         <p className="text-sm text-muted-foreground">
           Round: <span className="font-medium text-foreground">{submission.round.name}</span>. A
           submission stays in the round it was created in; duplicate it to use it elsewhere.
         </p>
         <ErrorAlert error={save.error} />
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={!dirty || !title.trim() || save.isPending}>
             Save details
           </Button>
+          {submission.round.phase !== 'closed' &&
+            (formClosed ? (
+              <Button type="button" variant="outline" disabled={save.isPending} onClick={reopen}>
+                <LockOpen aria-hidden /> Reopen
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" disabled={save.isPending} onClick={closeNow}>
+                <Lock aria-hidden /> Close now
+              </Button>
+            ))}
         </div>
       </form>
 
@@ -153,7 +222,70 @@ function Editor({ submission }: { submission: Submission }) {
         )}
       </section>
 
+      <WhoSubmitted submissionId={submission.id} />
       <EntriesTable submission={submission} />
     </>
+  );
+}
+
+/** Which teams expected in the round have submitted, and which haven't yet. */
+function WhoSubmitted({ submissionId }: { submissionId: string }) {
+  const api = useApi();
+  const { event } = useEventContext();
+  const status = useQuery({
+    queryKey: ['event', event.id, 'submissions', submissionId, 'status'],
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/events/{eventId}/submissions/{submissionId}/status', {
+          params: { path: { eventId: event.id, submissionId } },
+        }),
+      ),
+  });
+  return (
+    <section aria-label="Who has submitted" className="grid gap-3">
+      <h3 className="font-medium">Who has submitted</h3>
+      <ErrorAlert error={status.error} />
+      {status.data && (
+        <Tabs defaultValue={status.data.pending.length ? 'pending' : 'submitted'}>
+          <TabsList>
+            <TabsTrigger value="pending">Yet to submit ({status.data.pending.length})</TabsTrigger>
+            <TabsTrigger value="submitted">Submitted ({status.data.submitted.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="pending">
+            {status.data.pending.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Every team has submitted.</p>
+            ) : (
+              <ul
+                aria-label="Yet to submit"
+                className="grid gap-x-4 gap-y-1 rounded-lg border p-3 text-sm sm:grid-cols-2"
+              >
+                {status.data.pending.map((t) => (
+                  <li key={t.id} className="wrap-anywhere">
+                    {t.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+          <TabsContent value="submitted">
+            {status.data.submitted.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No team has submitted yet.</p>
+            ) : (
+              <ul aria-label="Submitted" className="grid gap-1 rounded-lg border p-3 text-sm">
+                {status.data.submitted.map((s) => (
+                  <li key={s.team.id} className="flex flex-wrap justify-between gap-x-3">
+                    <span className="min-w-0 wrap-anywhere">{s.team.name}</span>
+                    <span className="text-muted-foreground">
+                      {s.responses > 1 && `${s.responses} responses · `}
+                      {formatIST(s.lastAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
+    </section>
   );
 }

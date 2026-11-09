@@ -17,12 +17,13 @@ export const PHASES: { value: Phase; label: string; explain: string }[] = [
   {
     value: 'released',
     label: 'Released',
-    explain: 'Participants see this round and its submissions, and teams can submit.',
+    explain: 'Participants see this round and its submissions, teams can submit, and judges score.',
   },
   {
     value: 'closed',
     label: 'Closed',
-    explain: 'Participants still see this round, but no new submissions are accepted.',
+    explain:
+      'Participants still see this round, but no new submissions are accepted and scores are locked.',
   },
 ];
 
@@ -51,7 +52,7 @@ export function useRoundTeams(roundId: string | undefined) {
   });
 }
 
-const TONE: Record<Phase, string> = {
+export const PHASE_TONE: Record<Phase, string> = {
   draft: '',
   released: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   closed: 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
@@ -59,7 +60,7 @@ const TONE: Record<Phase, string> = {
 
 export function PhaseBadge({ phase }: { phase: Phase }) {
   return (
-    <Badge variant="secondary" className={cn(TONE[phase])}>
+    <Badge variant="secondary" className={cn(PHASE_TONE[phase])}>
       {PHASES.find((p) => p.value === phase)?.label ?? phase}
     </Badge>
   );

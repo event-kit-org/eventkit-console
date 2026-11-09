@@ -31,6 +31,23 @@ describe('deleting a team', () => {
   });
 });
 
+describe('team track', () => {
+  it('puts a team in a track once the event has tracks', async () => {
+    asRole('admin');
+    const t = registeredTeam();
+    server.use(
+      http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)),
+      http.get(`${E}/tracks`, () =>
+        HttpResponse.json([{ id: 'tr1', name: 'AI', position: 0, teamCount: 0 }]),
+      ),
+    );
+    const set = capture('put', `${E}/teams/${t.id}/track`, { teamId: t.id, trackId: 'tr1' });
+    go(`/teams/${t.id}`);
+    await userEvent.selectOptions(await screen.findByLabelText('Track'), 'tr1');
+    await waitFor(() => expect(set[0]?.body).toEqual({ trackId: 'tr1' }));
+  });
+});
+
 describe('manage event', () => {
   it('closes registration now while it is open', async () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });

@@ -49,6 +49,8 @@ const sub = (over: Partial<Schemas['Submission']> = {}): Schemas['Submission'] =
   description: 'Show it',
   position: 0,
   deadline: null,
+  closesAt: null,
+  allowMultiple: false,
   fields: [
     f({}),
     f({ id: 'q2', label: 'Track', type: 'choice', options: ['A', 'B'], position: 1 }),
@@ -86,6 +88,12 @@ function open(
     http.get(`${E}/rounds`, () => HttpResponse.json(rounds)),
     http.get(`${E}/submissions`, () => HttpResponse.json(list)),
     http.get(`${E}/submissions/s1/entries`, () => HttpResponse.json([entry])),
+    http.get(`${E}/submissions/s1/status`, () =>
+      HttpResponse.json({
+        submitted: [{ team: { id: 't1', name: 'Byte Club' }, responses: 1, lastAt: stamp }],
+        pending: [{ id: 't2', name: 'Null Pointers' }],
+      }),
+    ),
   );
   return renderApp(`/events/${event.id}/submissions${path}`, { token: 'good-token' });
 }
@@ -176,8 +184,14 @@ describe('submission detail', () => {
         title: 'Prototype v2',
         description: 'Show it',
         deadline: null,
+        closesAt: null,
+        allowMultiple: false,
       }),
     );
+
+    // Close it now; then reopen it.
+    await userEvent.click(screen.getByRole('button', { name: 'Close now' }));
+    await waitFor(() => expect(details[1]?.body).toEqual({ closesAt: expect.any(String) }));
 
     // Edit a saved question, then delete it.
     await userEvent.click(screen.getByRole('button', { name: 'Edit Repo link' }));
@@ -202,12 +216,38 @@ describe('submission detail', () => {
       }),
     );
 
-    // Entries expand to answers.
+    // Responses expand to answers; links open in a new tab, like on the portal.
     await userEvent.click(await screen.findByRole('button', { name: 'Answers from Byte Club' }));
-    expect(await screen.findByText('https://git.test/x')).toBeInTheDocument();
-    expect(screen.getByText(/Saved last by Asha/)).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: 'git.test/x' });
+    expect(link).toHaveAttribute('href', 'https://git.test/x');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText(/Sent by Asha/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Answers from Byte Club' }));
-    expect(screen.queryByText('https://git.test/x')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'git.test/x' })).not.toBeInTheDocument();
+  });
+
+  it('lets teams submit more than once, shows who is yet to submit, and deletes a response', async () => {
+    const details = capture('patch', `${E}/submissions/s1`, sub({ allowMultiple: true }));
+    const deleted = capture('delete', `${E}/submissions/s1/entries/e1`);
+    open('/s1');
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'Teams can submit more than once' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save details' }));
+    await waitFor(() => expect(details[0]?.body).toMatchObject({ allowMultiple: true }));
+
+    // Who still has to submit opens first; who has submitted is one tab away.
+    const pending = await screen.findByRole('list', { name: 'Yet to submit' });
+    expect(within(pending).getByText('Null Pointers')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Submitted (1)' }));
+    expect(
+      within(await screen.findByRole('list', { name: 'Submitted' })).getByText('Byte Club'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Answers from Byte Club' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete response' }));
+    await confirmDialog('Delete response');
+    await waitFor(() => expect(deleted).toHaveLength(1));
   });
 
   it('moves and duplicates questions, and cancels a draft', async () => {

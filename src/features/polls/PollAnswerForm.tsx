@@ -197,7 +197,7 @@ export function PollAnswerForm({ poll }: { poll: Poll }) {
                     : 'text'
               }
               inputMode={poll.type === 'number' ? 'decimal' : undefined}
-              maxLength={poll.type === 'short_text' ? 200 : undefined}
+              maxLength={poll.type === 'short_text' ? 1000 : undefined}
               value={text}
               onChange={(e) => setText(e.target.value)}
             />

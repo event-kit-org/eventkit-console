@@ -524,6 +524,20 @@ describe('people', () => {
     await waitFor(() => expect(remove).toHaveLength(1));
   });
 
+  it('turns judging on for an admin', async () => {
+    asRole('admin');
+    server.use(
+      http.get(`${E}/members`, () => HttpResponse.json([{ ...members[0], canJudge: false }])),
+    );
+    const judging = capture('put', `${E}/members/${members[0]!.userId}/judging`, {
+      userId: members[0]!.userId,
+      canJudge: true,
+    });
+    go('/people');
+    await userEvent.click(await screen.findByRole('switch', { name: 'Judges' }));
+    await waitFor(() => expect(judging[0]?.body).toEqual({ canJudge: true }));
+  });
+
   it('shows the owner without controls, and refusals', async () => {
     asRole('admin');
     server.use(
