@@ -166,6 +166,35 @@ describe('paid amounts', () => {
 });
 
 describe('teams', () => {
+  it('exports every team as a CSV from the Teams page, for admins', async () => {
+    asRole('admin');
+    const t = registeredTeam('confirmed');
+    server.use(
+      http.get(`${E}/teams`, () => HttpResponse.json([summary({ id: t.id })])),
+      http.get(`${E}/teams/${t.id}`, () => HttpResponse.json(t)),
+    );
+    const blobs: Blob[] = [];
+    // jsdom has no object URLs; catch the file instead.
+    Object.assign(URL, {
+      createObjectURL: (b: Blob) => (blobs.push(b), 'blob:x'),
+      revokeObjectURL: () => {},
+    });
+    go('/teams');
+    await userEvent.click(await screen.findByRole('button', { name: 'Export teams as CSV' }));
+    await waitFor(() => expect(blobs).toHaveLength(1));
+    const csv = await blobs[0]!.text();
+    expect(csv).toContain('Participant ID');
+    expect(csv).toContain('Asha');
+  });
+
+  it('does not offer the export to reviewers', async () => {
+    asRole('reviewer');
+    server.use(http.get(`${E}/teams`, () => HttpResponse.json([summary()])));
+    go('/teams');
+    await screen.findByRole('link', { name: 'Byte Club' });
+    expect(screen.queryByRole('button', { name: 'Export teams as CSV' })).not.toBeInTheDocument();
+  });
+
   it('lists and filters teams, linking to each', async () => {
     asRole('admin');
     server.use(

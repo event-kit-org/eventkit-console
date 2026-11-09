@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, LockKeyhole, Trash2 } from 'lucide-react';
+import { LockKeyhole, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { unwrap } from '@/api/client';
@@ -23,12 +23,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useEventContext } from '@/features/events/event-context';
-import { useFields } from '@/features/fields/queries';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST } from '@/lib/datetime';
-import { download, slug, teamsCsv } from './teams-csv';
 
-/** Registration window, exporting teams, and deleting the event. */
+/** Registration window, and deleting the event. (Exporting teams is on the Teams page.) */
 export function ManageEventCard() {
   const { isOwner } = useEventContext();
   return (
@@ -36,13 +34,13 @@ export function ManageEventCard() {
       <CardHeader>
         <CardTitle>Manage event</CardTitle>
         <CardDescription>
-          {isOwner ? 'Registration, exports, and deleting the event.' : 'Registration and exports.'}
+          {isOwner
+            ? 'The registration window, and deleting the event.'
+            : 'The registration window.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
         <RegistrationWindow />
-        <Separator />
-        <ExportTeams />
         {/* Only the owner deletes the event. */}
         {isOwner && (
           <>
@@ -100,54 +98,6 @@ function RegistrationWindow() {
           </ConfirmButton>
         </div>
       )}
-    </div>
-  );
-}
-
-function ExportTeams() {
-  const api = useApi();
-  const { event, path } = useEventContext();
-  const fields = useFields().data ?? [];
-  const exportCsv = useMutation({
-    mutationFn: async () => {
-      const list = await unwrap(api.GET('/v1/events/{eventId}/teams', path));
-      const teams = await Promise.all(
-        list.map((t) =>
-          unwrap(
-            api.GET('/v1/events/{eventId}/teams/{teamId}', {
-              params: { path: { eventId: event.id, teamId: t.id } },
-            }),
-          ),
-        ),
-      );
-      download(`${slug(event.name)}-teams.csv`, teamsCsv(teams, fields));
-      return teams.length;
-    },
-  });
-
-  return (
-    <div className="grid gap-2 text-sm">
-      <div className="font-medium">Export teams</div>
-      <p className="text-muted-foreground">
-        Every member as a row (CSV, opens in Excel or Google Sheets): team, participant ID, contact
-        details, status, payment and form answers.
-      </p>
-      <ErrorAlert error={exportCsv.error} />
-      <div className="flex items-center gap-3">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={exportCsv.isPending}
-          onClick={() => exportCsv.mutate()}
-        >
-          <Download aria-hidden /> {exportCsv.isPending ? 'Preparing…' : 'Download CSV'}
-        </Button>
-        {exportCsv.isSuccess && (
-          <span role="status" className="text-muted-foreground">
-            {exportCsv.data} {exportCsv.data === 1 ? 'team' : 'teams'} exported.
-          </span>
-        )}
-      </div>
     </div>
   );
 }

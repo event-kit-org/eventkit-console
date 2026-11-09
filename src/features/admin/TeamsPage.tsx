@@ -1,4 +1,4 @@
-import { ArrowRight, UsersRound } from 'lucide-react';
+import { ArrowRight, Download, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -25,6 +25,7 @@ import { useListFilter } from '@/hooks/useListFilter';
 import { useSearchParam } from '@/hooks/useSearchParam';
 import { useSort } from '@/hooks/useSort';
 import { formatMoney } from '@/lib/money';
+import { useExportTeams } from './export-teams';
 import { useTeams } from './queries';
 import { PendingReleaseBadge, ReleaseControls } from './TeamRelease';
 
@@ -66,8 +67,9 @@ const SORTS = {
 };
 
 export function TeamsPage() {
-  const { event } = useEventContext();
+  const { event, role } = useEventContext();
   const { search: listQuery } = useLocation();
+  const exportTeams = useExportTeams();
   const teams = useTeams();
   // In the address, so they survive opening a team and coming back.
   const [filter, setFilter] = useSearchParam('status', 'all');
@@ -117,6 +119,21 @@ export function TeamsPage() {
             options={FILTERS}
             fallback="all"
           />
+          {/* Everyone's contact details: admins only, like the rest of the event's data. */}
+          {role === 'admin' && (
+            <Button
+              variant="outline"
+              className="shrink-0"
+              aria-label="Export teams as CSV"
+              disabled={exportTeams.isPending}
+              onClick={() => exportTeams.mutate()}
+            >
+              <Download aria-hidden />
+              <span className="hidden md:inline">
+                {exportTeams.isPending ? 'Preparing…' : 'Export CSV'}
+              </span>
+            </Button>
+          )}
         </div>
       </PageHeader>
       {staged && (
@@ -133,7 +150,7 @@ export function TeamsPage() {
           />
         </div>
       )}
-      <ErrorAlert error={teams.error} />
+      <ErrorAlert error={teams.error ?? exportTeams.error} />
       {teams.data && teams.data.length > 0 && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {list.length === teams.data.length
