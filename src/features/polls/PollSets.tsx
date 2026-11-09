@@ -385,7 +385,13 @@ function AddQuestion({ groupId }: { groupId: string }) {
 }
 
 /** A set as one card: its questions in order, and (for its managers) the set's settings. */
-export function PollSetCard({ questions }: { questions: Poll[] }) {
+export function PollSetCard({
+  questions,
+  onDeleted,
+}: {
+  questions: Poll[];
+  onDeleted?: () => void;
+}) {
   const api = useApi();
   const { event } = useEventContext();
   const first = questions[0]!;
@@ -400,8 +406,8 @@ export function PollSetCard({ questions }: { questions: Poll[] }) {
     unwrap(api.DELETE('/v1/events/{eventId}/polls/groups/{groupId}', p)),
   );
   return (
-    <Card className="min-w-0">
-      <CardHeader>
+    <Card className="min-w-0 border-0 bg-transparent shadow-none">
+      <CardHeader className="pr-12">
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="min-w-0 wrap-anywhere">{group.title}</CardTitle>
           <Badge variant="outline">
@@ -475,7 +481,7 @@ export function PollSetCard({ questions }: { questions: Poll[] }) {
             confirmLabel="Delete set"
             destructive
             disabled={remove.isPending}
-            onConfirm={() => remove.mutate(undefined)}
+            onConfirm={() => remove.mutate(undefined, { onSuccess: onDeleted })}
           >
             <Trash2 aria-hidden /> Delete set
           </ConfirmButton>

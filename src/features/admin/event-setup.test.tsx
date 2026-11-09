@@ -1,10 +1,10 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => vi.restoreAllMocks());
-import { asRole, capture, confirmDialog, E, features } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { API, apiError, event, server } from '@/test/server';
 
@@ -184,25 +184,16 @@ describe('settings', () => {
     expect(await navigator.clipboard.readText()).toBe(API);
   });
 
-  it('activates and switches features', async () => {
+  it('shows features read only: the eventKit admin switches them', async () => {
     asRole('admin', { paymentMode: 'none' }, { registration: true });
-    const buy = capture('post', `${E}/billing/purchases`, {
-      status: 'approved',
-      provider: 'free',
-      providerRef: 'x',
-      amount: 0,
-      currency: 'INR',
-    });
-    const toggle = capture('patch', `${E}/features/registration`, features()[1]);
     renderApp(`/events/${event.id}/features`, { token: 'good-token' });
-    expect(await screen.findByRole('switch', { name: 'registration' })).toBeChecked();
-    const activate = screen.getAllByRole('button', { name: 'Activate' });
-    await userEvent.click(activate[0]!);
-    await waitFor(() => expect(buy[0]?.body).toEqual({ features: ['mailing'] }));
-    await userEvent.click(activate[1]!);
-    await waitFor(() => expect(buy[1]?.body).toEqual({ features: ['scanning'] }));
-    await userEvent.click(screen.getByRole('switch', { name: 'registration' }));
-    await waitFor(() => expect(toggle[0]?.body).toEqual({ enabled: false }));
+    const list = within(await screen.findByRole('list', { name: 'Features' }));
+    const row = (name: string) => list.getByText(name).closest('li') as HTMLElement;
+    await waitFor(() => expect(row('registration')).toHaveTextContent('On'));
+    expect(row('mailing')).toHaveTextContent('Off');
+    expect(screen.getByText(/contact eventKit/)).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
     expect(screen.queryByText('UPI QR code')).not.toBeInTheDocument();
   });
 
@@ -236,8 +227,8 @@ describe('settings', () => {
     expect(await screen.findByText('Payment instructions file')).toBeInTheDocument();
     expect(screen.queryByText(/Teams don't know how to pay yet/)).not.toBeInTheDocument();
     again.unmount();
-    // The written instructions are part of the event's details, on Settings.
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    // The written instructions are with the fee, on Payment setup.
+    renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
     expect(await screen.findByLabelText('How to pay')).toHaveValue('UPI: club@upi');
   });
 
@@ -269,10 +260,12 @@ describe('settings', () => {
   it('saves a fee change straight away, even after teams have paid', async () => {
     asRole('admin');
     const save = capture('patch', E, { event, role: 'admin' });
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
     fireEvent.change(await screen.findByLabelText('Fee'), { target: { value: '250' } });
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(save[0]?.body).toMatchObject({ registrationFee: 25000 }));
+    // Only the payment fields: the details card saves its own.
+    expect(save[0]?.body).not.toHaveProperty('venue');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
@@ -280,18 +273,23 @@ describe('settings', () => {
   it('edits the event and shows lock errors', async () => {
     asRole('admin');
     const save = capture('patch', E, { event, role: 'admin' });
-    renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
+    const settings = renderApp(`/events/${event.id}/settings`, { token: 'good-token' });
     const venue = await screen.findByLabelText('Venue');
-    expect(screen.getByLabelText('Fee')).toHaveValue(500);
+    // Payment is on its own page now.
+    expect(screen.queryByLabelText('Fee')).not.toBeInTheDocument();
     await userEvent.clear(venue);
     await userEvent.type(venue, 'Hall B');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(save[0]?.body).toMatchObject({ venue: 'Hall B' }));
+    expect(save[0]?.body).not.toHaveProperty('registrationFee');
     expect(await screen.findByText('Saved.')).toBeInTheDocument();
+    settings.unmount();
 
     server.use(
       http.patch(E, () => apiError(409, 'PAYMENT_SETTINGS_LOCKED', 'Payment settings are locked.')),
     );
+    renderApp(`/events/${event.id}/payment`, { token: 'good-token' });
+    expect(await screen.findByLabelText('Fee')).toHaveValue(500);
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByText('Payment settings are locked.')).toBeInTheDocument();
   });

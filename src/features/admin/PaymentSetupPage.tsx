@@ -1,22 +1,18 @@
-import { Link } from 'react-router';
 import { PageHeader } from '@/components/PageHeader';
-import { PaymentInstructionsFileCard, PaymentQrCard } from './SettingsPage';
+import { useEventContext } from '@/features/events/event-context';
+import { EditEventCard, PaymentInstructionsFileCard, PaymentQrCard } from './SettingsPage';
 
-/** How teams pay: the instructions file and the UPI QR shown to them on the portal. */
+/** How teams pay: the fee and when, the instructions file and the UPI QR shown on the portal. */
 export function PaymentSetupPage() {
+  const { event } = useEventContext();
   return (
     <div className="grid max-w-3xl gap-6">
-      <PageHeader
-        title="Payment setup"
-        description={
-          <>
-            What teams see when they pay. The fee, when they pay and written instructions are in{' '}
-            <Link to="../settings" relative="path" className="underline underline-offset-4">
-              Settings, under Event details
-            </Link>
-            .
-          </>
-        }
+      <PageHeader title="Payment setup" description="What teams pay, when, and how." />
+      <EditEventCard
+        key={`${event.paymentMode}-${event.registrationFee}-${event.paymentDeadline}`}
+        title="Payment"
+        description="Payment mode, fee basis and currency lock once anyone has registered. The fee can still change; teams that already paid keep what they paid, and any difference is settled by hand."
+        steps={[3]}
       />
       <PaymentInstructionsFileCard />
       <PaymentQrCard />

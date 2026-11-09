@@ -1,11 +1,11 @@
 import { PageHeader } from '@/components/PageHeader';
 import { FeaturesCard } from './SettingsPage';
 
-/** Switches for the parts of eventKit this event uses. */
+/** The parts of eventKit this event uses; the eventKit admin switches them. */
 export function FeaturesPage() {
   return (
     <div className="grid max-w-3xl gap-6">
-      <PageHeader title="Features" description="Switch on the parts of eventKit this event uses." />
+      <PageHeader title="Features" description="The parts of eventKit this event uses." />
       <FeaturesCard />
     </div>
   );

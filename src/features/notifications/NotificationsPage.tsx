@@ -144,15 +144,18 @@ export function NotificationsPage() {
                       c.id === selected?.id && 'bg-muted font-medium',
                     )}
                   >
-                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                    <span className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="truncate">{c.name}</span>
+                      {/* The audience under the name, cut short rather than spilling out. */}
+                      <span className="max-w-48 truncate text-xs font-normal text-muted-foreground md:max-w-none">
+                        {audienceText(c.audience)}
+                      </span>
+                    </span>
                     {unread(c) && (
                       <span className="size-2 shrink-0 rounded-full bg-blue-500">
                         <span className="sr-only">Unread</span>
                       </span>
                     )}
-                    <Badge variant="secondary" className="shrink-0">
-                      {audienceText(c.audience)}
-                    </Badge>
                   </button>
                 </li>
               ))}

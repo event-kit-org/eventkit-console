@@ -1,14 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Settings2, Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { RowsSkeleton, TableSkeleton } from '@/components/PageState';
-import { Badge } from '@/components/ui/badge';
+import { TableSkeleton } from '@/components/PageState';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
@@ -18,6 +24,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -56,105 +69,70 @@ const VISIBILITY: Record<Visibility, string> = {
 
 const num = (n: number) => (Number.isInteger(n) ? n.toString() : n.toFixed(2));
 
-/**
- * Admin: leaderboards over one or more rounds: overall, per track, the top N,
- * weighted, normalised, and who sees each.
- */
-export function SavedLeaderboards({ rounds }: { rounds: Round[] }) {
+export function useSavedBoards() {
   const api = useApi();
   const { event, path } = useEventContext();
-  const boards = useQuery({
+  return useQuery({
     queryKey: ['event', event.id, 'leaderboards'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/leaderboards', path)),
   });
-  const [editing, setEditing] = useState<Saved | 'new' | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
-  const remove = useEventMutation(event.id, (id: string) =>
+}
+
+/**
+ * Admin: a leaderboard over one or more rounds (overall, per track, the top N,
+ * weighted, normalised), with its settings top right.
+ */
+export function SavedBoardCard({ board, onEdit }: { board: Saved; onEdit: () => void }) {
+  const api = useApi();
+  const { event } = useEventContext();
+  const [deleting, setDeleting] = useState(false);
+  const remove = useEventMutation(event.id, () =>
     unwrap(
       api.DELETE('/v1/events/{eventId}/leaderboards/{leaderboardId}', {
-        params: { path: { eventId: event.id, leaderboardId: id } },
+        params: { path: { eventId: event.id, leaderboardId: board.id } },
       }),
     ),
   );
   return (
     <Card>
-      <CardHeader className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid min-w-0 gap-1.5">
-          <CardTitle>Saved leaderboards</CardTitle>
-          <CardDescription>
-            Rank teams across rounds: overall, per track, the top few. Each has its own way of
-            adding up and its own audience.
-          </CardDescription>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setEditing('new')}>
-          <Plus aria-hidden /> New leaderboard
-        </Button>
+      <CardHeader>
+        <CardTitle className="wrap-anywhere">{board.name}</CardTitle>
+        <CardDescription>
+          {summary(board)} · {VISIBILITY[board.visibility]}
+        </CardDescription>
+        <CardAction>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" aria-label="Leaderboard settings">
+                <Settings2 aria-hidden />
+                <span className="hidden sm:inline">Settings</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onSelect={onEdit}>
+                <Pencil aria-hidden /> Edit leaderboard
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
+                <Trash2 aria-hidden /> Delete leaderboard
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardAction>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <ErrorAlert error={boards.error ?? remove.error} />
-        {boards.isPending && <RowsSkeleton rows={2} />}
-        {boards.data?.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            None yet. Each round still has its own leaderboard above.
-          </p>
-        )}
-        {boards.data && boards.data.length > 0 && (
-          <ul className="grid divide-y rounded-lg border" aria-label="Saved leaderboards">
-            {boards.data.map((b) => (
-              <li key={b.id} className="grid gap-3 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="-ml-2 h-auto min-h-8 min-w-0 flex-1 justify-start text-left whitespace-normal"
-                    aria-expanded={open === b.id}
-                    onClick={() => setOpen(open === b.id ? null : b.id)}
-                  >
-                    {open === b.id ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
-                    <span className="grid min-w-0 gap-0.5">
-                      <span className="font-medium wrap-anywhere">{b.name}</span>
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {summary(b)}
-                      </span>
-                    </span>
-                  </Button>
-                  <Badge variant="secondary">{VISIBILITY[b.visibility]}</Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Edit ${b.name}`}
-                    onClick={() => setEditing(b)}
-                  >
-                    <Pencil aria-hidden />
-                  </Button>
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Delete ${b.name}`}
-                    title={`Delete ${b.name}?`}
-                    description="The leaderboard goes; scores and rounds stay."
-                    confirmLabel="Delete leaderboard"
-                    destructive
-                    disabled={remove.isPending}
-                    onConfirm={() => remove.mutate(b.id)}
-                  >
-                    <Trash2 aria-hidden />
-                  </ConfirmButton>
-                </div>
-                {open === b.id && <Results board={b} />}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ErrorAlert error={remove.error} />
+        <Results board={board} />
       </CardContent>
-      {editing && (
-        <BoardDialog
-          key={editing === 'new' ? 'new' : editing.id}
-          board={editing === 'new' ? null : editing}
-          rounds={rounds}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete ${board.name}?`}
+        description="The leaderboard goes; scores and rounds stay."
+        confirmLabel="Delete leaderboard"
+        destructive
+        onConfirm={() => remove.mutate(undefined)}
+      />
     </Card>
   );
 }
@@ -236,14 +214,17 @@ function Results({ board }: { board: Saved }) {
 }
 
 /** Set up or change a saved leaderboard. */
-function BoardDialog({
+export function BoardDialog({
   board,
   rounds,
   onClose,
+  onSaved,
 }: {
   board: Saved | null;
   rounds: Round[];
   onClose: () => void;
+  /** Called with the saved board, to show it. */
+  onSaved?: (board: Saved) => void;
 }) {
   const api = useApi();
   const { event } = useEventContext();
@@ -283,7 +264,12 @@ function BoardDialog({
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    save.mutate(undefined, { onSuccess: onClose });
+    save.mutate(undefined, {
+      onSuccess: (saved) => {
+        onSaved?.(saved);
+        onClose();
+      },
+    });
   };
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>

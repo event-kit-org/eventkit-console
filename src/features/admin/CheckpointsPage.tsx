@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { Info, MapPin } from 'lucide-react';
+import { Ellipsis, Info, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
-import { unwrap } from '@/api/client';
+import { type Schemas, unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { EmptyState, RowsSkeleton } from '@/components/PageState';
@@ -14,8 +15,22 @@ import { SearchInput } from '@/components/SearchInput';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useEventContext } from '@/features/events/event-context';
@@ -43,6 +58,8 @@ const TYPE_LABEL = {
   session: 'Session',
 };
 
+type Checkpoint = Schemas['Checkpoint'];
+
 const checkpointText = (c: { name: string; type: string }) => [c.name, c.type];
 
 export function CheckpointsPage() {
@@ -54,6 +71,9 @@ export function CheckpointsPage() {
     enabled: features.scanning,
   });
   const search = useListFilter(checkpoints.data ?? [], checkpointText);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Checkpoint | null>(null);
+  const [deleting, setDeleting] = useState<Checkpoint | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -107,20 +127,45 @@ export function CheckpointsPage() {
     );
   }
 
+  const closeAdd = (open: boolean) => {
+    setAdding(open);
+    if (!open) {
+      form.reset();
+      create.reset();
+    }
+  };
+
   return (
     <div className="grid gap-4">
       <PageHeader
         title="Checkpoints"
         description="Places where volunteers scan people's QR codes: check-in, the venue door (in and out), meals, swag, sessions."
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle>New checkpoint</CardTitle>
-        </CardHeader>
-        <CardContent>
+      >
+        {checkpoints.data && checkpoints.data.length > 0 && (
+          <SearchInput
+            label="Search checkpoints"
+            className="w-48 sm:w-56"
+            value={search.query}
+            onChange={search.setQuery}
+          />
+        )}
+        <Button size="sm" onClick={() => setAdding(true)}>
+          <Plus aria-hidden /> Add checkpoint
+        </Button>
+      </PageHeader>
+      <Dialog open={adding} onOpenChange={closeAdd}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>New checkpoint</DialogTitle>
+            <DialogDescription>
+              Volunteers scan people here on the event's portal.
+            </DialogDescription>
+          </DialogHeader>
           <form
             className="grid gap-5 sm:grid-cols-2"
-            onSubmit={form.handleSubmit((v) => create.mutate(v, { onSuccess: () => form.reset() }))}
+            onSubmit={form.handleSubmit((v) =>
+              create.mutate(v, { onSuccess: () => closeAdd(false) }),
+            )}
             noValidate
           >
             <FormField
@@ -190,20 +235,17 @@ export function CheckpointsPage() {
             />
             <div className="grid gap-3 sm:col-span-2">
               <ErrorAlert error={create.error} />
-              <div>
+              <DialogFooter>
                 <Button type="submit" disabled={create.isPending}>
                   Add checkpoint
                 </Button>
-              </div>
+              </DialogFooter>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
       <ErrorAlert error={checkpoints.error ?? remove.error} />
       {checkpoints.isPending && <RowsSkeleton />}
-      {checkpoints.data && checkpoints.data.length > 0 && (
-        <SearchInput label="Search checkpoints" value={search.query} onChange={search.setQuery} />
-      )}
       {checkpoints.data && search.filtered.length === 0 && (
         <EmptyState
           icon={MapPin}
@@ -227,23 +269,35 @@ export function CheckpointsPage() {
                 {c.closesAt && ` until ${formatIST(c.closesAt)}`}
               </div>
             </div>
-            <div className="flex gap-2">
-              <EditCheckpointDialog checkpoint={c} />
-              <ConfirmButton
-                size="sm"
-                variant="outline"
-                title={`Delete ${c.name}?`}
-                description="This can't be undone."
-                confirmLabel="Delete"
-                destructive
-                onConfirm={() => remove.mutate(c.id)}
-              >
-                Delete
-              </ConfirmButton>
-            </div>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon-sm" variant="ghost" aria-label={`More for ${c.name}`}>
+                  <Ellipsis aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setEditing(c)}>
+                  <Pencil aria-hidden /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(c)}>
+                  <Trash2 aria-hidden /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         ))}
       </ul>
+      {editing && <EditCheckpointDialog checkpoint={editing} onClose={() => setEditing(null)} />}
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title={`Delete ${deleting?.name}?`}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => deleting && remove.mutate(deleting.id)}
+      />
       <ExitReasonsCard />
     </div>
   );

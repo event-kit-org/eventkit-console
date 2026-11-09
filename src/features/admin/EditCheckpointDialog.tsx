@@ -12,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { useEventContext } from '@/features/events/event-context';
@@ -21,18 +20,17 @@ import { fromISTInput, toISTInput } from '@/lib/datetime';
 
 type Checkpoint = Schemas['Checkpoint'];
 
-/** Edits a checkpoint's name, opening hours and repeat scans. */
-export function EditCheckpointDialog({ checkpoint }: { checkpoint: Checkpoint }) {
-  const [open, setOpen] = useState(false);
+/** Edits a checkpoint's name, opening hours and repeat scans (opened from its ⋯ menu). */
+export function EditCheckpointDialog({
+  checkpoint,
+  onClose,
+}: {
+  checkpoint: Checkpoint;
+  onClose: () => void;
+}) {
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" aria-label={`Edit ${checkpoint.name}`}>
-          Edit
-        </Button>
-      </DialogTrigger>
-      {/* A fresh form each time it opens, from the checkpoint as it is now. */}
-      {open && <EditForm checkpoint={checkpoint} onDone={() => setOpen(false)} />}
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <EditForm checkpoint={checkpoint} onDone={onClose} />
     </Dialog>
   );
 }

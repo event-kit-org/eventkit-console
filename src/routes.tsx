@@ -11,7 +11,7 @@ import { LinksPage } from '@/features/admin/LinksPage';
 import { PaymentSetupPage } from '@/features/admin/PaymentSetupPage';
 import { PaymentsPage } from '@/features/admin/PaymentsPage';
 import { PortalConnectionPage } from '@/features/admin/PortalConnectionPage';
-import { PeoplePage } from '@/features/admin/PeoplePage';
+import { PeoplePage, StaffPage } from '@/features/admin/PeoplePage';
 import { RequireRole } from '@/features/admin/RequireAdmin';
 import { SettingsPage } from '@/features/admin/SettingsPage';
 import { TeamDetailPage } from '@/features/admin/TeamDetailPage';
@@ -24,7 +24,11 @@ import { EventsPage } from '@/features/events/EventsPage';
 import { JudgingPage } from '@/features/judging/JudgingPage';
 import { LeaderboardsPage } from '@/features/judging/LeaderboardsPage';
 import { NotificationsPage } from '@/features/notifications/NotificationsPage';
-import { SubmissionPage } from '@/features/submissions/SubmissionPage';
+import {
+  SubmissionDetailsPage,
+  SubmissionPage,
+  SubmissionQuestionsPage,
+} from '@/features/submissions/SubmissionPage';
 import { SubmissionsPage } from '@/features/submissions/SubmissionsPage';
 import { PollsPage } from '@/features/polls/PollsPage';
 import { EventPeoplePage } from '@/features/scanner/EventPeoplePage';
@@ -77,11 +81,17 @@ export const routes: RouteObject[] = [
                 element: <RequireRole roles={['admin']} />,
                 children: [
                   { path: 'people', element: <PeoplePage /> },
+                  { path: 'staff', element: <StaffPage /> },
                   { path: 'links', element: <LinksPage /> },
                   { path: 'form', element: <FieldsPage /> },
                   { path: 'assignments', element: <AssignmentsPage /> },
                   { path: 'submissions', element: <SubmissionsPage /> },
                   { path: 'submissions/:submissionId', element: <SubmissionPage /> },
+                  {
+                    path: 'submissions/:submissionId/questions',
+                    element: <SubmissionQuestionsPage />,
+                  },
+                  { path: 'submissions/:submissionId/details', element: <SubmissionDetailsPage /> },
                   { path: 'checkpoints', element: <CheckpointsPage /> },
                   { path: 'portal', element: <PortalConnectionPage /> },
                   { path: 'features', element: <FeaturesPage /> },

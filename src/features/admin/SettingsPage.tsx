@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -44,7 +45,7 @@ import { Switch } from '@/components/ui/switch';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { EventFields } from './EventFields';
-import { ManageEventCard } from './ManageEventCard';
+import { DangerZoneCard, ManageEventCard } from './ManageEventCard';
 import { StagedReleaseCard } from './StagedReleaseCard';
 import {
   eventFormSchema,
@@ -62,12 +63,12 @@ const FEATURE_TEXT: Record<Schemas['Feature'], string> = {
 
 export function SettingsPage() {
   const [search] = useSearchParams();
-  const { event } = useEventContext();
+  const { event, isOwner } = useEventContext();
   return (
     <div className="grid max-w-3xl gap-6">
       <PageHeader
         title="Settings"
-        description="The event's details, RSVP, staged release, and managing the event. Features, payment setup and the portal each have their own page."
+        description="The event's details, RSVP, staged release, and managing the event. Features, payment and the portal each have their own page."
       />
       {search.get('new') && (
         <Alert>
@@ -97,10 +98,16 @@ export function SettingsPage() {
       )}
       {/* Remounts when the deadline changes elsewhere (Manage event), so saving the
           details can't put the old deadline back. */}
-      <EditEventCard key={event.registrationDeadline} />
+      <EditEventCard
+        key={event.registrationDeadline}
+        title="Event details"
+        description="The basics, dates, and team sizes."
+        steps={[0, 1, 2]}
+      />
       <RsvpCard />
       <StagedReleaseCard />
       <ManageEventCard />
+      {isOwner && <DangerZoneCard />}
     </div>
   );
 }
@@ -363,68 +370,47 @@ export function PortalCard() {
 }
 
 /** Which parts of eventKit this event uses: registration, scanning, mailing. */
+/**
+ * Which features this event has, read only: the eventKit admin switches them
+ * (organisers can't switch their own).
+ */
 export function FeaturesCard() {
   const api = useApi();
-  const { event, path, isOwner } = useEventContext();
+  const { event, path } = useEventContext();
   const toggles = useQuery({
     queryKey: ['event', event.id, 'features'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/features', path)),
   });
-  const buy = useEventMutation(event.id, (feature: Schemas['Feature']) =>
-    unwrap(
-      api.POST('/v1/events/{eventId}/billing/purchases', {
-        ...path,
-        body: { features: [feature] },
-      }),
-    ),
-  );
-  const toggle = useEventMutation(
-    event.id,
-    ({ feature, enabled }: { feature: Schemas['Feature']; enabled: boolean }) =>
-      unwrap(
-        api.PATCH('/v1/events/{eventId}/features/{feature}', {
-          params: { path: { eventId: event.id, feature } },
-          body: { enabled },
-        }),
-      ),
-  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Features</CardTitle>
-        <CardDescription>Free during the pilot.</CardDescription>
+        <CardDescription>
+          The eventKit admin switches features on and off. To change one, contact eventKit.
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <ErrorAlert error={buy.error ?? toggle.error} />
+        <ErrorAlert error={toggles.error} />
         {toggles.isPending && <RowsSkeleton rows={3} />}
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y rounded-lg border" aria-label="Features">
           {toggles.data?.map((t) => (
             <li key={t.feature} className="flex items-center justify-between gap-4 p-4">
-              <div className="grid gap-0.5">
-                <div className="flex items-center gap-2 font-medium capitalize">{t.feature}</div>
+              <div className="grid min-w-0 gap-0.5">
+                <div className="font-medium capitalize">{t.feature}</div>
                 <div className="text-sm text-muted-foreground">{FEATURE_TEXT[t.feature]}</div>
               </div>
-              {!t.bought ? (
-                isOwner ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={buy.isPending}
-                    onClick={() => buy.mutate(t.feature)}
-                  >
-                    Activate
-                  </Button>
-                ) : (
-                  <span className="text-sm text-muted-foreground">The owner activates it</span>
-                )
+              {t.enabled ? (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                >
+                  On
+                </Badge>
               ) : (
-                <Switch
-                  aria-label={t.feature}
-                  checked={t.enabled}
-                  disabled={toggle.isPending}
-                  onCheckedChange={(enabled) => toggle.mutate({ feature: t.feature, enabled })}
-                />
+                <Badge variant="outline" className="shrink-0 text-muted-foreground">
+                  Off
+                </Badge>
               )}
             </li>
           ))}
@@ -562,26 +548,50 @@ export function PaymentQrCard() {
   );
 }
 
-function EditEventCard() {
+/** What each group of event fields sends when saved, so cards don't overwrite each other. */
+const STEP_KEYS: (keyof ReturnType<typeof toEventPayload>)[][] = [
+  ['name', 'hostedBy', 'venue'],
+  ['startAt', 'endAt', 'registrationStart', 'registrationDeadline'],
+  ['maxParticipants', 'minTeamSize', 'maxTeamSize'],
+  [
+    'paymentMode',
+    'registrationFee',
+    'feeBasis',
+    'currency',
+    'paymentInstructions',
+    'paymentDeadline',
+  ],
+];
+
+/** Some of the event's details (by wizard step), saved on their own. */
+export function EditEventCard({
+  title,
+  description,
+  steps,
+}: {
+  title: string;
+  description: string;
+  steps: number[];
+}) {
   const api = useApi();
   const { event, path } = useEventContext();
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: fromEvent(event),
   });
-  const save = useEventMutation(event.id, (v: EventFormValues) =>
-    unwrap(api.PATCH('/v1/events/{eventId}', { ...path, body: toEventPayload(v) })),
-  );
+  const save = useEventMutation(event.id, (v: EventFormValues) => {
+    const all = toEventPayload(v);
+    const body = Object.fromEntries(
+      steps.flatMap((i) => STEP_KEYS[i]!).map((k) => [k, all[k]]),
+    ) as Partial<typeof all>;
+    return unwrap(api.PATCH('/v1/events/{eventId}', { ...path, body }));
+  });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Event details</CardTitle>
-        <CardDescription>
-          Payment mode, fee basis and currency lock once anyone has registered. The fee can still
-          change; teams that already paid keep what they paid, and any difference is settled by
-          hand.
-        </CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <form
         className="flex flex-col gap-4"
@@ -589,12 +599,16 @@ function EditEventCard() {
         noValidate
       >
         <CardContent className="grid gap-8">
-          {STEPS.map((s, i) => (
-            <FieldSet key={s.title}>
-              <FieldLegend>{s.title}</FieldLegend>
-              <EventFields form={form} step={i} />
-            </FieldSet>
-          ))}
+          {steps.map((i) =>
+            steps.length === 1 ? (
+              <EventFields key={i} form={form} step={i} />
+            ) : (
+              <FieldSet key={STEPS[i]!.title}>
+                <FieldLegend>{STEPS[i]!.title}</FieldLegend>
+                <EventFields form={form} step={i} />
+              </FieldSet>
+            ),
+          )}
           <ErrorAlert error={save.error} />
         </CardContent>
         <CardFooter className="gap-3 border-t">

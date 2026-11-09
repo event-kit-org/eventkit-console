@@ -5,7 +5,7 @@ export const ROLES: Schemas['Role'][] = ['participant', 'volunteer', 'judge', 'a
 
 /** "Everyone" for all four roles, otherwise the roles in a fixed order. */
 export function audienceText(roles: Schemas['Role'][]): string {
-  if (roles.length === ROLES.length) return 'Everyone';
+  if (ROLES.every((r) => roles.includes(r))) return 'Everyone';
   return ROLES.filter((r) => roles.includes(r))
     .map((r) => `${roleLabel[r]}s`)
     .join(', ');

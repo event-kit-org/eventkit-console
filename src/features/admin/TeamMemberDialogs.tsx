@@ -473,7 +473,7 @@ export function AddMemberDialog({
                 <code className="font-mono text-xs break-all text-foreground">
                   {result.link.url ?? result.link.token}
                 </code>
-                <CopyButton value={result.link.url ?? result.link.token} label="Copy link" />
+                <CopyButton value={result.link.url ?? result.link.token} label="link" />
               </AlertDescription>
             </Alert>
             {extra && (

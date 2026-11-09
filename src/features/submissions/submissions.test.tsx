@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import type { Schemas } from '@/api/client';
-import { asRole, capture, confirmDialog, E } from '@/test/fixtures';
+import { asRole, capture, confirmDialog, E, filterBy } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { apiError, event, server } from '@/test/server';
 
@@ -99,18 +99,28 @@ function open(
 }
 
 describe('submissions list', () => {
-  it('groups by round with phase badges, creates, duplicates and deletes', async () => {
+  const menu = async (title: string, item: string) => {
+    await userEvent.click(await screen.findByRole('button', { name: `More for ${title}` }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: item }));
+  };
+
+  it('is a table with search and a round filter; duplicates, deletes and creates', async () => {
     const made = capture('post', `${E}/submissions`, sub(), 201);
     const dup = capture('post', `${E}/submissions/s1/duplicate`, sub(), 201);
     open('');
-    const r1 = await screen.findByRole('region', { name: 'Round 1' });
-    expect(within(r1).getByText('Released')).toBeInTheDocument();
-    expect(within(r1).getByText('Prototype')).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('region', { name: 'Finals' })).getByText('Pitch'),
-    ).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'Submissions' });
+    expect(within(table).getByText('Prototype')).toBeInTheDocument();
+    expect(within(table).getByText('Released')).toBeInTheDocument();
+    expect(within(table).getByText('Pitch')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicate Prototype' }));
+    await userEvent.type(screen.getByLabelText('Search submissions'), 'pitch');
+    await waitFor(() => expect(within(table).queryByText('Prototype')).not.toBeInTheDocument());
+    await userEvent.clear(screen.getByLabelText('Search submissions'));
+    await filterBy('Finals');
+    await waitFor(() => expect(screen.queryByText('Prototype')).not.toBeInTheDocument());
+    await filterBy('All rounds');
+
+    await menu('Prototype', 'Duplicate');
     await waitFor(() => expect(dup).toHaveLength(1));
 
     server.use(
@@ -118,7 +128,7 @@ describe('submissions list', () => {
         apiError(409, 'SUBMISSION_HAS_ENTRIES', 'Teams have submitted this.'),
       ),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Delete Prototype' }));
+    await menu('Prototype', 'Delete');
     await confirmDialog('Delete');
     expect(await screen.findByText('Teams have submitted this.')).toBeInTheDocument();
 
@@ -140,12 +150,18 @@ describe('submissions list', () => {
       }),
     );
     expect(await screen.findByRole('link', { name: /All submissions/ })).toBeInTheDocument();
+  }, 15_000);
+
+  it('opens a submission from its row', async () => {
+    const { router } = open('');
+    await userEvent.click(await screen.findByText('Released'));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/\/submissions\/s1$/));
   });
 
   it('deletes a submission nobody answered', async () => {
     const del = capture('delete', `${E}/submissions/s2`);
     open('');
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete Pitch' }));
+    await menu('Pitch', 'Delete');
     await confirmDialog('Delete');
     await waitFor(() => expect(del).toHaveLength(1));
   });
@@ -168,12 +184,23 @@ describe('submissions list', () => {
 });
 
 describe('submission detail', () => {
-  it('edits details, builds questions and shows entries', async () => {
+  it('shows a card with the details; questions and details have their own pages', async () => {
+    const { router } = open('/s1');
+    expect(await screen.findByRole('heading', { name: 'Prototype' })).toBeInTheDocument();
+    expect(screen.getByText('One per team')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: /Questions/ }));
+    expect(await screen.findByRole('button', { name: 'Edit Repo link' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toMatch(/\/s1\/questions$/);
+    await userEvent.click(screen.getByRole('link', { name: /Back to Prototype/ }));
+    await userEvent.click(await screen.findByRole('link', { name: /Details/ }));
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(router.state.location.pathname).toMatch(/\/s1\/details$/);
+  });
+
+  it('edits details', async () => {
     const details = capture('patch', `${E}/submissions/s1`, sub());
-    const patchField = capture('patch', `${E}/submissions/s1/fields/q1`, f({}));
-    const created = capture('post', `${E}/submissions/s1/fields`, f({ id: 'q3' }), 201);
-    const removed = capture('delete', `${E}/submissions/s1/fields/q1`);
-    open('/s1');
+    open('/s1/details');
     const title = await screen.findByLabelText('Title');
     expect(screen.getByText(/stays in the round it was created in/)).toBeInTheDocument();
     await userEvent.clear(title);
@@ -188,13 +215,17 @@ describe('submission detail', () => {
         allowMultiple: false,
       }),
     );
-
-    // Close it now; then reopen it.
     await userEvent.click(screen.getByRole('button', { name: 'Close now' }));
     await waitFor(() => expect(details[1]?.body).toEqual({ closesAt: expect.any(String) }));
+  });
 
+  it('builds questions', async () => {
+    const patchField = capture('patch', `${E}/submissions/s1/fields/q1`, f({}));
+    const created = capture('post', `${E}/submissions/s1/fields`, f({ id: 'q3' }), 201);
+    const removed = capture('delete', `${E}/submissions/s1/fields/q1`);
+    open('/s1/questions');
     // Edit a saved question, then delete it.
-    await userEvent.click(screen.getByRole('button', { name: 'Edit Repo link' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Repo link' }));
     await userEvent.click(screen.getByRole('switch', { name: 'Required' }));
     await waitFor(() => expect(patchField[0]?.body).toEqual({ required: false }));
     await userEvent.click(screen.getByRole('button', { name: 'Delete Repo link' }));
@@ -215,26 +246,28 @@ describe('submission detail', () => {
         options: ['Option 1'],
       }),
     );
+  });
 
-    // Responses expand to answers; links open in a new tab, like on the portal.
+  it('opens a response in a popup; links open in a new tab', async () => {
+    open('/s1');
     await userEvent.click(await screen.findByRole('button', { name: 'Answers from Byte Club' }));
-    const link = await screen.findByRole('link', { name: 'git.test/x' });
+    const dialog = within(await screen.findByRole('dialog'));
+    const link = dialog.getByRole('link', { name: 'git.test/x' });
     expect(link).toHaveAttribute('href', 'https://git.test/x');
     expect(link).toHaveAttribute('target', '_blank');
-    expect(screen.getByText(/Sent by Asha/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Answers from Byte Club' }));
-    expect(screen.queryByRole('link', { name: 'git.test/x' })).not.toBeInTheDocument();
+    expect(dialog.getByText(/by Asha/)).toBeInTheDocument();
   });
 
   it('lets teams submit more than once, shows who is yet to submit, and deletes a response', async () => {
     const details = capture('patch', `${E}/submissions/s1`, sub({ allowMultiple: true }));
     const deleted = capture('delete', `${E}/submissions/s1/entries/e1`);
-    open('/s1');
+    open('/s1/details');
     await userEvent.click(
       await screen.findByRole('switch', { name: 'Teams can submit more than once' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save details' }));
     await waitFor(() => expect(details[0]?.body).toMatchObject({ allowMultiple: true }));
+    await userEvent.click(screen.getByRole('link', { name: /Back to Prototype/ }));
 
     // Who still has to submit opens first; who has submitted is one tab away.
     const pending = await screen.findByRole('list', { name: 'Yet to submit' });
@@ -254,7 +287,7 @@ describe('submission detail', () => {
     const patchQ1 = capture('patch', `${E}/submissions/s1/fields/q1`, f({}));
     const patchQ2 = capture('patch', `${E}/submissions/s1/fields/q2`, f({ id: 'q2' }));
     const dup = capture('post', `${E}/submissions/s1/fields`, f({ id: 'q9' }), 201);
-    open('/s1');
+    open('/s1/questions');
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Repo link' }));
     await userEvent.click(screen.getByRole('button', { name: 'Move down Repo link' }));
     await waitFor(() => expect(patchQ1[0]?.body).toEqual({ position: 1 }));

@@ -114,7 +114,7 @@ export function PaymentsPage() {
                 <TableHead>Team</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="hidden md:table-cell">For</TableHead>
-                <TableHead className="hidden sm:table-cell">Uploaded</TableHead>
+                <TableHead className="hidden lg:table-cell">Uploaded</TableHead>
                 <TableHead className="hidden lg:table-cell">Status</TableHead>
                 <TableHead>
                   <span className="sr-only">Receipt</span>
@@ -132,7 +132,7 @@ export function PaymentsPage() {
                       {p.team.name}
                     </Link>
                     {/* What the hidden columns hold, on small screens. */}
-                    <div className="text-xs text-muted-foreground sm:hidden">
+                    <div className="text-xs text-muted-foreground lg:hidden">
                       {formatIST(p.uploadedAt)}
                     </div>
                   </TableCell>
@@ -147,7 +147,7 @@ export function PaymentsPage() {
                   <TableCell className="hidden max-w-64 whitespace-normal text-muted-foreground md:table-cell">
                     {payingFor(p)}
                   </TableCell>
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                  <TableCell className="hidden text-muted-foreground lg:table-cell">
                     {formatIST(p.uploadedAt)}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
@@ -161,7 +161,7 @@ export function PaymentsPage() {
                       aria-label={`View receipt from ${p.team.name}`}
                     >
                       <Eye aria-hidden />
-                      <span className="hidden sm:inline">View receipt</span>
+                      <span className="hidden xl:inline">View receipt</span>
                     </Button>
                   </TableCell>
                 </TableRow>

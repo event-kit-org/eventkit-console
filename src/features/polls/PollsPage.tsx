@@ -8,7 +8,8 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { FormField } from '@/components/FormField';
 import { RolePicker } from '@/components/RolePicker';
 import { audienceText } from '@/lib/audience';
-import { CardsSkeleton, EmptyState } from '@/components/PageState';
+import { EmptyState, TableSkeleton } from '@/components/PageState';
+import { Pager, usePage } from '@/components/Pager';
 import { PageHeader } from '@/components/PageHeader';
 import { SearchInput } from '@/components/SearchInput';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -32,6 +34,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
@@ -76,7 +86,15 @@ function listItems(all: Poll[], matched: readonly Poll[]) {
   return items;
 }
 
-/** Polls on anything (food choices, feedback, ratings…), for any combination of roles. */
+type Item = ReturnType<typeof listItems>[number];
+const itemId = (i: Item) => (i.kind === 'poll' ? i.poll.id : i.id);
+/** The poll a row describes: the poll, or a set's first question (they share settings). */
+const lead = (i: Item) => (i.kind === 'poll' ? i.poll : i.questions[0]!);
+
+/**
+ * Polls on anything (food choices, feedback, ratings…), for any combination of
+ * roles: a table with search; a row opens the poll's results and options.
+ */
 export function PollsPage() {
   const api = useApi();
   const { event, path } = useEventContext();
@@ -86,27 +104,110 @@ export function PollsPage() {
   });
   const search = useListFilter(polls.data ?? [], pollText);
   const items = listItems(polls.data ?? [], search.filtered);
+  const page = usePage(items);
+  const [openId, setOpenId] = useState<string | null>(null);
+  // Looked up again on every render, so the popup shows fresh results.
+  const open = listItems(polls.data ?? [], polls.data ?? []).find((i) => itemId(i) === openId);
 
   return (
     <div className="grid gap-4">
       <CreatePoll />
       {polls.data && polls.data.length > 0 && (
-        <SearchInput label="Search polls" value={search.query} onChange={search.setQuery} />
+        <SearchInput
+          label="Search polls"
+          className="sm:w-72"
+          value={search.query}
+          onChange={search.setQuery}
+        />
       )}
       <ErrorAlert error={polls.error} />
-      {polls.isPending && <CardsSkeleton />}
+      {polls.isPending && <TableSkeleton cols={4} />}
       {polls.data && items.length === 0 && (
         <EmptyState icon={BarChart3} title={search.active ? 'No poll matches.' : 'No polls yet.'} />
       )}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        {items.map((item) =>
-          item.kind === 'poll' ? (
-            <PollCard key={item.poll.id} poll={item.poll} />
-          ) : (
-            <PollSetCard key={item.id} questions={item.questions} />
-          ),
+      {page.items.length > 0 && (
+        <div className="overflow-hidden rounded-lg border">
+          <Table aria-label="Polls">
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead>Poll</TableHead>
+                <TableHead className="hidden md:table-cell">Who answers</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {page.items.map((item) => {
+                const p = lead(item);
+                const title = item.kind === 'poll' ? item.poll.question : p.group!.title;
+                return (
+                  <TableRow
+                    key={itemId(item)}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('button')) return;
+                      setOpenId(itemId(item));
+                    }}
+                  >
+                    <TableCell className="whitespace-normal">
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-left font-medium wrap-anywhere whitespace-normal text-foreground"
+                        onClick={() => setOpenId(itemId(item))}
+                      >
+                        {title}
+                      </Button>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+                        <Badge variant="outline">
+                          {item.kind === 'poll'
+                            ? typeLabel(item.poll.type)
+                            : `${item.questions.length} ${item.questions.length === 1 ? 'question' : 'questions'}`}
+                        </Badge>
+                        {p.mealCheckpoints.length > 0 && <Badge variant="secondary">Meal</Badge>}
+                        <span className="md:hidden">{audienceText(p.audience)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden whitespace-normal text-muted-foreground md:table-cell">
+                      {audienceText(p.audience)}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                      {p.closed ? (
+                        <Badge variant="secondary">Closed</Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        >
+                          Open
+                        </Badge>
+                      )}
+                      {p.closesAt && !p.closed && (
+                        <div className="pt-1 text-xs text-muted-foreground">
+                          closes {formatIST(p.closesAt)}
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <Pager {...page} />
+      <Dialog open={open !== undefined} onOpenChange={(o) => !o && setOpenId(null)}>
+        {open && (
+          <DialogContent className="max-h-[90dvh] gap-0 overflow-y-auto p-0 sm:max-w-2xl">
+            <DialogTitle className="sr-only">
+              {open.kind === 'poll' ? open.poll.question : open.questions[0]!.group!.title}
+            </DialogTitle>
+            {open.kind === 'poll' ? (
+              <PollCard poll={open.poll} />
+            ) : (
+              <PollSetCard questions={open.questions} onDeleted={() => setOpenId(null)} />
+            )}
+          </DialogContent>
         )}
-      </div>
+      </Dialog>
     </div>
   );
 }
@@ -132,8 +233,8 @@ function PollCard({ poll }: { poll: Poll }) {
   );
 
   return (
-    <Card className="min-w-0">
-      <CardHeader>
+    <Card className="min-w-0 border-0 bg-transparent shadow-none">
+      <CardHeader className="pr-12">
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="min-w-0 wrap-anywhere">{poll.question}</CardTitle>
           <Badge variant="outline">{typeLabel(poll.type)}</Badge>

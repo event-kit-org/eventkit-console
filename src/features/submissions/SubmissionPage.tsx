@@ -1,6 +1,6 @@
-import { ArrowLeft, Lock, LockOpen, Plus } from 'lucide-react';
+import { ArrowLeft, ListChecks, Lock, LockOpen, Plus, Settings2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, QuestionsSkeleton } from '@/components/PageState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,20 +26,26 @@ import { useSubmissions, type Submission } from './queries';
 import { DraftQuestion, SavedQuestion, useMoveField } from './SubmissionBuilder';
 import { MarkdownTextarea } from '@/components/MarkdownTextarea';
 
-/** Admin: one submission's title, description, questions and the entries teams made. */
-export function SubmissionPage() {
+type View = 'main' | 'questions' | 'details';
+
+/**
+ * Admin: one submission. Its main page is the responses, under a card with what
+ * it is and its options; its questions and its details each have a page.
+ */
+export function SubmissionPage({ view = 'main' }: { view?: View }) {
   const { submissionId = '' } = useParams();
   const submissions = useSubmissions();
   const submission = submissions.data?.find((s) => s.id === submissionId);
   useDetailCrumb(submission?.title);
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-6">
+    <div className="mx-auto grid w-full max-w-4xl gap-6">
       <Link
         to=".."
         relative="path"
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:underline"
       >
-        <ArrowLeft className="size-4" aria-hidden /> All submissions
+        <ArrowLeft className="size-4" aria-hidden />
+        {view === 'main' ? 'All submissions' : `Back to ${submission?.title ?? 'the submission'}`}
       </Link>
       <ErrorAlert error={submissions.error} />
       {submissions.isPending && <QuestionsSkeleton />}
@@ -47,29 +54,25 @@ export function SubmissionPage() {
           It may have been deleted.
         </EmptyState>
       )}
-      {submission && <Editor key={submission.id} submission={submission} />}
+      {submission && view === 'main' && <Overview key={submission.id} submission={submission} />}
+      {submission && view === 'questions' && (
+        <Questions key={submission.id} submission={submission} />
+      )}
+      {submission && view === 'details' && <Details key={submission.id} submission={submission} />}
     </div>
   );
 }
 
-type Active = { id: string } | { draft: true } | null;
+/** The routes' paths are relative to the submission, so ".." from a section is it. */
+export const SubmissionQuestionsPage = () => <SubmissionPage view="questions" />;
+export const SubmissionDetailsPage = () => <SubmissionPage view="details" />;
 
-function Editor({ submission }: { submission: Submission }) {
+const closed = (s: Submission) => s.closesAt !== null && Date.parse(s.closesAt) <= Date.now();
+
+function useSubmissionPatch(submission: Submission) {
   const api = useApi();
   const { event } = useEventContext();
-  const [title, setTitle] = useState(submission.title);
-  const [description, setDescription] = useState(submission.description);
-  const savedDeadline = submission.deadline ? toISTInput(submission.deadline) : '';
-  const [deadline, setDeadline] = useState(savedDeadline);
-  const savedClose = submission.closesAt ? toISTInput(submission.closesAt) : '';
-  const [closesAt, setClosesAt] = useState(savedClose);
-  const [allowMultiple, setAllowMultiple] = useState(submission.allowMultiple);
-  // Closed on its own once its close time has come (closing the round closes it too).
-  const formClosed = submission.closesAt !== null && Date.parse(submission.closesAt) <= Date.now();
-  const [active, setActive] = useState<Active>(null);
-  const fields = [...submission.fields].sort((a, b) => a.position - b.position);
-  const move = useMoveField(submission.id, fields);
-  const save = useEventMutation(
+  return useEventMutation(
     event.id,
     (body: {
       title?: string;
@@ -85,6 +88,148 @@ function Editor({ submission }: { submission: Submission }) {
         }),
       ),
   );
+}
+
+function Badges({ submission }: { submission: Submission }) {
+  return (
+    <>
+      <PhaseBadge phase={submission.round.phase} />
+      {closed(submission) && submission.round.phase !== 'closed' && (
+        <Badge variant="secondary" className={PHASE_TONE.closed}>
+          Submissions closed
+        </Badge>
+      )}
+    </>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid min-w-0 gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 wrap-anywhere">{children}</dd>
+    </div>
+  );
+}
+
+/** The card with everything about the submission, then who submitted and the responses. */
+function Overview({ submission }: { submission: Submission }) {
+  const questions = submission.fields.length;
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
+            <h2 className="wrap-anywhere">{submission.title}</h2>
+            <Badges submission={submission} />
+          </CardTitle>
+          {submission.description && (
+            <CardDescription className="line-clamp-2 whitespace-pre-line">
+              {submission.description}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
+            <Fact label="Round">{submission.round.name}</Fact>
+            <Fact label="Deadline">
+              {submission.deadline ? formatIST(submission.deadline) : 'None'}
+            </Fact>
+            <Fact label="Closes">
+              {submission.closesAt ? formatIST(submission.closesAt) : 'With the round'}
+            </Fact>
+            <Fact label="Responses">
+              {submission.allowMultiple ? 'Several per team' : 'One per team'}
+            </Fact>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="questions">
+                <ListChecks aria-hidden /> Questions
+                <Badge variant="secondary" className="tabular-nums">
+                  {questions}
+                </Badge>
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="details">
+                <Settings2 aria-hidden /> Details
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      <WhoSubmitted submissionId={submission.id} />
+      <EntriesTable submission={submission} />
+    </>
+  );
+}
+
+type Active = { id: string } | { draft: true } | null;
+
+/** The submission's questions: built and edited one at a time. */
+function Questions({ submission }: { submission: Submission }) {
+  const [active, setActive] = useState<Active>(null);
+  const fields = [...submission.fields].sort((a, b) => a.position - b.position);
+  const move = useMoveField(submission.id, fields);
+  return (
+    <>
+      <PageHeader
+        title={`${submission.title}: questions`}
+        description="What teams answer when they submit."
+      />
+      <section aria-label="Questions" className="grid gap-3">
+        <ErrorAlert error={move.error} />
+        {fields.map((f, i) =>
+          active && 'id' in active && active.id === f.id ? (
+            <SavedQuestion
+              key={f.id}
+              submissionId={submission.id}
+              field={f}
+              canMoveUp={i > 0}
+              canMoveDown={i < fields.length - 1}
+              onMove={(by) => move.mutate({ field: f, neighbour: fields[i + by]! })}
+              canDelete={fields.length > 1}
+              onDuplicated={(id) => setActive({ id })}
+              onDeleted={() => setActive(null)}
+            />
+          ) : (
+            <QuestionPreview key={f.id} question={f} onEdit={() => setActive({ id: f.id })} />
+          ),
+        )}
+        {active && 'draft' in active ? (
+          <DraftQuestion
+            submissionId={submission.id}
+            onCancel={() => setActive(null)}
+            onCreated={(id) => setActive({ id })}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            className="justify-self-start"
+            onClick={() => setActive({ draft: true })}
+          >
+            <Plus aria-hidden /> Add question
+          </Button>
+        )}
+      </section>
+    </>
+  );
+}
+
+/** Title, description, deadline, closing and whether teams submit more than once. */
+function Details({ submission }: { submission: Submission }) {
+  const [title, setTitle] = useState(submission.title);
+  const [description, setDescription] = useState(submission.description);
+  const savedDeadline = submission.deadline ? toISTInput(submission.deadline) : '';
+  const [deadline, setDeadline] = useState(savedDeadline);
+  const savedClose = submission.closesAt ? toISTInput(submission.closesAt) : '';
+  const [closesAt, setClosesAt] = useState(savedClose);
+  const [allowMultiple, setAllowMultiple] = useState(submission.allowMultiple);
+  // Closed on its own once its close time has come (closing the round closes it too).
+  const formClosed = closed(submission);
+  const save = useSubmissionPatch(submission);
   const dirty =
     title.trim() !== submission.title ||
     description !== submission.description ||
@@ -104,14 +249,9 @@ function Editor({ submission }: { submission: Submission }) {
 
   return (
     <>
-      <PageHeader title={submission.title}>
+      <PageHeader title={`${submission.title}: details`}>
         <div className="flex flex-wrap gap-2">
-          <PhaseBadge phase={submission.round.phase} />
-          {formClosed && submission.round.phase !== 'closed' && (
-            <Badge variant="secondary" className={PHASE_TONE.closed}>
-              Submissions closed
-            </Badge>
-          )}
+          <Badges submission={submission} />
         </div>
       </PageHeader>
       <form
@@ -186,46 +326,6 @@ function Editor({ submission }: { submission: Submission }) {
             ))}
         </div>
       </form>
-
-      <section aria-label="Questions" className="grid gap-3">
-        <h3 className="font-medium">Questions</h3>
-        <ErrorAlert error={move.error} />
-        {fields.map((f, i) =>
-          active && 'id' in active && active.id === f.id ? (
-            <SavedQuestion
-              key={f.id}
-              submissionId={submission.id}
-              field={f}
-              canMoveUp={i > 0}
-              canMoveDown={i < fields.length - 1}
-              onMove={(by) => move.mutate({ field: f, neighbour: fields[i + by]! })}
-              canDelete={fields.length > 1}
-              onDuplicated={(id) => setActive({ id })}
-              onDeleted={() => setActive(null)}
-            />
-          ) : (
-            <QuestionPreview key={f.id} question={f} onEdit={() => setActive({ id: f.id })} />
-          ),
-        )}
-        {active && 'draft' in active ? (
-          <DraftQuestion
-            submissionId={submission.id}
-            onCancel={() => setActive(null)}
-            onCreated={(id) => setActive({ id })}
-          />
-        ) : (
-          <Button
-            variant="outline"
-            className="justify-self-start"
-            onClick={() => setActive({ draft: true })}
-          >
-            <Plus aria-hidden /> Add question
-          </Button>
-        )}
-      </section>
-
-      <WhoSubmitted submissionId={submission.id} />
-      <EntriesTable submission={submission} />
     </>
   );
 }

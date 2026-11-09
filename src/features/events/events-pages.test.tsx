@@ -71,7 +71,7 @@ describe('event layout', () => {
       'OverviewEvent statisticsRegistrationTeamsPaymentsAssignmentsEvent day',
     );
     expect(nav).toHaveTextContent(
-      'SetupRegistration formPortal connectionLinksTeam & rolesFeaturesPayment setupSettings',
+      'SetupRegistration formPortal connectionLinksTeam & rolesStaffFeaturesPayment setupSettings',
     );
     // Scanning happens on the portal; the page still opens by its address.
     expect(nav).toHaveTextContent('Event dayCheckpointsAttendeesPollsNotifications');

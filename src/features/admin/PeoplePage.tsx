@@ -1,19 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserCog, UserMinus } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { Ellipsis, LogOut, Pencil, UserCog, UserMinus, UserPlus } from 'lucide-react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { type Schemas, unwrap } from '@/api/client';
 import { useApi, useAuth } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmButton, ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { EmptyState, TableSkeleton } from '@/components/PageState';
+import { Pager, usePage } from '@/components/Pager';
 import { PageHeader } from '@/components/PageHeader';
 import { SearchInput } from '@/components/SearchInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -37,13 +51,18 @@ const ORGANISER_ROLES: OrganiserRole[] = ['admin', 'reviewer'];
 const ORGANISER_LABEL: Record<OrganiserRole, string> = { admin: 'Co-admin', reviewer: 'Reviewer' };
 const isOrganiser = (m: Member) => m.role === 'admin' || m.role === 'reviewer';
 
-export function PeoplePage() {
+function useMembers() {
   const api = useApi();
   const { event, path } = useEventContext();
-  const members = useQuery({
+  return useQuery({
     queryKey: ['event', event.id, 'members'],
     queryFn: () => unwrap(api.GET('/v1/events/{eventId}/members', path)),
   });
+}
+
+function useMemberActions() {
+  const api = useApi();
+  const { event } = useEventContext();
   const p = (userId: string) => ({ params: { path: { eventId: event.id, userId } } });
   const change = useEventMutation(
     event.id,
@@ -64,141 +83,203 @@ export function PeoplePage() {
         }),
       ),
   );
+  return { change, remove, judging };
+}
+
+const organiserRole = (m: Member) =>
+  m.isOwner ? 'Owner' : ORGANISER_LABEL[m.role as OrganiserRole];
+
+/**
+ * The owner, co-admins and reviewers: a table, each edited in a popup. Only the
+ * owner adds organisers, changes their role or removes them; any admin turns
+ * judging on for an admin.
+ */
+export function PeoplePage() {
+  const { isOwner } = useEventContext();
+  const { user } = useAuth();
+  const members = useMembers();
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Member | null>(null);
   const organisers = members.data?.filter(isOrganiser) ?? [];
-  const staff = members.data?.filter((m) => !isOrganiser(m)) ?? [];
+  const canEdit = (m: Member) =>
+    m.role === 'admin' || (isOwner && !m.isOwner) || (!m.isOwner && m.userId === user?.id);
 
   return (
     <div className="grid gap-4">
       <PageHeader
         title="Team & roles"
-        description="Who runs this event with you, and its volunteers and judges."
-      />
-      <ErrorAlert error={members.error ?? change.error ?? remove.error ?? judging.error} />
-      {members.isPending && <TableSkeleton rows={4} cols={3} />}
+        description="Co-admins can do everything except delete the event, billing, API keys and organisers. Reviewers work through teams and payments: shortlisting, confirming and receipts. Both need an eventKit account. Admins score teams on the portal only once judging is allowed for them."
+      >
+        {isOwner && (
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <UserPlus aria-hidden /> Add member
+          </Button>
+        )}
+      </PageHeader>
+      <ErrorAlert error={members.error} />
+      {members.isPending && <TableSkeleton rows={3} cols={3} />}
       {members.data && (
-        <>
-          <Organisers
-            organisers={organisers}
-            onRole={(userId, role) => change.mutate({ userId, role })}
-            onRemove={(userId) => remove.mutate(userId)}
-            onJudging={(userId, canJudge) => judging.mutate({ userId, canJudge })}
-            judgingBusy={judging.isPending}
-          />
-          <Staff
-            staff={staff}
-            onRole={(userId, role) => change.mutate({ userId, role })}
-            onRemove={(userId) => remove.mutate(userId)}
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-/** The owner, co-admins and reviewers. Only the owner adds, changes or removes them. */
-function Organisers(props: {
-  organisers: Member[];
-  onRole: (userId: string, role: OrganiserRole) => void;
-  onRemove: (userId: string) => void;
-  onJudging: (userId: string, canJudge: boolean) => void;
-  judgingBusy: boolean;
-}) {
-  const { isOwner } = useEventContext();
-  const { user } = useAuth();
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Organisers</CardTitle>
-        <CardDescription>
-          Co-admins can do everything except delete the event, billing, API keys and organisers.
-          Reviewers work through teams and payments: shortlisting, confirming and receipts. Both
-          need an eventKit account and work in this console. Reviewers who want to leave ask the
-          owner to remove them. Admins score teams on the portal only once judging is turned on for
-          them; any admin can turn it on.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4">
         <div className="overflow-hidden rounded-lg border">
-          <Table>
+          <Table aria-label="Organisers">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">Edit</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {props.organisers.map((m) => (
+              {organisers.map((m) => (
                 <TableRow key={m.userId}>
                   <TableCell className="whitespace-normal">
-                    <div className="font-medium wrap-anywhere">{m.name}</div>
+                    <div className="font-medium wrap-anywhere">
+                      {m.name}
+                      {m.userId === user?.id && (
+                        <span className="font-normal text-muted-foreground"> (you)</span>
+                      )}
+                    </div>
                     <div className="text-xs break-all text-muted-foreground">{m.email}</div>
                   </TableCell>
                   <TableCell>
-                    {m.isOwner || !isOwner ? (
-                      <Badge variant="secondary">
-                        {m.isOwner ? 'Owner' : ORGANISER_LABEL[m.role as OrganiserRole]}
-                      </Badge>
-                    ) : (
-                      <NativeSelect
-                        size="sm"
-                        aria-label={`Role of ${m.name}`}
-                        className="w-28 sm:w-36"
-                        value={m.role}
-                        onChange={(e) => props.onRole(m.userId, e.target.value as OrganiserRole)}
-                      >
-                        {ORGANISER_ROLES.map((r) => (
-                          <NativeSelectOption key={r} value={r}>
-                            {ORGANISER_LABEL[r]}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    )}
-                    {m.role === 'admin' && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Switch
-                          id={`judges-${m.userId}`}
-                          checked={m.canJudge}
-                          disabled={props.judgingBusy}
-                          onCheckedChange={(on) => props.onJudging(m.userId, on)}
-                        />
-                        <Label htmlFor={`judges-${m.userId}`} className="text-xs font-normal">
-                          Judges
-                        </Label>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>{organiserRole(m)}</span>
+                      {m.role === 'admin' && m.canJudge && (
+                        <Badge variant="secondary">Judges</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    {!m.isOwner && isOwner && (
-                      <ConfirmButton
+                    {canEdit(m) && (
+                      <Button
                         size="sm"
                         variant="outline"
-                        title={`Remove ${m.name} from the event?`}
-                        description="They stop seeing the event in their console straight away. Their eventKit account stays."
-                        confirmLabel="Remove"
-                        destructive
-                        onConfirm={() => props.onRemove(m.userId)}
+                        aria-label={`Edit ${m.name}`}
+                        onClick={() => setEditing(m)}
                       >
-                        <UserMinus aria-hidden />
-                        <span className="sr-only sm:not-sr-only">Remove</span>
-                      </ConfirmButton>
+                        <Pencil aria-hidden />
+                        <span className="hidden sm:inline">Edit</span>
+                      </Button>
                     )}
-                    {!m.isOwner && m.userId === user?.id && <LeaveEvent />}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
-        {isOwner && <AddOrganiser />}
-      </CardContent>
-    </Card>
+      )}
+      {adding && <AddOrganiserDialog onClose={() => setAdding(false)} />}
+      {editing && (
+        <EditOrganiserDialog
+          key={editing.userId}
+          member={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </div>
   );
 }
 
-function AddOrganiser() {
+/** Allow judging, change role, remove (or leave, for yourself). */
+function EditOrganiserDialog({ member, onClose }: { member: Member; onClose: () => void }) {
+  const { isOwner } = useEventContext();
+  const { user } = useAuth();
+  const { change, remove, judging } = useMemberActions();
+  const [role, setRole] = useState(member.role as OrganiserRole);
+  const [canJudge, setCanJudge] = useState(member.canJudge);
+  const [confirm, setConfirm] = useState(false);
+  const self = member.userId === user?.id;
+  const ownerControls = isOwner && !member.isOwner;
+  const busy = change.isPending || judging.isPending || remove.isPending;
+  const dirty = role !== member.role || (role === 'admin' && canJudge !== member.canJudge);
+  const save = async () => {
+    if (role !== member.role) await change.mutateAsync({ userId: member.userId, role });
+    if (role === 'admin' && canJudge !== member.canJudge) {
+      await judging.mutateAsync({ userId: member.userId, canJudge });
+    }
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="wrap-anywhere">Edit {member.name}</DialogTitle>
+          <DialogDescription className="break-all">{member.email}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <Field data-disabled={!ownerControls || undefined}>
+            <FieldLabel htmlFor="organiser-role">Role</FieldLabel>
+            <NativeSelect
+              id="organiser-role"
+              className="w-full"
+              disabled={!ownerControls}
+              value={member.isOwner ? 'owner' : role}
+              onChange={(e) => setRole(e.target.value as OrganiserRole)}
+            >
+              {member.isOwner && <NativeSelectOption value="owner">Owner</NativeSelectOption>}
+              {ORGANISER_ROLES.map((r) => (
+                <NativeSelectOption key={r} value={r}>
+                  {ORGANISER_LABEL[r]}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            {!ownerControls && (
+              <FieldDescription>
+                {member.isOwner
+                  ? "The owner's role can't change."
+                  : 'Only the owner changes roles.'}
+              </FieldDescription>
+            )}
+          </Field>
+          {role === 'admin' && (
+            <Field orientation="horizontal">
+              <Switch id="organiser-judges" checked={canJudge} onCheckedChange={setCanJudge} />
+              <div className="grid gap-1">
+                <FieldLabel htmlFor="organiser-judges">Allow judging</FieldLabel>
+                <FieldDescription>They score teams on the event's portal.</FieldDescription>
+              </div>
+            </Field>
+          )}
+          <ErrorAlert error={change.error ?? judging.error ?? remove.error} />
+        </div>
+        <DialogFooter className="gap-2 sm:justify-between">
+          {ownerControls ? (
+            <Button
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              disabled={busy}
+              onClick={() => setConfirm(true)}
+            >
+              <UserMinus aria-hidden /> Remove member
+            </Button>
+          ) : self && !member.isOwner ? (
+            <LeaveEvent />
+          ) : (
+            <span />
+          )}
+          {(ownerControls || role === 'admin') && (
+            <Button disabled={!dirty || busy} onClick={() => void save().catch(() => {})}>
+              Save
+            </Button>
+          )}
+        </DialogFooter>
+        <ConfirmDialog
+          open={confirm}
+          onOpenChange={setConfirm}
+          title={`Remove ${member.name} from the event?`}
+          description="They stop seeing the event in their console straight away. Their eventKit account stays."
+          confirmLabel="Remove"
+          destructive
+          onConfirm={() => remove.mutate(member.userId, { onSuccess: onClose })}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddOrganiserDialog({ onClose }: { onClose: () => void }) {
   const api = useApi();
   const { event, path } = useEventContext();
   const [email, setEmail] = useState('');
@@ -208,78 +289,91 @@ function AddOrganiser() {
   );
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    add.mutate(undefined, { onSuccess: () => setEmail('') });
+    add.mutate(undefined, { onSuccess: onClose });
   };
   return (
-    <form className="grid gap-2" onSubmit={submit} aria-label="Add an organiser">
-      <div className="flex flex-wrap gap-2">
-        <Input
-          type="email"
-          required
-          aria-label="Their eventKit email"
-          placeholder="Their eventKit email"
-          className="min-w-0 flex-1 basis-56"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <NativeSelect
-          aria-label="Role"
-          className="w-36"
-          value={role}
-          onChange={(e) => setRole(e.target.value as OrganiserRole)}
-        >
-          {ORGANISER_ROLES.map((r) => (
-            <NativeSelectOption key={r} value={r}>
-              {ORGANISER_LABEL[r]}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <Button type="submit" disabled={add.isPending || !email.trim()}>
-          Add
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        They need an eventKit account first: send them this console's sign-up page.
-      </p>
-      <ErrorAlert error={add.error} />
-    </form>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <form className="grid gap-4" onSubmit={submit} aria-label="Add an organiser">
+          <DialogHeader>
+            <DialogTitle>Add member</DialogTitle>
+            <DialogDescription>
+              They need an eventKit account first: send them this console's sign-up page.
+            </DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor="organiser-email">Their eventKit email</FieldLabel>
+            <Input
+              id="organiser-email"
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="organiser-new-role">Role</FieldLabel>
+            <NativeSelect
+              id="organiser-new-role"
+              className="w-full"
+              value={role}
+              onChange={(e) => setRole(e.target.value as OrganiserRole)}
+            >
+              {ORGANISER_ROLES.map((r) => (
+                <NativeSelectOption key={r} value={r}>
+                  {ORGANISER_LABEL[r]}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <ErrorAlert error={add.error} />
+          <DialogFooter>
+            <Button type="submit" disabled={add.isPending || !email.trim()}>
+              Add member
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 const memberText = (m: Member) => [m.name, m.email, m.phone, roleLabel[m.role]];
 
 /** Volunteers and judges: portal accounts made through staff links. */
-function Staff(props: {
-  staff: Member[];
-  onRole: (userId: string, role: StaffRole) => void;
-  onRemove: (userId: string) => void;
-}) {
-  const search = useListFilter(props.staff, memberText);
+export function StaffPage() {
+  const members = useMembers();
+  const { change, remove } = useMemberActions();
+  const staff = useMemo(() => members.data?.filter((m) => !isOrganiser(m)) ?? [], [members.data]);
+  const search = useListFilter(staff, memberText);
+  const page = usePage(search.filtered);
+  const [removing, setRemoving] = useState<Member | null>(null);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Staff</CardTitle>
-        <CardDescription>
-          Volunteers and judges join through a staff link (Links) and sign in on the event's portal.
-          Removing someone ends their access.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        {props.staff.length > 0 && (
-          <SearchInput
-            label="Search staff"
-            placeholder="Name, email or role"
-            value={search.query}
-            onChange={search.setQuery}
-          />
-        )}
-        {props.staff.length === 0 ? (
+    <div className="grid gap-4">
+      <PageHeader
+        title="Staff"
+        description="Volunteers and judges join through a staff link (Links) and sign in on the event's portal. Removing someone ends their access."
+      />
+      <ErrorAlert error={members.error ?? change.error ?? remove.error} />
+      {members.isPending && <TableSkeleton rows={4} cols={3} />}
+      {staff.length > 0 && (
+        <SearchInput
+          label="Search staff"
+          placeholder="Name, email or role"
+          value={search.query}
+          onChange={search.setQuery}
+        />
+      )}
+      {members.data &&
+        (staff.length === 0 ? (
           <EmptyState icon={UserCog} title="No staff yet." />
         ) : search.filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nobody matches.</p>
         ) : (
           <div className="overflow-hidden rounded-lg border">
-            <Table>
+            <Table aria-label="Staff">
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -290,7 +384,7 @@ function Staff(props: {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {search.filtered.map((m) => (
+                {page.items.map((m) => (
                   <TableRow key={m.userId}>
                     <TableCell className="whitespace-normal">
                       <div className="font-medium wrap-anywhere">{m.name}</div>
@@ -305,7 +399,9 @@ function Staff(props: {
                         aria-label={`Role of ${m.name}`}
                         className="w-28 sm:w-36"
                         value={m.role}
-                        onChange={(e) => props.onRole(m.userId, e.target.value as StaffRole)}
+                        onChange={(e) =>
+                          change.mutate({ userId: m.userId, role: e.target.value as StaffRole })
+                        }
                       >
                         {STAFF_ROLES.map((r) => (
                           <NativeSelectOption key={r} value={r}>
@@ -315,27 +411,36 @@ function Staff(props: {
                       </NativeSelect>
                     </TableCell>
                     <TableCell className="text-right">
-                      <ConfirmButton
-                        size="sm"
-                        variant="outline"
-                        title={`Remove ${m.name} from the event?`}
-                        description="Their access to the event ends straight away."
-                        confirmLabel="Remove"
-                        destructive
-                        onConfirm={() => props.onRemove(m.userId)}
-                      >
-                        <UserMinus aria-hidden />
-                        <span className="sr-only sm:not-sr-only">Remove</span>
-                      </ConfirmButton>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon-sm" variant="ghost" aria-label={`More for ${m.name}`}>
+                            <Ellipsis aria-hidden />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(m)}>
+                            <UserMinus aria-hidden /> Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        ))}
+      <Pager {...page} />
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={`Remove ${removing?.name} from the event?`}
+        description="Their access to the event ends straight away."
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => removing && remove.mutate(removing.userId)}
+      />
+    </div>
   );
 }
 
@@ -359,18 +464,17 @@ function LeaveEvent() {
     },
   });
   return (
-    <div className="flex items-center justify-end gap-2">
-      <span className="text-xs text-muted-foreground">You</span>
+    <div className="grid gap-2">
       <ConfirmButton
-        size="sm"
-        variant="outline"
+        variant="ghost"
+        className="text-destructive hover:text-destructive"
         title={`Leave ${event.name}?`}
         description="It disappears from your console. The owner can add you again."
         confirmLabel="Leave"
         destructive
         onConfirm={() => leave.mutate()}
       >
-        Leave
+        <LogOut aria-hidden /> Leave
       </ConfirmButton>
       <ErrorAlert error={leave.error} />
     </div>

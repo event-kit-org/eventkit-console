@@ -1,13 +1,16 @@
-import { Copy, Download, FileUp, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Copy, Download, Ellipsis, FileUp, Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { FilterMenu } from '@/components/FilterMenu';
 import { FormField } from '@/components/FormField';
 import { PageHeader } from '@/components/PageHeader';
-import { CardsSkeleton, EmptyState } from '@/components/PageState';
+import { EmptyState, TableSkeleton } from '@/components/PageState';
+import { Pager, usePage } from '@/components/Pager';
+import { SearchInput } from '@/components/SearchInput';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,22 +21,53 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useEventContext } from '@/features/events/event-context';
 import { PhaseBadge, useRounds } from '@/features/judging/rounds';
 import { useEventMutation } from '@/hooks/useEventMutation';
+import { useListFilter } from '@/hooks/useListFilter';
+import { useSearchParam } from '@/hooks/useSearchParam';
 import { formatIST, fromISTInput } from '@/lib/datetime';
-import { useSubmissions } from './queries';
+import { type Submission, useSubmissions } from './queries';
 import { useRoundExport } from './round-export';
 
-/** Admin: what teams submit in each round (a project link, a deck...), grouped by round. */
+const submissionText = (s: Submission) => [s.title, s.round.name, s.description];
+
+/**
+ * Admin: what teams submit in each round (a project link, a deck...), as a
+ * table. A row opens the submission; its ⋯ holds the rest.
+ */
 export function SubmissionsPage() {
   const api = useApi();
   const { event } = useEventContext();
+  const navigate = useNavigate();
   const rounds = useRounds();
   const submissions = useSubmissions();
+  const [round, setRound] = useSearchParam('round', '');
+  const inRound = useMemo(
+    () => (submissions.data ?? []).filter((s) => !round || s.round.id === round),
+    [submissions.data, round],
+  );
+  const search = useListFilter(inRound, submissionText);
+  const page = usePage(search.filtered);
+  const [deleting, setDeleting] = useState<Submission | null>(null);
   const params = (submissionId: string) => ({
     params: { path: { eventId: event.id, submissionId } },
   });
@@ -45,89 +79,145 @@ export function SubmissionsPage() {
   );
   const exportRound = useRoundExport();
   const loading = rounds.isPending || submissions.isPending;
+  const all = submissions.data ?? [];
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-6">
+    <div className="grid gap-4">
       <PageHeader
         title="Submissions"
         description="What teams hand in during each round. Participants see a round's submissions once the round is released."
       >
         {rounds.data && rounds.data.length > 0 && <CreateDialog />}
       </PageHeader>
+      {all.length > 0 && (
+        <div className="flex min-w-0 items-center gap-2">
+          <SearchInput
+            label="Search submissions"
+            placeholder="Title or round"
+            className="min-w-0 flex-1 sm:w-72 sm:flex-none"
+            value={search.query}
+            onChange={search.setQuery}
+          />
+          <FilterMenu
+            value={round}
+            onChange={setRound}
+            fallback=""
+            options={[
+              ['', 'All rounds'],
+              ...(rounds.data ?? []).map((r) => [r.id, r.name] as const),
+            ]}
+          />
+        </div>
+      )}
       <ErrorAlert
         error={
           rounds.error ?? submissions.error ?? duplicate.error ?? remove.error ?? exportRound.error
         }
       />
-      {loading && <CardsSkeleton />}
+      {loading && <TableSkeleton cols={4} />}
       {rounds.data?.length === 0 && (
         <EmptyState icon={FileUp} title="No rounds yet">
           Add a round on the Judging page first; every submission belongs to a round.
         </EmptyState>
       )}
-      {rounds.data?.map((round) => {
-        const items = (submissions.data ?? []).filter((s) => s.round.id === round.id);
-        return (
-          <section key={round.id} aria-label={round.name} className="grid gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="min-w-0 font-medium wrap-anywhere">{round.name}</h3>
-              <PhaseBadge phase={round.phase} />
-              {items.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto"
-                  disabled={exportRound.isPending}
-                  onClick={() => exportRound.mutate(round)}
+      {rounds.data &&
+        rounds.data.length > 0 &&
+        submissions.data &&
+        search.filtered.length === 0 && (
+          <EmptyState
+            icon={FileUp}
+            title={all.length === 0 ? 'No submissions yet' : 'No submission matches.'}
+          >
+            {all.length === 0 && 'Create one for teams to hand in their work.'}
+          </EmptyState>
+        )}
+      {page.items.length > 0 && (
+        <div className="overflow-hidden rounded-lg border">
+          <Table aria-label="Submissions">
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead>Submission</TableHead>
+                <TableHead className="hidden md:table-cell">Round</TableHead>
+                <TableHead className="text-right">Responses</TableHead>
+                <TableHead className="hidden sm:table-cell">Due</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {page.items.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    // The title link and the ⋯ menu handle their own clicks.
+                    if ((e.target as HTMLElement).closest('a,button,[role=menu]')) return;
+                    void navigate(s.id);
+                  }}
                 >
-                  <Download aria-hidden /> CSV
-                  <span className="sr-only"> of every submission in {round.name}</span>
-                </Button>
-              )}
-            </div>
-            {items.length === 0 && !loading && (
-              <p className="text-sm text-muted-foreground">No submissions in this round yet.</p>
-            )}
-            <ul className="grid divide-y rounded-lg border text-sm empty:hidden">
-              {items.map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-2 p-3">
-                  <Link to={s.id} className="grid min-w-0 gap-0.5 hover:underline">
-                    <span className="font-medium wrap-anywhere">{s.title}</span>
-                    <span className="text-muted-foreground">
-                      {s.fields.length} {s.fields.length === 1 ? 'question' : 'questions'} ·{' '}
-                      {s.entryCount} submitted
-                      {s.deadline && <> · due {formatIST(s.deadline)}</>}
-                    </span>
-                  </Link>
-                  <span className="flex shrink-0">
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={`Duplicate ${s.title}`}
-                      disabled={duplicate.isPending}
-                      onClick={() => duplicate.mutate(s.id)}
-                    >
-                      <Copy />
-                    </Button>
-                    <ConfirmButton
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={`Delete ${s.title}`}
-                      title={`Delete "${s.title}"?`}
-                      description="A submission teams have already answered can't be deleted."
-                      confirmLabel="Delete"
-                      destructive
-                      onConfirm={() => remove.mutate(s.id)}
-                    >
-                      <Trash2 />
-                    </ConfirmButton>
-                  </span>
-                </li>
+                  <TableCell className="whitespace-normal">
+                    <Link to={s.id} className="font-medium wrap-anywhere hover:underline">
+                      {s.title}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {s.fields.length} {s.fields.length === 1 ? 'question' : 'questions'}
+                      <span className="md:hidden"> · {s.round.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden whitespace-normal md:table-cell">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="wrap-anywhere">{s.round.name}</span>
+                      <PhaseBadge phase={s.round.phase} />
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{s.entryCount}</TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                    {s.deadline ? formatIST(s.deadline) : '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon-sm" variant="ghost" aria-label={`More for ${s.title}`}>
+                          <Ellipsis aria-hidden />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-60">
+                        <DropdownMenuItem
+                          disabled={duplicate.isPending}
+                          onSelect={() => duplicate.mutate(s.id)}
+                        >
+                          <Copy aria-hidden /> Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={exportRound.isPending}
+                          onSelect={() => exportRound.mutate(s.round)}
+                        >
+                          <Download aria-hidden /> Download {s.round.name} (CSV)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(s)}>
+                          <Trash2 aria-hidden /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
               ))}
-            </ul>
-          </section>
-        );
-      })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <Pager {...page} />
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title={`Delete "${deleting?.title}"?`}
+        description="A submission teams have already answered can't be deleted."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => deleting && remove.mutate(deleting.id)}
+      />
     </div>
   );
 }

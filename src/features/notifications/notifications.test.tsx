@@ -117,7 +117,8 @@ describe('notifications', () => {
     expect(await screen.findByText('Lunch is served')).toBeInTheDocument();
     const list = screen.getByRole('complementary', { name: 'Channels' });
     expect(within(list).getByText('Everyone')).toBeInTheDocument();
-    expect(within(list).getByText('Judges', { selector: 'span.truncate' })).toBeInTheDocument();
+    // The Judges channel's name, and its audience under it.
+    expect(within(list).getAllByText('Judges', { selector: 'span.truncate' })).toHaveLength(2);
     expect(screen.getByRole('button', { name: /Announcements/ })).toHaveAttribute(
       'aria-current',
       'true',

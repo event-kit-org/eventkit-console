@@ -671,22 +671,41 @@ describe('people', () => {
     respondedAt: event.createdAt,
   };
 
-  it('changes roles and removes people, but not yourself', async () => {
+  const organisers = async () => within(await screen.findByRole('table', { name: 'Organisers' }));
+
+  it('lists staff on their own page: role changes and a remove in the ⋯ menu', async () => {
     asRole('admin');
     server.use(http.get(`${E}/members`, () => HttpResponse.json(members)));
     const change = capture('patch', `${E}/members/v1`, { userId: 'v1', role: 'judge' });
     const remove = capture('delete', `${E}/members/v1`);
-    go('/people');
+    go('/staff');
     expect(await screen.findByText(/vik@example.com · \+91 90000/)).toBeInTheDocument();
+    // Organisers aren't staff.
+    expect(
+      within(screen.getByRole('table', { name: 'Staff' })).queryByText('Asha'),
+    ).not.toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Role of Vik'), 'judge');
     await waitFor(() => expect(change[0]?.body).toEqual({ role: 'judge' }));
-    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(screen.getByRole('button', { name: 'More for Vik' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }));
     await confirmDialog('Remove');
     await waitFor(() => expect(remove).toHaveLength(1));
   });
 
-  it('turns judging on for an admin', async () => {
+  it('shows staff refusals', async () => {
+    asRole('admin');
+    server.use(
+      http.get(`${E}/members`, () => HttpResponse.json(members)),
+      http.patch(`${E}/members/v1`, () =>
+        apiError(404, 'MEMBER_NOT_FOUND', 'Not a member of this event.'),
+      ),
+    );
+    go('/staff');
+    await userEvent.selectOptions(await screen.findByLabelText('Role of Vik'), 'judge');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not a member');
+  });
+
+  it('allows judging for an admin in the edit popup', async () => {
     asRole('admin');
     server.use(
       http.get(`${E}/members`, () => HttpResponse.json([{ ...members[0], canJudge: false }])),
@@ -696,22 +715,15 @@ describe('people', () => {
       canJudge: true,
     });
     go('/people');
-    await userEvent.click(await screen.findByRole('switch', { name: 'Judges' }));
+    await userEvent.click((await organisers()).getByRole('button', { name: 'Edit Asha' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    // The owner's role isn't changed, and the owner isn't removed.
+    expect(dialog.getByLabelText('Role')).toBeDisabled();
+    expect(dialog.getByText("The owner's role can't change.")).toBeInTheDocument();
+    expect(dialog.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('switch', { name: 'Allow judging' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(judging[0]?.body).toEqual({ canJudge: true }));
-  });
-
-  it('shows the owner without controls, and refusals', async () => {
-    asRole('admin');
-    server.use(
-      http.get(`${E}/members`, () => HttpResponse.json(members)),
-      http.patch(`${E}/members/v1`, () =>
-        apiError(404, 'MEMBER_NOT_FOUND', 'Not a member of this event.'),
-      ),
-    );
-    go('/people');
-    await userEvent.selectOptions(await screen.findByLabelText('Role of Vik'), 'judge');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Not a member');
-    expect(screen.queryByLabelText('Role of Asha')).not.toBeInTheDocument();
   });
 
   it('lets the owner add organisers by email, change their role and remove them', async () => {
@@ -721,17 +733,28 @@ describe('people', () => {
     const change = capture('patch', `${E}/members/u3`, { userId: 'u3', role: 'admin' });
     const remove = capture('delete', `${E}/members/u3`);
     go('/people');
-    const organisers = within(
-      (await screen.findByText('Organisers')).closest('[data-slot="card"]') as HTMLElement,
-    );
-    expect(organisers.getByText('Owner')).toBeInTheDocument();
-    await userEvent.selectOptions(organisers.getByLabelText('Role of Rhea'), 'admin');
+    const table = await organisers();
+    expect(table.getByText('Owner')).toBeInTheDocument();
+    expect(table.getByText('Reviewer')).toBeInTheDocument();
+    // Staff are on their own page.
+    expect(table.queryByText('Vik')).not.toBeInTheDocument();
+
+    await userEvent.click(table.getByRole('button', { name: 'Edit Rhea' }));
+    let dialog = within(await screen.findByRole('dialog'));
+    await userEvent.selectOptions(dialog.getByLabelText('Role'), 'admin');
+    await userEvent.click(dialog.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(change[0]?.body).toEqual({ role: 'admin' }));
-    await userEvent.type(organisers.getByLabelText('Their eventKit email'), 'new@example.com');
-    await userEvent.selectOptions(organisers.getByLabelText('Role'), 'admin');
-    await userEvent.click(organisers.getByRole('button', { name: 'Add' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add member' }));
+    dialog = within(await screen.findByRole('dialog'));
+    await userEvent.type(dialog.getByLabelText('Their eventKit email'), 'new@example.com');
+    await userEvent.selectOptions(dialog.getByLabelText('Role'), 'admin');
+    await userEvent.click(dialog.getByRole('button', { name: 'Add member' }));
     await waitFor(() => expect(add[0]?.body).toEqual({ email: 'new@example.com', role: 'admin' }));
-    await userEvent.click(organisers.getByRole('button', { name: 'Remove' }));
+
+    await userEvent.click(table.getByRole('button', { name: 'Edit Rhea' }));
+    dialog = within(await screen.findByRole('dialog'));
+    await userEvent.click(dialog.getByRole('button', { name: 'Remove member' }));
     await confirmDialog('Remove');
     await waitFor(() => expect(remove).toHaveLength(1));
   });
@@ -740,13 +763,10 @@ describe('people', () => {
     asRole('admin', {}, undefined, false);
     server.use(http.get(`${E}/members`, () => HttpResponse.json([...members, reviewer])));
     go('/people');
-    const organisers = within(
-      (await screen.findByText('Organisers')).closest('[data-slot="card"]') as HTMLElement,
-    );
-    expect(organisers.getByText('Reviewer')).toBeInTheDocument();
-    expect(organisers.queryByLabelText('Role of Rhea')).not.toBeInTheDocument();
-    expect(organisers.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
-    expect(organisers.queryByRole('form', { name: 'Add an organiser' })).not.toBeInTheDocument();
+    const table = await organisers();
+    expect(table.getByText('Reviewer')).toBeInTheDocument();
+    expect(table.queryByRole('button', { name: 'Edit Rhea' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument();
   });
 
   it('lets a co-admin leave from their own row, and never offers it to the owner', async () => {
@@ -756,11 +776,16 @@ describe('people', () => {
     server.use(http.get(`${E}/members`, () => HttpResponse.json([owner, me])));
     const leave = capture('delete', `${E}/members/${me.userId}`, null, 204);
     const { router } = go('/people');
-    const organisers = within(
-      (await screen.findByText('Organisers')).closest('[data-slot="card"]') as HTMLElement,
+    const table = await organisers();
+    await userEvent.click(table.getByRole('button', { name: 'Edit Olu' }));
+    expect(
+      within(await screen.findByRole('dialog')).queryByRole('button', { name: 'Leave' }),
+    ).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(table.getByRole('button', { name: 'Edit Asha' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Leave' }),
     );
-    expect(organisers.getAllByRole('button', { name: 'Leave' })).toHaveLength(1);
-    await userEvent.click(organisers.getByRole('button', { name: 'Leave' }));
     await confirmDialog('Leave');
     await waitFor(() => expect(leave).toHaveLength(1));
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
@@ -770,9 +795,9 @@ describe('people', () => {
     asRole('admin');
     server.use(http.get(`${E}/members`, () => HttpResponse.json(members)));
     go('/people');
-    await screen.findByText('Organisers');
+    await userEvent.click((await organisers()).getByRole('button', { name: 'Edit Asha' }));
+    await screen.findByRole('dialog');
     expect(screen.queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Leave this event/ })).not.toBeInTheDocument();
   });
 });
 
@@ -856,25 +881,37 @@ describe('invite links', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     go('/links');
 
-    expect(await screen.findByText(/Expires 31 Oct 2026, 9:00 am IST/)).toBeInTheDocument();
-    expect(screen.getByText(/^Revoked/)).toBeInTheDocument();
+    // Shown twice: in its column, and under the name on phones.
+    expect(await screen.findAllByText(/Expires 31 Oct 2026, 9:00 am IST/)).toHaveLength(2);
+    expect(screen.getAllByText(/^Revoked/)).toHaveLength(2);
 
-    await userEvent.type(screen.getByLabelText('Label (optional)'), 'WhatsApp');
-    await userEvent.click(screen.getByRole('button', { name: 'Create link' }));
+    const newLink = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'New link' }));
+      return within(await screen.findByRole('dialog'));
+    };
+    let dialog = await newLink();
+    await userEvent.type(dialog.getByLabelText('Label (optional)'), 'WhatsApp');
+    await userEvent.click(dialog.getByRole('button', { name: 'Create link' }));
     await waitFor(() =>
       expect(create[0]?.body).toEqual({ role: 'participant', label: 'WhatsApp' }),
     );
+    // The new link, with a copy button, then back to the list.
+    expect(await dialog.findByText('Link created')).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Copy link' }));
+    expect(writeText).toHaveBeenCalledWith('https://portal.test/register/tok123');
+    await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
 
-    await userEvent.selectOptions(screen.getByLabelText('Role'), 'volunteer');
-    await userEvent.click(screen.getByRole('button', { name: 'Create link' }));
+    dialog = await newLink();
+    await userEvent.selectOptions(dialog.getByLabelText('Role'), 'volunteer');
+    await userEvent.click(dialog.getByRole('button', { name: 'Create link' }));
     expect(
-      await screen.findByText('Staff links need a password of 8+ characters.'),
+      await dialog.findByText('Staff links need a password of 8+ characters.'),
     ).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Link password'), 'volunteer1');
-    fireEvent.change(screen.getByLabelText('Expires (IST, optional)'), {
+    await userEvent.type(dialog.getByLabelText('Link password'), 'volunteer1');
+    fireEvent.change(dialog.getByLabelText('Expires (IST, optional)'), {
       target: { value: '2026-10-31T09:00' },
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Create link' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Create link' }));
     await waitFor(() =>
       expect(create[1]?.body).toEqual({
         role: 'volunteer',
@@ -882,15 +919,20 @@ describe('invite links', () => {
         expiresAt: '2026-10-31T03:30:00.000Z',
       }),
     );
+    await userEvent.click(await dialog.findByRole('button', { name: 'Done' }));
 
-    const items = () =>
-      within(screen.getByRole('list', { name: 'Your links' })).getAllByRole('listitem');
-    const first = items()[0]!;
+    writeText.mockClear();
+    const rows = () =>
+      within(screen.getByRole('table', { name: 'Your links' }))
+        .getAllByRole('row')
+        .slice(1);
+    const first = rows()[0]!;
     await userEvent.click(within(first).getByRole('button', { name: 'Copy link' }));
     expect(writeText).toHaveBeenCalledWith('https://portal.test/register/tok123');
-    expect(within(items()[1]!).getByText('Staff: Judge')).toBeInTheDocument();
+    expect(within(rows()[1]!).getByText('Staff: Judge')).toBeInTheDocument();
     expect(within(first).getByRole('button', { name: 'Copied' })).toBeInTheDocument();
-    await userEvent.click(within(first).getByRole('button', { name: 'Revoke' }));
+    await userEvent.click(within(first).getByRole('button', { name: 'More for this link' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Revoke' }));
     await confirmDialog('Revoke');
     await waitFor(() => expect(revoke).toHaveLength(1));
   });
@@ -899,9 +941,11 @@ describe('invite links', () => {
     asRole('admin', { portalUrl: null }, { scanning: true });
     server.use(http.get(`${E}/invite-links`, () => HttpResponse.json([link({ url: null })])));
     go('/links');
+    await userEvent.click(await screen.findByRole('button', { name: 'New link' }));
     expect(
       await screen.findByText('Registration links need the registration feature.'),
     ).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
     expect(screen.getByText(/Set its URL in/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Copy link' })).not.toBeInTheDocument();
   });
@@ -953,6 +997,8 @@ describe('checkpoints', () => {
     expect(screen.getByText('Always open')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Add checkpoint' }));
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Add checkpoint' }));
     expect(await screen.findByText('Name the checkpoint.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Name'), 'Dinner');
     await userEvent.selectOptions(screen.getByLabelText('Type'), 'meal');
@@ -975,7 +1021,9 @@ describe('checkpoints', () => {
         pollId: 'p-food',
       }),
     );
-    await userEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'More for Lunch' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await confirmDialog('Delete');
     await waitFor(() => expect(remove).toHaveLength(1));
   });

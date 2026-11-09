@@ -108,6 +108,9 @@ describe('exit reasons (on Checkpoints)', () => {
     server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([])));
     const save = capture('patch', E, { event, role: 'admin' });
     go('/checkpoints');
+    const table = await screen.findByRole('table', { name: 'Exit reasons' });
+    expect(within(table).getByText('Emergency')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await userEvent.type(await screen.findByLabelText('New reason'), 'Phone call{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Remove Emergency' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save reasons' }));
@@ -118,6 +121,7 @@ describe('exit reasons (on Checkpoints)', () => {
     asRole('admin', { exitReasons: ['Bathroom'] });
     server.use(http.get(`${E}/checkpoints`, () => HttpResponse.json([])));
     go('/checkpoints');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     await userEvent.type(await screen.findByLabelText('New reason'), 'bathroom{Enter}');
     expect(screen.getByText('Each reason must be different.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save reasons' })).toBeDisabled();
@@ -202,7 +206,8 @@ describe('editing a checkpoint', () => {
       cp({ id: 'c-out', name: 'Exit', type: 'gate' }),
     );
     go('/checkpoints');
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit Exit' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'More for Exit' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit Exit' });
     await userEvent.type(
       within(dialog).getByLabelText('Opens (IST, optional)'),

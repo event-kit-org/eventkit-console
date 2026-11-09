@@ -17,6 +17,7 @@ import { type Schemas, unwrap } from '@/api/client';
 import { uploadFile } from '@/api/upload';
 import { useApi } from '@/auth/context';
 import { ConfirmButton, ConfirmDialog } from '@/components/ConfirmButton';
+import { CopyButton } from '@/components/CopyButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { CardsSkeleton } from '@/components/PageState';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -338,13 +339,18 @@ export function TeamDetailPage() {
             <Alert>
               <Link2 aria-hidden />
               <AlertTitle>New personal link for {newLink.name}</AlertTitle>
-              <AlertDescription>
-                {newLink.emailedTo
-                  ? `Emailed to the team leader (${newLink.emailedTo}) to pass on. Also shown here once:`
-                  : 'Shown once; send it to them.'}{' '}
-                <code className="font-mono text-xs break-all text-foreground">
-                  {newLink.url ?? newLink.token}
-                </code>
+              <AlertDescription className="grid gap-2">
+                <p>
+                  {newLink.emailedTo
+                    ? `Emailed to the team leader (${newLink.emailedTo}) to pass on. Also shown here once:`
+                    : 'Shown once; send it to them.'}
+                </p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <code className="min-w-0 flex-1 font-mono text-xs break-all text-foreground">
+                    {newLink.url ?? newLink.token}
+                  </code>
+                  <CopyButton value={newLink.url ?? newLink.token} label="link" />
+                </div>
               </AlertDescription>
             </Alert>
           )}

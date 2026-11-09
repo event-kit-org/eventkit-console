@@ -1,20 +1,27 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
+import { Download, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { TableSkeleton } from '@/components/PageState';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -25,6 +32,7 @@ import {
 } from '@/components/ui/table';
 import { download, slug } from '@/features/admin/teams-csv';
 import { useEventContext } from '@/features/events/event-context';
+import { useEventMutation } from '@/hooks/useEventMutation';
 import { judgesCsv, leaderboardCsv } from './judging-csv';
 import { ScoreBreakdownSheet } from './ScoreBreakdown';
 
@@ -82,49 +90,69 @@ export function Leaderboard({ roundId }: { roundId?: string }) {
     },
   });
   const scored = (board.data?.entries.length ?? 0) > 0;
+  const visible = useEventMutation(event.id, () =>
+    unwrap(
+      api.PATCH('/v1/events/{eventId}', {
+        ...path,
+        body: { leaderboardVisible: !event.leaderboardVisible },
+      }),
+    ),
+  );
   return (
     <Card>
-      <CardHeader className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid min-w-0 gap-1.5">
-          <CardTitle>Leaderboard{board.data?.round ? `: ${board.data.round.name}` : ''}</CardTitle>
-          <CardDescription>
-            {board.data?.visibleToEveryone
-              ? 'Everyone in the event can see this.'
-              : 'Only admins and judges can see this.'}
-          </CardDescription>
-        </div>
-        {role === 'admin' && scored && (
-          <DropdownMenu>
+      <CardHeader>
+        <CardTitle>{board.data?.round?.name ?? 'Leaderboard'}</CardTitle>
+        <CardDescription>
+          {board.data?.visibleToEveryone
+            ? 'Everyone in the event can see this.'
+            : 'Only admins and judges can see this.'}
+          {normalise && ' Lenient and harsh judges are evened out.'}
+        </CardDescription>
+        <CardAction>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={exportJudges.isPending}>
-                <Download aria-hidden /> Download CSV
+              <Button variant="outline" size="sm" aria-label="Leaderboard settings">
+                <Settings2 aria-hidden />
+                <span className="hidden sm:inline">Settings</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={exportBoard}>Leaderboard</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => exportJudges.mutate()}>
-                Each judge's scores and comments
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-72">
+              {role === 'admin' && (
+                <DropdownMenuCheckboxItem
+                  checked={event.leaderboardVisible}
+                  disabled={visible.isPending}
+                  onCheckedChange={() => visible.mutate(undefined)}
+                >
+                  Show to everyone
+                </DropdownMenuCheckboxItem>
+              )}
+              <DropdownMenuCheckboxItem checked={normalise} onCheckedChange={setNormalise}>
+                Even out lenient and harsh judges
+              </DropdownMenuCheckboxItem>
+              <p className="px-2 pb-1.5 text-xs text-muted-foreground">
+                Ranks by each judge's scores compared with their own average, so a team isn't held
+                back by a strict panel. Judges who scored fewer than 3 teams count as they are.
+              </p>
+              {role === 'admin' && scored && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={exportBoard}>
+                    <Download aria-hidden /> Download leaderboard (CSV)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={exportJudges.isPending}
+                    onSelect={() => exportJudges.mutate()}
+                  >
+                    <Download aria-hidden /> Download each judge's scores (CSV)
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
+        </CardAction>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="flex items-start gap-3">
-          <Switch
-            id="normalise"
-            checked={normalise}
-            onCheckedChange={setNormalise}
-            className="mt-0.5"
-          />
-          <div className="grid gap-1">
-            <Label htmlFor="normalise">Even out lenient and harsh judges</Label>
-            <p className="text-sm text-muted-foreground">
-              Ranks by each judge's scores compared with their own average, so a team isn't held
-              back by a strict panel. Judges who scored fewer than 3 teams count as they are.
-            </p>
-          </div>
-        </div>
+        <ErrorAlert error={visible.error} />
         <ErrorAlert error={board.error ?? exportJudges.error} />
         {board.isPending && <TableSkeleton rows={3} />}
         {board.data?.entries.length === 0 && (

@@ -188,7 +188,7 @@ export function TeamsPage() {
                     dir={sort.dir}
                     onSort={() => sort.toggle('name')}
                   />
-                  <TableHead className="hidden sm:table-cell">Leader</TableHead>
+                  <TableHead className="hidden lg:table-cell">Leader</TableHead>
                   <SortableHead
                     label="Status"
                     active={sort.key === 'status'}
@@ -246,9 +246,9 @@ export function TeamsPage() {
                         </Badge>
                       )}
                       {/* The leader column is hidden on phones; show who leads here. */}
-                      <div className="text-xs text-muted-foreground sm:hidden">{t.leader.name}</div>
+                      <div className="text-xs text-muted-foreground lg:hidden">{t.leader.name}</div>
                     </TableCell>
-                    <TableCell className="hidden whitespace-normal sm:table-cell">
+                    <TableCell className="hidden whitespace-normal lg:table-cell">
                       {t.leader.name}
                       <div className="text-xs break-all text-muted-foreground">
                         {t.leader.email}

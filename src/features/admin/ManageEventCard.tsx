@@ -21,33 +21,35 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useEventContext } from '@/features/events/event-context';
 import { useEventMutation } from '@/hooks/useEventMutation';
 import { formatIST } from '@/lib/datetime';
 
-/** Registration window, and deleting the event. (Exporting teams is on the Teams page.) */
+/** The registration window. (Exporting teams is on the Teams page.) */
 export function ManageEventCard() {
-  const { isOwner } = useEventContext();
   return (
     <Card>
       <CardHeader>
         <CardTitle>Manage event</CardTitle>
-        <CardDescription>
-          {isOwner
-            ? 'The registration window, and deleting the event.'
-            : 'The registration window.'}
-        </CardDescription>
+        <CardDescription>The registration window.</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6">
+      <CardContent>
         <RegistrationWindow />
-        {/* Only the owner deletes the event. */}
-        {isOwner && (
-          <>
-            <Separator />
-            <DeleteEvent />
-          </>
-        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Deleting the event, on its own card. Only the owner sees it. */
+export function DangerZoneCard() {
+  return (
+    <Card className="border-destructive/50">
+      <CardHeader>
+        <CardTitle className="text-destructive">Danger zone</CardTitle>
+        <CardDescription>Actions here can&apos;t be undone.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <DeleteEvent />
       </CardContent>
     </Card>
   );

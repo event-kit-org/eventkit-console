@@ -124,7 +124,10 @@ describe('judging', () => {
     go('leaderboards');
     expect(await screen.findByText('Byte Club')).toBeInTheDocument();
     expect(screen.queryByText('How original')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Show to everyone' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Leaderboard settings' }));
+    await userEvent.click(
+      await screen.findByRole('menuitemcheckbox', { name: 'Show to everyone' }),
+    );
     await waitFor(() => expect(shown[0]?.body).toEqual({ leaderboardVisible: true }));
   });
 
@@ -415,9 +418,11 @@ describe('scores, tracks and leaderboards', () => {
     );
     go('leaderboards');
     expect(await screen.findByText('12.50 / 15')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Leaderboard settings' }));
     await userEvent.click(
-      screen.getByRole('switch', { name: 'Even out lenient and harsh judges' }),
+      await screen.findByRole('menuitemcheckbox', { name: 'Even out lenient and harsh judges' }),
     );
+    await userEvent.keyboard('{Escape}');
     expect(await screen.findByText('12.00 / 15')).toBeInTheDocument();
     expect(screen.getByText('raw 12.50')).toBeInTheDocument();
     expect(asked).toContain('true');
@@ -457,11 +462,13 @@ describe('scores, tracks and leaderboards', () => {
     );
     go('leaderboards');
     await screen.findByText('12.50 / 15');
-    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Leaderboard' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Leaderboard settings' }));
     await userEvent.click(
-      await screen.findByRole('menuitem', { name: "Each judge's scores and comments" }),
+      await screen.findByRole('menuitem', { name: 'Download leaderboard (CSV)' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Leaderboard settings' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: "Download each judge's scores (CSV)" }),
     );
     await waitFor(() => expect(blobs).toHaveLength(2));
     const [boardCsv, judges] = await Promise.all(blobs.map((b) => b.text()));
@@ -495,15 +502,17 @@ describe('scores, tracks and leaderboards', () => {
       ),
     );
     const removed = capture('delete', `${E}/leaderboards/lb1`);
-    go('leaderboards');
-    const card = within(
-      (await screen.findByText('Saved leaderboards')).closest('[data-slot="card"]') as HTMLElement,
-    );
-    expect(await card.findByText(/Every team · Round 1 \+ Finals ×2 · Add up/)).toBeInTheDocument();
-    await userEvent.click(card.getByRole('button', { name: /^Overall/ }));
-    expect(await card.findByText('32 / 45')).toBeInTheDocument();
+    const { router } = go('leaderboards');
+    // One board at a time: the round's, until a saved one is picked.
+    await screen.findByText('Byte Club');
+    await pick('Leaderboard', 'Overall');
+    await waitFor(() => expect(router.state.location.search).toMatch(/board=lb1/));
+    expect(
+      await screen.findByText(/Every team · Round 1 \+ Finals ×2 · Add up · Everyone/),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('32 / 45')).toBeInTheDocument();
 
-    await userEvent.click(card.getByRole('button', { name: 'New leaderboard' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New leaderboard' }));
     const dialog = await screen.findByRole('dialog', { name: 'New leaderboard' });
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Finals top 3');
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Finals' }));
@@ -523,7 +532,8 @@ describe('scores, tracks and leaderboards', () => {
       }),
     );
 
-    await userEvent.click(card.getByRole('button', { name: 'Delete Overall' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Leaderboard settings' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete leaderboard' }));
     await confirmDialog('Delete leaderboard');
     await waitFor(() => expect(removed).toHaveLength(1));
   });

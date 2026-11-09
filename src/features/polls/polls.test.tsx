@@ -39,6 +39,11 @@ function poll(over: Partial<Schemas['Poll']> = {}): Schemas['Poll'] {
 const usePolls = (list: Schemas['Poll'][]) =>
   server.use(http.get(`${E}/polls`, () => HttpResponse.json(list)));
 const go = () => renderApp(`/events/${event.id}/polls`, { token: 'good-token' });
+/** Opens a poll (or set) from the table, in a popup. */
+async function openPoll(title: string) {
+  await userEvent.click(await screen.findByRole('button', { name: title }));
+  return within(await screen.findByRole('dialog'));
+}
 
 describe('polls', () => {
   it('votes when in the audience; results stay hidden', async () => {
@@ -46,7 +51,10 @@ describe('polls', () => {
     usePolls([poll()]);
     const vote = capture('put', `${E}/polls/p1/vote`, poll({ myVote: 'o1' }));
     go();
-    expect(await screen.findByText('Lunch?')).toBeInTheDocument();
+    const table = within(await screen.findByRole('table', { name: 'Polls' }));
+    expect(table.getByText('Open')).toBeInTheDocument();
+    expect(table.getAllByText('Everyone')).not.toHaveLength(0);
+    await openPoll('Lunch?');
     expect(
       screen.getByText(/Everyone · closes 31 Oct 2026, 12:00 pm IST · used at Lunch/),
     ).toBeInTheDocument();
@@ -75,6 +83,7 @@ describe('polls', () => {
     ]);
     go();
     expect(await screen.findByText('Closed')).toBeInTheDocument();
+    await openPoll('Lunch?');
     expect(screen.getByText('3 votes in total.')).toBeInTheDocument();
     expect(screen.getByText(/Curd rice \(your choice\)/)).toBeInTheDocument();
   });
@@ -86,6 +95,7 @@ describe('polls', () => {
     const patched = capture('patch', `${E}/polls/p1`, poll({ resultsVisible: true }));
     const added = capture('post', `${E}/polls/p1/options`, poll(), 201);
     go();
+    await openPoll('Lunch?');
     await userEvent.click(
       await screen.findByRole('button', { name: 'Show results to the audience' }),
     );
@@ -93,6 +103,7 @@ describe('polls', () => {
     await userEvent.type(screen.getByLabelText('New option'), 'Pasta');
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(added[0]?.body).toEqual({ label: 'Pasta' }));
+    await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'New poll' }));
     const create = screen.getByRole('button', { name: 'Create poll' });
@@ -148,6 +159,7 @@ describe('polls', () => {
     ]);
     const voted = capture('put', `${E}/polls/p1/vote`, poll());
     go();
+    await openPoll('Lunch?');
     await userEvent.click(await screen.findByRole('checkbox', { name: 'AI' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Chips' }));
     await userEvent.click(screen.getByRole('button', { name: 'Vote' }));
@@ -175,6 +187,7 @@ describe('polls', () => {
     ]);
     const voted = capture('put', `${E}/polls/p1/vote`, poll());
     go();
+    await openPoll('Lunch?');
     await userEvent.click(await screen.findByRole('radio', { name: '3' }));
     await userEvent.click(screen.getByRole('button', { name: 'Answer' }));
     await waitFor(() => expect(voted[0]?.body).toEqual({ value: 3 }));
@@ -204,6 +217,7 @@ describe('polls', () => {
     );
     const voted = capture('put', `${E}/polls/p1/vote`, poll());
     go();
+    await openPoll('Lunch?');
     const box = await screen.findByRole('textbox', { name: 'Lunch?' });
     expect(box).toHaveValue('Loved it');
     await userEvent.clear(box);
@@ -250,12 +264,15 @@ describe('polls', () => {
     const closed = capture('patch', `${E}/polls/p1`, poll());
     const reopened = capture('patch', `${E}/polls/p2`, poll());
     go();
+    await openPoll('Lunch?');
     await userEvent.click(await screen.findByRole('button', { name: 'Close poll' }));
     expect(await screen.findByRole('alertdialog')).toHaveTextContent('default');
     await confirmDialog('Close poll');
     await waitFor(() => expect(closed[0]?.body).toEqual({ closesAt: expect.any(String) }));
     const at = Date.parse((closed[0]!.body as { closesAt: string }).closesAt);
     expect(Math.abs(Date.now() - at)).toBeLessThan(60_000);
+    await userEvent.keyboard('{Escape}');
+    await openPoll('Venue?');
     await userEvent.click(screen.getByRole('button', { name: 'Reopen poll' }));
     await waitFor(() => expect(reopened[0]?.body).toEqual({ closesAt: null }));
   });
@@ -264,7 +281,7 @@ describe('polls', () => {
     asRole('admin');
     usePolls([poll({ canManage: false })]);
     go();
-    expect(await screen.findByText('Lunch?')).toBeInTheDocument();
+    await openPoll('Lunch?');
     expect(screen.queryByRole('button', { name: 'Close poll' })).not.toBeInTheDocument();
   });
 
@@ -319,15 +336,14 @@ describe('polls', () => {
     const patched = capture('patch', `${E}/polls/groups/g1`, []);
     const removed = capture('delete', `${E}/polls/groups/g1`);
     go();
-    const card = (await screen.findByRole('heading', { name: 'Feedback' })).closest(
-      '[data-slot=card]',
-    )!;
-    const inCard = within(card as HTMLElement);
+    const table = within(await screen.findByRole('table', { name: 'Polls' }));
+    expect(table.getByText('2 questions')).toBeInTheDocument();
+    expect(table.getByText('Alone?')).toBeInTheDocument();
+    const inCard = await openPoll('Feedback');
     expect(inCard.getByText('2 questions')).toBeInTheDocument();
     const order = inCard.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(order[0]).toContain('1. First?');
     expect(order[1]).toContain('2. Second?');
-    expect(screen.getByText('Alone?')).toBeInTheDocument();
     await userEvent.click(inCard.getByRole('button', { name: 'Show results to the audience' }));
     await waitFor(() => expect(patched[0]?.body).toEqual({ resultsVisible: true }));
     await userEvent.click(inCard.getByRole('button', { name: 'Delete set' }));

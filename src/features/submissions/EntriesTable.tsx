@@ -1,12 +1,21 @@
-import { ChevronDown, ChevronRight, Download, Trash2 } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Download, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { unwrap } from '@/api/client';
 import { useApi } from '@/auth/context';
-import { ConfirmButton } from '@/components/ConfirmButton';
+import { ConfirmDialog } from '@/components/ConfirmButton';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { TableSkeleton } from '@/components/PageState';
+import { Pager, usePage } from '@/components/Pager';
 import { SearchInput } from '@/components/SearchInput';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -61,27 +70,34 @@ export function EntriesTable({ submission }: { submission: Submission }) {
     }),
   );
   const search = useListFilter(entries.data ?? [], entryText);
-  const [open, setOpen] = useState<string | null>(null);
+  const page = usePage(search.filtered);
+  const [openId, setOpen] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Entry | null>(null);
+  const open = entries.data?.find((e) => e.id === openId) ?? null;
   const fields = [...submission.fields].sort((a, b) => a.position - b.position);
   const exportCsv = () =>
     download(
       `${slug(event.name)}-${slug(submission.title)}.csv`,
       entriesCsv({ ...submission, fields }, entries.data ?? []),
     );
+  const label = (e: Entry) =>
+    perTeam.get(e.team.id)! > 1 ? `${e.team.name} #${number.get(e.id)}` : e.team.name;
   return (
     <section aria-label="Responses" className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-medium">Responses</h3>
         {entries.data && entries.data.length > 0 && (
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <SearchInput
               label="Search responses"
               placeholder="Team or answer"
+              className="min-w-0 flex-1 sm:w-64 sm:flex-none"
               value={search.query}
               onChange={search.setQuery}
             />
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download aria-hidden /> Download CSV
+            <Button variant="outline" onClick={exportCsv} aria-label="Download CSV">
+              <Download aria-hidden />
+              <span className="hidden sm:inline">Download CSV</span>
             </Button>
           </div>
         )}
@@ -99,33 +115,39 @@ export function EntriesTable({ submission }: { submission: Submission }) {
       {search.active && search.filtered.length === 0 && (
         <p className="text-sm text-muted-foreground">No response matches.</p>
       )}
-      {search.filtered.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Team</TableHead>
-              <TableHead>Sent</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {search.filtered.map((e) => (
-              <Fragment key={e.id}>
-                <TableRow>
+      {page.items.length > 0 && (
+        <div className="overflow-hidden rounded-lg border">
+          <Table aria-label="Responses">
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead>Team</TableHead>
+                <TableHead className="hidden sm:table-cell">Sent by</TableHead>
+                <TableHead>Sent</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {page.items.map((e) => (
+                <TableRow
+                  key={e.id}
+                  className="cursor-pointer"
+                  onClick={(ev) => {
+                    if ((ev.target as HTMLElement).closest('button')) return;
+                    setOpen(e.id);
+                  }}
+                >
                   <TableCell className="whitespace-normal">
                     <Button
-                      variant="ghost"
+                      variant="link"
                       size="sm"
-                      className="h-auto min-h-8 justify-start text-left whitespace-normal"
-                      aria-expanded={open === e.id}
-                      aria-label={`Answers from ${e.team.name}`}
-                      onClick={() => setOpen(open === e.id ? null : e.id)}
+                      className="h-auto p-0 text-left whitespace-normal text-foreground"
+                      aria-label={`Answers from ${label(e)}`}
+                      onClick={() => setOpen(e.id)}
                     >
-                      {open === e.id ? <ChevronDown /> : <ChevronRight />}
-                      {e.team.name}
-                      {perTeam.get(e.team.id)! > 1 && (
-                        <span className="text-muted-foreground">#{number.get(e.id)}</span>
-                      )}
+                      {label(e)}
                     </Button>
+                  </TableCell>
+                  <TableCell className="hidden whitespace-normal text-muted-foreground wrap-anywhere sm:table-cell">
+                    {e.submittedBy?.name ?? '—'}
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     {formatIST(e.createdAt)}
@@ -136,50 +158,63 @@ export function EntriesTable({ submission }: { submission: Submission }) {
                     )}
                   </TableCell>
                 </TableRow>
-                {open === e.id && (
-                  <TableRow>
-                    <TableCell colSpan={2} className="whitespace-normal">
-                      <div className="grid gap-3 text-sm">
-                        <dl className="grid gap-2">
-                          {e.submittedBy && (
-                            <p className="text-muted-foreground">Sent by {e.submittedBy.name}</p>
-                          )}
-                          {fields.map((f) => (
-                            <div key={f.id} className="grid gap-0.5">
-                              <dt className="text-muted-foreground">{f.label}</dt>
-                              <dd className="min-w-0">
-                                <AnswerValue type={f.type} value={e.answers[f.id]} />
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                        {role === 'admin' && (
-                          <ConfirmButton
-                            variant="outline"
-                            size="sm"
-                            className="justify-self-start"
-                            title={`Delete this response from ${e.team.name}?`}
-                            description="Its answers go, so the team can submit again (for example after sending wrong details). This can't be undone."
-                            confirmLabel="Delete response"
-                            destructive
-                            disabled={remove.isPending}
-                            onConfirm={() => {
-                              setOpen(null);
-                              remove.mutate(e.id);
-                            }}
-                          >
-                            <Trash2 aria-hidden /> Delete response
-                          </ConfirmButton>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </Fragment>
-            ))}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
+      <Pager {...page} />
+      <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
+        {open && (
+          <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="flex flex-wrap items-center gap-2 pr-6 wrap-anywhere">
+                {label(open)}
+                {open.late && <Badge variant="destructive">Late</Badge>}
+              </DialogTitle>
+              <DialogDescription>
+                Sent {formatIST(open.createdAt)}
+                {open.submittedBy && <> by {open.submittedBy.name}</>}
+              </DialogDescription>
+            </DialogHeader>
+            <dl className="grid gap-3 text-sm">
+              {fields.map((f) => (
+                <div key={f.id} className="grid gap-0.5">
+                  <dt className="text-muted-foreground">{f.label}</dt>
+                  <dd className="min-w-0">
+                    <AnswerValue type={f.type} value={open.answers[f.id]} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {role === 'admin' && (
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  className="text-destructive"
+                  disabled={remove.isPending}
+                  onClick={() => setDeleting(open)}
+                >
+                  <Trash2 aria-hidden /> Delete response
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        )}
+      </Dialog>
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title={`Delete this response from ${deleting?.team.name}?`}
+        description="Its answers go, so the team can submit again (for example after sending wrong details). This can't be undone."
+        confirmLabel="Delete response"
+        destructive
+        onConfirm={() => {
+          if (!deleting) return;
+          setOpen(null);
+          remove.mutate(deleting.id);
+        }}
+      />
     </section>
   );
 }

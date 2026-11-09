@@ -174,7 +174,7 @@ export function RoundsStrip({
             </SelectContent>
           </Select>
         )}
-        <Button variant="outline" size="sm" onClick={() => setDialog('add')}>
+        <Button size="sm" className="ml-auto" onClick={() => setDialog('add')}>
           <Plus aria-hidden /> Add round
         </Button>
       </div>
@@ -209,7 +209,7 @@ export function RoundsStrip({
                   <Ellipsis aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem onSelect={() => setDialog('rename')}>
                   <Pencil aria-hidden /> Rename
                 </DropdownMenuItem>
@@ -219,11 +219,6 @@ export function RoundsStrip({
                   <Swords aria-hidden />
                   {elimination ? 'Make a normal round' : 'Make an elimination round'}
                 </DropdownMenuItem>
-                {elimination && (
-                  <DropdownMenuItem onSelect={() => setDialog('advance')}>
-                    <Users aria-hidden /> Choose who goes on…
-                  </DropdownMenuItem>
-                )}
                 <DropdownMenuItem
                   disabled={exportRound.isPending}
                   onSelect={() => exportRound.mutate(selected)}
@@ -237,6 +232,16 @@ export function RoundsStrip({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {elimination && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed px-3 py-2">
+              <span className="min-w-0 flex-1 basis-56 text-muted-foreground">
+                An elimination round: once it closes, pick the teams that go on to the next round.
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => setDialog('advance')}>
+                <Users aria-hidden /> Choose who goes on
+              </Button>
+            </div>
+          )}
           {limited && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-2">
               <span>
