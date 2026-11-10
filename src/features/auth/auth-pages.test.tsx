@@ -19,7 +19,7 @@ describe('route protection', () => {
   });
 
   it('logs out when the stored token is rejected', async () => {
-    const { session: s } = renderApp('/', { token: 'expired-token' });
+    const { session: s } = renderApp('/events/abc', { token: 'expired-token' });
     await screen.findByRole('heading', { name: 'Log in' });
     expect(s.get()).toBeNull();
   });

@@ -11,7 +11,7 @@ import {
   Sun,
   UserCog,
 } from 'lucide-react';
-import { Link, NavLink, useMatch } from 'react-router';
+import { Link, NavLink, useMatch, useNavigate } from 'react-router';
 import { unwrap } from '@/api/client';
 import { useApi, useAuth } from '@/auth/context';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -200,6 +200,7 @@ const initials = (name: string) =>
 /** Who is signed in, the colour theme, and logging out. */
 function UserMenu() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const { isMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   return (
@@ -245,7 +246,12 @@ function UserMenu() {
                 <UserCog aria-hidden /> Account settings
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={logout}>
+            <DropdownMenuItem
+              onSelect={() => {
+                logout();
+                void navigate('/login', { replace: true });
+              }}
+            >
               <LogOut aria-hidden /> Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
