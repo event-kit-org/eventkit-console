@@ -32,6 +32,21 @@ describe('LandingPage', () => {
     expect(screen.queryByRole('heading', { name: /run your whole event/i })).toBeNull();
   });
 
+  it('lists submissions and assignments among the features', async () => {
+    renderApp('/');
+    expect(await screen.findByRole('heading', { name: 'Submissions' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Assignments' })).toBeInTheDocument();
+  });
+
+  it('glides to the features instead of jumping', async () => {
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+    renderApp('/');
+    await userEvent.click(await screen.findByRole('link', { name: 'See what it does' }));
+    expect(scroll).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(window.location.hash).toBe('#features');
+    scroll.mockRestore();
+  });
+
   it('leads from the hero to the SDK docs', async () => {
     const { router } = renderApp('/');
     await userEvent.click(await screen.findByRole('link', { name: /build with the sdk/i }));
@@ -39,6 +54,9 @@ describe('LandingPage', () => {
     expect(
       await screen.findByRole('heading', { name: /build your event's own site/i }),
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'eventKit' }));
+    await screen.findByRole('heading', { name: /run your whole event/i });
+    expect(document.title).toBe('eventKit');
   });
 });
 

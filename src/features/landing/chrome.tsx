@@ -1,4 +1,6 @@
+import type { ComponentProps } from 'react';
 import { Link } from 'react-router';
+import { scrollToSection } from './scroll';
 import logo from '@/assets/logo.png';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -7,6 +9,23 @@ import { cn } from '@/lib/utils';
 export const PRESS =
   'duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.96] motion-safe:active:duration-100';
 export const PRESS_GLOW = `${PRESS} hover:bg-primary hover:shadow-[0_0_32px_-4px_rgb(255_255_255/0.45)]`;
+
+/** A link to a section of this page that scrolls there smoothly instead of jumping. */
+export function SectionLink({ id, onClick, ...props }: ComponentProps<'a'> & { id: string }) {
+  return (
+    <a
+      {...props}
+      href={`#${id}`}
+      onClick={(e) => {
+        onClick?.(e);
+        // Let new-tab and modified clicks behave as links do.
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        scrollToSection(id);
+      }}
+    />
+  );
+}
 
 /** The public pages' frame: always black, whatever the console theme. */
 export function PublicPage({ children }: { children: React.ReactNode }) {
@@ -41,9 +60,9 @@ export function Nav({ home = false }: { home?: boolean }) {
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-black/60 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         {home ? (
-          <a href="#top" className="flex items-center gap-2.5 rounded-md">
+          <SectionLink id="top" className="flex items-center gap-2.5 rounded-md">
             <Brand />
-          </a>
+          </SectionLink>
         ) : (
           <Link to="/" className="flex items-center gap-2.5 rounded-md">
             <Brand />
@@ -55,7 +74,11 @@ export function Nav({ home = false }: { home?: boolean }) {
             variant="ghost"
             className={cn(PRESS, 'hidden h-10 px-3 text-muted-foreground sm:inline-flex')}
           >
-            {home ? <a href="#features">Features</a> : <Link to="/#features">Features</Link>}
+            {home ? (
+              <SectionLink id="features">Features</SectionLink>
+            ) : (
+              <Link to="/#features">Features</Link>
+            )}
           </Button>
           <Button
             asChild

@@ -2,19 +2,24 @@ import {
   ArrowRight,
   BarChart3,
   Bell,
+  ClipboardList,
   Download,
   IdCard,
   LayoutTemplate,
   ScanLine,
+  Send,
   Ticket,
   Trophy,
   Vote,
   type LucideIcon,
 } from 'lucide-react';
-import { Link } from 'react-router';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'react-router';
 import { Button } from '@/components/ui/button';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { cn } from '@/lib/utils';
-import { Nav, PRESS, PRESS_GLOW, PublicPage } from './chrome';
+import { Nav, PRESS, PRESS_GLOW, PublicPage, SectionLink } from './chrome';
+import { scrollToSection } from './scroll';
 import { ConsoleMock } from './ConsoleMock';
 
 /**
@@ -22,6 +27,12 @@ import { ConsoleMock } from './ConsoleMock';
  * Signed-in users get their events there instead (see RequireAuth).
  */
 export function LandingPage() {
+  usePageTitle();
+  // Arriving from another page at /#features: glide down to it.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) scrollToSection(hash.slice(1));
+  }, [hash]);
   return (
     <PublicPage>
       <Nav home />
@@ -62,7 +73,7 @@ function Hero() {
           variant="ghost"
           className={cn(PRESS, 'h-12 rounded-full px-6 text-base text-muted-foreground')}
         >
-          <a href="#features">See what it does</a>
+          <SectionLink id="features">See what it does</SectionLink>
         </Button>
         <Button
           asChild
@@ -113,13 +124,24 @@ const FEATURES: Feature[] = [
   {
     icon: Trophy,
     title: 'Judging and live leaderboards',
-    body: 'Submissions, rounds and scoring criteria, with rankings that update as judges score.',
+    body: 'Rounds and scoring criteria, with rankings that update as judges score.',
   },
   {
     icon: LayoutTemplate,
     title: 'Your portal, your brand',
     body: 'Start from our portal template or build your own on the SDK. Participants never need an account.',
     link: { to: '/docs/sdk', label: 'Read the SDK docs' },
+    className: 'md:col-span-2',
+  },
+  {
+    icon: Send,
+    title: 'Submissions',
+    body: 'A form for each round, like Google Forms. Set a deadline, see late entries and who has yet to submit.',
+  },
+  {
+    icon: ClipboardList,
+    title: 'Assignments',
+    body: 'Hand out problem statements, tables, mentors or Wi-Fi logins, cap how many teams get each, and reveal them to every team at once.',
     className: 'md:col-span-2',
   },
 ];

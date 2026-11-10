@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { cn } from '@/lib/utils';
-import { Nav, PRESS_GLOW, PublicPage } from './chrome';
+import { Nav, PRESS_GLOW, PublicPage, SectionLink } from './chrome';
 
 /**
  * How to build a portal on @eventkit/sdk, linked from the landing page. Public:
@@ -67,9 +67,9 @@ function Contents() {
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm lg:flex-col lg:gap-2">
         {SECTIONS.map((s) => (
           <li key={s.id}>
-            <a href={`#${s.id}`} className="text-muted-foreground hover:text-foreground">
+            <SectionLink id={s.id} className="text-muted-foreground hover:text-foreground">
               {s.title}
-            </a>
+            </SectionLink>
           </li>
         ))}
       </ul>
