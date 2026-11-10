@@ -144,10 +144,23 @@ const SECTIONS: Section[] = [
     title: 'Install',
     body: (
       <>
-        <Code label="bash">npm install @eventkit/sdk</Code>
         <p>
-          React hooks live in <code>@eventkit/sdk/react</code> (TanStack Query v5) and the push
-          handlers for your service worker in <code>@eventkit/sdk/sw</code>.
+          The SDK isn't on the npm registry: install it straight from{' '}
+          <a
+            href="https://github.com/event-kit-org/eventkit-sdk"
+            className="text-foreground underline underline-offset-4"
+          >
+            GitHub
+          </a>
+          . npm clones it and builds it on install.
+        </p>
+        <Code label="bash">npm install github:event-kit-org/eventkit-sdk</Code>
+        <p>
+          Imports stay <code>@eventkit/sdk</code>, with React hooks in{' '}
+          <code>@eventkit/sdk/react</code> (TanStack Query v5) and the push handlers for your
+          service worker in <code>@eventkit/sdk/sw</code>. Add <code>#&lt;commit&gt;</code> to pin a
+          version. On npm 11, run <code>npm install-scripts approve @eventkit/sdk</code> once to
+          allow its build step.
         </p>
       </>
     ),

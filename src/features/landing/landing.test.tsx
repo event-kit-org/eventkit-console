@@ -75,7 +75,7 @@ describe('SdkDocsPage', () => {
     renderApp('/docs/sdk');
     const [first] = await screen.findAllByRole('button', { name: 'Copy code' });
     await user.click(first!);
-    expect(writeText).toHaveBeenCalledWith('npm install @eventkit/sdk');
+    expect(writeText).toHaveBeenCalledWith('npm install github:event-kit-org/eventkit-sdk');
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
   });
 
