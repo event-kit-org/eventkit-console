@@ -61,14 +61,14 @@ function Nav() {
           <Button
             asChild
             variant="ghost"
-            className="hidden h-10 px-3 text-muted-foreground sm:inline-flex"
+            className={cn(PRESS, 'hidden h-10 px-3 text-muted-foreground sm:inline-flex')}
           >
             <a href="#features">Features</a>
           </Button>
-          <Button asChild variant="ghost" className="h-10 px-3 text-muted-foreground">
+          <Button asChild variant="ghost" className={cn(PRESS, 'h-10 px-3 text-muted-foreground')}>
             <Link to="/login">Sign in</Link>
           </Button>
-          <Button asChild className="h-10 rounded-full px-4">
+          <Button asChild className={cn(PRESS_GLOW, 'h-10 rounded-full px-4')}>
             <Link to="/signup">Get started</Link>
           </Button>
         </nav>
@@ -76,6 +76,11 @@ function Nav() {
     </header>
   );
 }
+
+/** Buttons ease up on hover and sink a little when pressed (off for reduced motion). */
+const PRESS =
+  'duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.96] motion-safe:active:duration-100';
+const PRESS_GLOW = `${PRESS} hover:bg-primary hover:shadow-[0_0_32px_-4px_rgb(255_255_255/0.45)]`;
 
 function Hero() {
   return (
@@ -96,14 +101,14 @@ function Hero() {
       </p>
 
       <div className="mt-10 flex animate-rise flex-col items-stretch justify-center gap-3 [animation-delay:240ms] sm:flex-row sm:items-center">
-        <Button asChild size="lg" className="h-12 rounded-full px-6 text-base">
+        <Button asChild size="lg" className={cn(PRESS_GLOW, 'h-12 rounded-full px-6 text-base')}>
           <Link to="/login">Open the console</Link>
         </Button>
         <Button
           asChild
           size="lg"
           variant="ghost"
-          className="h-12 rounded-full px-6 text-base text-muted-foreground"
+          className={cn(PRESS, 'h-12 rounded-full px-6 text-base text-muted-foreground')}
         >
           <a href="#features">See what it does</a>
         </Button>
@@ -231,13 +236,18 @@ function FinalCta() {
           Create an account, set up your event and open registrations in an afternoon.
         </p>
         <div className="relative mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-          <Button asChild size="lg" className="h-12 rounded-full px-6 text-base">
+          <Button asChild size="lg" className={cn(PRESS_GLOW, 'h-12 rounded-full px-6 text-base')}>
             <Link to="/signup">
               Create an account
               <ArrowRight data-icon="inline-end" />
             </Link>
           </Button>
-          <Button asChild size="lg" variant="outline" className="h-12 rounded-full px-6 text-base">
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className={cn(PRESS, 'h-12 rounded-full px-6 text-base')}
+          >
             <Link to="/login">Sign in to the console</Link>
           </Button>
         </div>
