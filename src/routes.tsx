@@ -17,6 +17,7 @@ import { SettingsPage } from '@/features/admin/SettingsPage';
 import { TeamDetailPage } from '@/features/admin/TeamDetailPage';
 import { TeamsPage } from '@/features/admin/TeamsPage';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { SdkDocsPage } from '@/features/landing/SdkDocsPage';
 import { SignupPage } from '@/features/auth/SignupPage';
 import { EventHome } from '@/features/events/EventHome';
 import { EventLayout } from '@/features/events/EventLayout';
@@ -43,6 +44,8 @@ export const routes: RouteObject[] = [
   { path: '/signup', element: <SignupPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Public, signed in or not: linked from the landing page.
+  { path: '/docs/sdk', element: <SdkDocsPage /> },
   {
     element: <RequireAuth />,
     children: [

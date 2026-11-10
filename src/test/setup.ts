@@ -25,6 +25,8 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 Element.prototype.scrollIntoView ??= () => {};
+// jsdom logs "not implemented" for scrollTo; pages that reset scroll call it.
+window.scrollTo = () => {};
 Element.prototype.hasPointerCapture ??= () => false;
 Element.prototype.releasePointerCapture ??= () => {};
 
